@@ -1,0 +1,120 @@
+version: '3.9'
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: aura_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aura}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aura_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-aura_accounting}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aura}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: aura_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Python AI Service ───────────────────────────────────
+  python-ai:
+    build:
+      context: ./backend/python-ai
+      dockerfile: Dockerfile
+    container_name: aura_python_ai
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      PINECONE_API_KEY: ${PINECONE_API_KEY}
+      REDIS_URL: ${REDIS_URL}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/python-ai:/app
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Node.js API ─────────────────────────────────────────
+  nodejs-api:
+    build:
+      context: ./backend/nodejs-api
+      dockerfile: Dockerfile
+    container_name: aura_nodejs_api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      PYTHON_AI_URL: http://python-ai:8000
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend/nodejs-api:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Frontend ────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aura_frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_AI_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - nodejs-api
+      - python-ai
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:
+
+networks:
+  default:
+    name: aura_network

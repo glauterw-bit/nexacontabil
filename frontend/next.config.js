@@ -1,0 +1,15 @@
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+    NEXT_PUBLIC_AI_URL: process.env.NEXT_PUBLIC_AI_URL || 'http://localhost:8000',
+  },
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '*.amazonaws.com' },
+    ],
+  },
+};
+
+module.exports = nextConfig;

@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 8%;
+    --card-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+  }
+
+  * { @apply border-surface-border; }
+  body { @apply bg-surface text-white; }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/5 backdrop-blur-sm border border-white/10;
+  }
+  .card-aura {
+    @apply bg-surface-card rounded-xl border border-surface-border p-6;
+  }
+  .btn-primary {
+    @apply bg-brand-500 hover:bg-brand-600 text-white font-medium px-4 py-2 rounded-lg transition-colors;
+  }
+  .btn-ghost {
+    @apply hover:bg-white/5 text-gray-400 hover:text-white px-3 py-2 rounded-lg transition-colors;
+  }
+  .badge-risk-low    { @apply bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-full; }
+  .badge-risk-medium { @apply bg-yellow-500/20 text-yellow-400 text-xs px-2 py-0.5 rounded-full; }
+  .badge-risk-high   { @apply bg-red-500/20 text-red-400 text-xs px-2 py-0.5 rounded-full; }
+  .badge-risk-critical { @apply bg-red-700/40 text-red-300 text-xs px-2 py-0.5 rounded-full animate-pulse; }
+}

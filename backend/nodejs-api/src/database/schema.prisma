@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Empresas ───────────────────────────────────────────────
+model Company {
+  id              String   @id @default(uuid())
+  name            String
+  cnpj            String   @unique
+  taxRegime       String   // "simples_nacional" | "lucro_presumido" | "lucro_real"
+  address         String?
+  phone           String?
+  email           String?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users           User[]
+  documents       Document[]
+  transactions    Transaction[]
+  auditTrails     AuditTrail[]
+
+  @@map("companies")
+}
+
+// ─── Usuários ────────────────────────────────────────────────
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  name        String
+  password    String
+  role        String   @default("user") // "admin" | "accountant" | "manager" | "user"
+  active      Boolean  @default(true)
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("users")
+}
+
+// ─── Documentos ──────────────────────────────────────────────
+model Document {
+  id                String   @id @default(uuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id])
+
+  type              String   // "nota_fiscal" | "boleto" | "extrato_bancario" | etc
+  status            String   @default("pending") // "pending" | "processing" | "completed" | "failed" | "needs_review"
+  originalFilename  String?
+  fileUrl           String?
+  mimeType          String?
+  fileSizeBytes     Int?
+
+  // Dados extraídos pelo IDP
+  extractedData     Json?
+  confidenceScore   Float?
+
+  // Identificação do documento
+  number            String?
+  series            String?
+  issueDate         DateTime?
+  dueDate           DateTime?
+  totalValue        Decimal?  @db.Decimal(15, 2)
+
+  // Emitente
+  issuerName        String?
+  issuerCnpj        String?
+
+  // Destinatário
+  recipientName     String?
+  recipientCnpj     String?
+
+  // Análise IA
+  fiscalValidation  Json?
+  complianceCheck   Json?
+  agentDecisions    Json?
+
+  // Reconciliação
+  reconciliationStatus String? @default("pending")
+  reconciledWith    String[]
+
+  processingTimeMs  Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  transactions      Transaction[]
+
+  @@index([companyId, type])
+  @@index([issuerCnpj])
+  @@index([status])
+  @@map("documents")
+}
+
+// ─── Transações / Lançamentos Contábeis ─────────────────────
+model Transaction {
+  id          String   @id @default(uuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  documentId  String?
+  document    Document? @relation(fields: [documentId], references: [id])
+
+  description String
+  date        DateTime
+  status      String   @default("draft") // "draft" | "pending_review" | "approved" | "reconciled" | "rejected"
+
+  // Partidas dobradas (JSON com entries)
+  entries     Json     // Array de {accountCode, accountName, nature, value, costCenter}
+
+  totalDebit  Decimal  @db.Decimal(15, 2)
+  totalCredit Decimal  @db.Decimal(15, 2)
+  isBalanced  Boolean  @default(false)
+
+  // Metadados IA
+  aiConfidence   Float?
+  aiReasoning    String?
+  approvedBy     String?
+  approvedAt     DateTime?
+
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  auditTrails AuditTrail[]
+
+  @@index([companyId, date])
+  @@index([status])
+  @@map("transactions")
+}
+
+// ─── Trilha de Auditoria (Imutável) ─────────────────────────
+model AuditTrail {
+  id            String   @id @default(uuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  transactionId String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+
+  action        String   // "create" | "update" | "approve" | "reject" | "ai_analysis"
+  entityType    String   // "document" | "transaction" | "user"
+  entityId      String
+  performedBy   String   // userId ou "ai_agent"
+  agentType     String?  // "tax_agent" | "accounting_agent" | etc
+
+  oldValues     Json?
+  newValues     Json?
+  metadata      Json?
+
+  // Hash para imutabilidade blockchain-like
+  previousHash  String?
+  currentHash   String
+
+  createdAt     DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_trails")
+}
+
+// ─── Resultados de Reconciliação ────────────────────────────
+model ReconciliationRun {
+  id              String   @id @default(uuid())
+  companyId       String
+  matchType       String   // "nf_boleto" | "boleto_extrato" | "nf_extrato"
+  status          String   @default("completed")
+  matchesCount    Int      @default(0)
+  unmatchedCount  Int      @default(0)
+  totalMatchedValue   Decimal @db.Decimal(15, 2)
+  totalUnmatchedValue Decimal @db.Decimal(15, 2)
+  matches         Json     // Array de ReconciliationMatch
+  createdAt       DateTime @default(now())
+
+  @@index([companyId])
+  @@map("reconciliation_runs")
+}
