@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: process.env.NODE_ENV === 'production' && process.env.NEXT_STANDALONE === 'true' ? 'standalone' : undefined,
+  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
     NEXT_PUBLIC_AI_URL: process.env.NEXT_PUBLIC_AI_URL || 'http://localhost:8000',
