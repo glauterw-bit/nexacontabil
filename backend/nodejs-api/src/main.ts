@@ -9,7 +9,7 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3010'],
     credentials: true,
   });
 
@@ -25,7 +25,7 @@ async function bootstrap() {
 
   const port = process.env.APP_PORT || 3001;
   await app.listen(port);
-  logger.log(`Aura Accounting API running on port ${port}`);
+  logger.log(`DomoSYS API running on port ${port}`);
   logger.log(`GraphQL playground: http://localhost:${port}/graphql`);
 }
 

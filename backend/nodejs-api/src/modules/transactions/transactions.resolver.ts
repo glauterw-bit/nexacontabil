@@ -1,5 +1,7 @@
 import { Resolver, Query, Mutation, Args, ID } from '@nestjs/graphql';
 import { ObjectType, Field, Float, InputType, Int } from '@nestjs/graphql';
+import { IsString, IsOptional, IsNumber, IsDate, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { GraphQLJSON } from 'graphql-type-json';
 import { TransactionsService, CreateTransactionDto } from './transactions.service';
 
@@ -23,21 +25,21 @@ export class TransactionObjectType {
 
 @InputType()
 export class AccountingEntryInput {
-  @Field() accountCode: string;
-  @Field() accountName: string;
-  @Field() nature: string;
-  @Field(() => Float) value: number;
-  @Field({ nullable: true }) costCenter?: string;
-  @Field({ nullable: true }) description?: string;
+  @Field() @IsString() accountCode: string;
+  @Field() @IsString() accountName: string;
+  @Field() @IsString() nature: string;
+  @Field(() => Float) @IsNumber() value: number;
+  @Field({ nullable: true }) @IsOptional() @IsString() costCenter?: string;
+  @Field({ nullable: true }) @IsOptional() @IsString() description?: string;
 }
 
 @InputType()
 export class CreateTransactionInput {
-  @Field() companyId: string;
-  @Field({ nullable: true }) documentId?: string;
-  @Field() description: string;
+  @Field() @IsString() companyId: string;
+  @Field({ nullable: true }) @IsOptional() @IsString() documentId?: string;
+  @Field() @IsString() description: string;
   @Field() date: Date;
-  @Field(() => [AccountingEntryInput]) entries: AccountingEntryInput[];
+  @Field(() => [AccountingEntryInput]) @IsArray() @ValidateNested({ each: true }) @Type(() => AccountingEntryInput) entries: AccountingEntryInput[];
 }
 
 @Resolver(() => TransactionObjectType)

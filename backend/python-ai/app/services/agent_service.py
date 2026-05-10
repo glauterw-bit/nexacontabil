@@ -15,7 +15,7 @@ from app.services.rag_service import rag_service
 
 logger = structlog.get_logger()
 
-COPILOT_SYSTEM = """Você é o Copilot do Aura Accounting — um assistente financeiro e contábil inteligente.
+COPILOT_SYSTEM = """Você é o Copilot do DomoSYS — um assistente financeiro e contábil inteligente.
 
 Você tem acesso ao histórico financeiro da empresa e pode responder perguntas sobre:
 - Fluxo de caixa e projeções

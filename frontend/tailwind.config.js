@@ -10,27 +10,22 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          50:  '#f0f4ff',
-          100: '#e0e9ff',
-          500: '#4f6ef7',
-          600: '#3d5ae8',
-          700: '#2d47d0',
-          900: '#1a2a8a',
+          50:  '#eef2ff',
+          100: '#e0e7ff',
+          400: '#818cf8',
+          500: '#6366f1',
+          600: '#4f46e5',
+          700: '#4338ca',
+          900: '#312e81',
         },
         surface: {
           DEFAULT: '#0f1117',
-          card: '#161b2e',
+          card:   '#161b2e',
           border: '#1e2740',
         },
       },
-      fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
-      },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        DEFAULT: '0.5rem',
       },
     },
   },

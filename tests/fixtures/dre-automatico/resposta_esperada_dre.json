@@ -1,0 +1,204 @@
+{
+  "empresa": {
+    "razao_social": "TechCommerce Soluções Ltda",
+    "cnpj": "12.345.678/0001-90",
+    "periodo": {
+      "inicio": "2025-01-01",
+      "fim": "2025-03-31",
+      "descricao": "Q1 2025 - 1º Trimestre"
+    }
+  },
+
+  "dre": {
+    "receita_bruta": {
+      "vendas_produtos": 600000.00,
+      "prestacao_servicos": 250000.00,
+      "total": 850000.00
+    },
+
+    "deducoes_receita": {
+      "pis_cofins": 78625.00,
+      "iss": 12500.00,
+      "icms": 39000.00,
+      "devolucoes_abatimentos": 25500.00,
+      "total": 155625.00
+    },
+
+    "receita_liquida": 694275.00,
+
+    "cmv_csp": {
+      "cmv": 300000.00,
+      "csp": 62500.00,
+      "total": 362500.00
+    },
+
+    "lucro_bruto": 331775.00,
+    "margem_bruta_pct": 47.78,
+
+    "despesas_operacionais": {
+      "salarios_encargos": 62000.00,
+      "comissoes": 42500.00,
+      "aluguel": 15000.00,
+      "marketing_publicidade": 28000.00,
+      "frete_logistica": 14500.00,
+      "energia_agua_telefone": 8500.00,
+      "material_escritorio": 4500.00,
+      "software_ti": 8000.00,
+      "depreciacao_amortizacao": 12000.00,
+      "outras_despesas": 20000.00,
+      "total": 215000.00
+    },
+
+    "ebit": 116775.00,
+    "margem_ebit_pct": 16.82,
+
+    "resultado_financeiro": {
+      "receitas_financeiras": 4250.00,
+      "despesas_financeiras": -23000.00,
+      "total": -18750.00
+    },
+
+    "lair": 98025.00,
+
+    "impostos": {
+      "irpj": 18788.13,
+      "csll": 8822.25,
+      "total": 27610.38
+    },
+
+    "lucro_liquido": 70414.62,
+    "margem_liquida_pct": 10.14,
+
+    "ebitda": 128775.00,
+    "margem_ebitda_pct": 18.55
+  },
+
+  "mensal": [
+    {
+      "mes": "Janeiro",
+      "competencia": "2025-01",
+      "receita_bruta": 258000.00,
+      "receita_liquida": 210935.00,
+      "lucro_bruto": 101435.00,
+      "margem_bruta_pct": 48.09,
+      "despesas_operacionais": 68200.00,
+      "ebit": 33235.00,
+      "margem_ebit_pct": 15.76,
+      "resultado_financeiro": -7000.00,
+      "lair": 26235.00,
+      "impostos": 7296.15,
+      "lucro_liquido": 18938.85,
+      "margem_liquida_pct": 8.98,
+      "ebitda": 37235.00,
+      "margem_ebitda_pct": 17.66
+    },
+    {
+      "mes": "Fevereiro",
+      "competencia": "2025-02",
+      "receita_bruta": 285000.00,
+      "receita_liquida": 232387.50,
+      "lucro_bruto": 111137.50,
+      "margem_bruta_pct": 47.83,
+      "despesas_operacionais": 72950.00,
+      "ebit": 38187.50,
+      "margem_ebit_pct": 16.43,
+      "resultado_financeiro": -6000.00,
+      "lair": 32187.50,
+      "impostos": 9065.63,
+      "lucro_liquido": 23121.88,
+      "margem_liquida_pct": 9.95,
+      "ebitda": 42187.50,
+      "margem_ebitda_pct": 18.15
+    },
+    {
+      "mes": "Março",
+      "competencia": "2025-03",
+      "receita_bruta": 307000.00,
+      "receita_liquida": 250952.50,
+      "lucro_bruto": 119202.50,
+      "margem_bruta_pct": 47.50,
+      "despesas_operacionais": 73850.00,
+      "ebit": 45352.50,
+      "margem_ebit_pct": 18.07,
+      "resultado_financeiro": -5750.00,
+      "lair": 39602.50,
+      "impostos": 11248.60,
+      "lucro_liquido": 28353.90,
+      "margem_liquida_pct": 11.30,
+      "ebitda": 49352.50,
+      "margem_ebitda_pct": 19.67
+    }
+  ],
+
+  "conciliacao_bancaria": {
+    "saldo_inicial": 45230.50,
+    "saldo_final": 328520.12,
+    "variacao_caixa": 283289.62,
+    "total_entradas_brutas": 878050.00,
+    "total_saidas": 594760.38,
+    "nota": "Variação de caixa inclui tributos pagos e movimentos não DRE (DARF, IOF, tarifas)"
+  },
+
+  "classificacao_transacoes": {
+    "receitas": [
+      { "historico_pattern": "PIX RECEBIDO", "categoria": "Receita Bruta", "subcategoria": "Vendas / Serviços" },
+      { "historico_pattern": "TED RECEBIDO", "categoria": "Receita Bruta", "subcategoria": "Vendas / Serviços" },
+      { "historico_pattern": "CREDITO APLICACAO FINANCEIRA", "categoria": "Resultado Financeiro", "subcategoria": "Receitas Financeiras" }
+    ],
+    "despesas": [
+      { "historico_pattern": "PAGTO FORNECEDOR", "categoria": "CMV/CSP", "subcategoria": "Custo Mercadoria Vendida" },
+      { "historico_pattern": "PAGTO FOLHA SALARIOS", "categoria": "Despesas Operacionais", "subcategoria": "Salários e Encargos" },
+      { "historico_pattern": "PAGTO COMISSOES", "categoria": "Despesas Operacionais", "subcategoria": "Comissões sobre Vendas" },
+      { "historico_pattern": "PAGTO ALUGUEL", "categoria": "Despesas Operacionais", "subcategoria": "Aluguel" },
+      { "historico_pattern": "PAGTO GOOGLE ADS", "categoria": "Despesas Operacionais", "subcategoria": "Marketing e Publicidade" },
+      { "historico_pattern": "PAGTO META ADS", "categoria": "Despesas Operacionais", "subcategoria": "Marketing e Publicidade" },
+      { "historico_pattern": "PAGTO FRETE", "categoria": "Despesas Operacionais", "subcategoria": "Frete e Logística" },
+      { "historico_pattern": "DEBITO AUTOMATICO ENERGIA", "categoria": "Despesas Operacionais", "subcategoria": "Energia / Água / Telefone" },
+      { "historico_pattern": "DEBITO AUTOMATICO AGUA", "categoria": "Despesas Operacionais", "subcategoria": "Energia / Água / Telefone" },
+      { "historico_pattern": "PAGTO TELEFONIA", "categoria": "Despesas Operacionais", "subcategoria": "Energia / Água / Telefone" },
+      { "historico_pattern": "PAGTO MATERIAL ESCRITORIO", "categoria": "Despesas Operacionais", "subcategoria": "Material de Escritório" },
+      { "historico_pattern": "PAGTO SOFTWARE", "categoria": "Despesas Operacionais", "subcategoria": "Software e Licenças TI" },
+      { "historico_pattern": "PAGTO OUTRAS DESPESAS", "categoria": "Despesas Operacionais", "subcategoria": "Outras Despesas" },
+      { "historico_pattern": "DEBITO JUROS", "categoria": "Resultado Financeiro", "subcategoria": "Despesas Financeiras" },
+      { "historico_pattern": "PAGTO TARIFAS BANCARIAS", "categoria": "Resultado Financeiro", "subcategoria": "Despesas Financeiras" },
+      { "historico_pattern": "DEBITO IOF", "categoria": "Resultado Financeiro", "subcategoria": "Despesas Financeiras" },
+      { "historico_pattern": "PAGTO DARF IRPJ", "categoria": "Impostos sobre Lucro", "subcategoria": "IRPJ" },
+      { "historico_pattern": "PAGTO DARF CSLL", "categoria": "Impostos sobre Lucro", "subcategoria": "CSLL" }
+    ]
+  },
+
+  "alertas": [
+    {
+      "tipo": "POSITIVO",
+      "mensagem": "Receita crescendo: Jan R$258k → Fev R$285k → Mar R$307k (+19% no trimestre)"
+    },
+    {
+      "tipo": "POSITIVO",
+      "mensagem": "Margem líquida em expansão: 8,98% → 9,95% → 11,30%"
+    },
+    {
+      "tipo": "ATENCAO",
+      "mensagem": "Resultado financeiro negativo em todos os meses — empresa tem custo de dívida relevante (R$23k/trimestre)"
+    },
+    {
+      "tipo": "ATENCAO",
+      "mensagem": "CMV representa ~52% da receita líquida — monitorar margem bruta vs. concorrência"
+    },
+    {
+      "tipo": "INFO",
+      "mensagem": "EBITDA Q1 = R$128.775 | Margem EBITDA = 18,55%"
+    }
+  ],
+
+  "metadata": {
+    "fontes": [
+      "dre_q1_2025.csv",
+      "extrato_janeiro_2025.csv",
+      "extrato_fevereiro_2025.csv",
+      "extrato_marco_2025.csv",
+      "extrato_q1_2025.ofx"
+    ],
+    "gerado_em": "2025-04-02T00:00:00-03:00",
+    "versao_schema": "1.0"
+  }
+}

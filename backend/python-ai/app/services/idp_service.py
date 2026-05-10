@@ -1,17 +1,15 @@
 """
 IDP Service — Intelligent Document Processing
-Extrai dados estruturados de documentos usando GPT-4o Vision + OCR fallback.
+Extrai dados estruturados de documentos usando Claude Vision (Anthropic).
 """
 import base64
 import json
 import time
 import structlog
-from pathlib import Path
 from typing import Optional
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential
 
-import openai
-from openai import AsyncOpenAI
+import anthropic
 
 from app.config import settings
 from app.models.document import (
@@ -58,12 +56,12 @@ Retorne EXATAMENTE este JSON (preencha null para campos não encontrados):
   "suggestions": ["sugestão 1"]
 }
 
-Seja preciso. Para documentos em português brasileiro, identifique todos os campos fiscais."""
+Retorne APENAS o JSON, sem texto adicional. Para documentos em português brasileiro, identifique todos os campos fiscais."""
 
 
 class IDPService:
     def __init__(self):
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
+        self.client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 
     def _encode_image(self, image_bytes: bytes) -> str:
         return base64.b64encode(image_bytes).decode("utf-8")
@@ -84,31 +82,33 @@ class IDPService:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type((openai.RateLimitError, openai.APITimeoutError)),
     )
     async def _call_vision_api(self, image_b64: str, media_type: str = "image/jpeg") -> str:
-        """Chama GPT-4o Vision com retry automático."""
-        response = await self.client.chat.completions.create(
-            model=settings.openai_vision_model,
+        """Chama Claude Vision com retry automático."""
+        # Anthropic aceita: image/jpeg, image/png, image/gif, image/webp
+        safe_mime = media_type if media_type in ("image/jpeg", "image/png", "image/gif", "image/webp") else "image/jpeg"
+
+        response = await self.client.messages.create(
+            model=settings.anthropic_model,
+            max_tokens=4096,
             messages=[
                 {
                     "role": "user",
                     "content": [
                         {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{media_type};base64,{image_b64}",
-                                "detail": "high",
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": safe_mime,
+                                "data": image_b64,
                             },
                         },
                         {"type": "text", "text": EXTRACTION_PROMPT},
                     ],
                 }
             ],
-            max_tokens=4096,
-            response_format={"type": "json_object"},
         )
-        return response.choices[0].message.content
+        return response.content[0].text
 
     async def extract_from_image(
         self, image_bytes: bytes, media_type: str = "image/jpeg"
@@ -121,50 +121,109 @@ class IDPService:
         try:
             image_b64 = self._encode_image(image_bytes)
             raw_json = await self._call_vision_api(image_b64, media_type)
-            data = json.loads(raw_json)
-        except openai.APIError as e:
+            # Remove possíveis blocos de código markdown
+            raw_json = raw_json.strip()
+            if raw_json.startswith("```"):
+                raw_json = raw_json.split("```")[1]
+                if raw_json.startswith("json"):
+                    raw_json = raw_json[4:]
+            data = json.loads(raw_json.strip())
+        except json.JSONDecodeError as e:
+            logger.error("json_parse_failed", error=str(e), raw=raw_json[:500] if raw_json else "")
+            # Fallback via OCR + texto
+            raw_text = self._ocr_fallback(image_bytes)
+            if raw_text:
+                data = await self._extract_from_text(raw_text)
+            else:
+                raise RuntimeError("Failed to parse extraction response as JSON") from e
+        except Exception as e:
             logger.error("vision_api_failed", error=str(e))
-            # Fallback: tenta extrair via OCR e passa o texto para o modelo de texto
             raw_text = self._ocr_fallback(image_bytes)
             if raw_text:
                 data = await self._extract_from_text(raw_text)
             else:
                 raise RuntimeError(f"IDP extraction failed: {e}") from e
-        except json.JSONDecodeError as e:
-            logger.error("json_parse_failed", error=str(e), raw=raw_json[:500] if raw_json else "")
-            raise RuntimeError("Failed to parse extraction response as JSON") from e
 
         elapsed = int((time.time() - start) * 1000)
         logger.info("idp_extraction_complete", elapsed_ms=elapsed, confidence=data.get("confidence_score"))
 
-        # Normaliza e constrói o modelo
         return self._parse_extracted_data(data)
 
     async def extract_from_pdf(self, pdf_bytes: bytes) -> ExtractedDocumentData:
-        """Converte PDF para imagem e processa via Vision."""
+        """Extrai texto + converte páginas para imagem via PyMuPDF e processa via Vision."""
         try:
-            import pdf2image
+            import fitz  # PyMuPDF
             import io
-            images = pdf2image.convert_from_bytes(pdf_bytes, dpi=200, first_page=1, last_page=1)
-            if not images:
+
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            if doc.page_count == 0:
                 raise ValueError("PDF has no pages")
-            buf = io.BytesIO()
-            images[0].save(buf, format="JPEG", quality=95)
-            return await self.extract_from_image(buf.getvalue(), "image/jpeg")
+
+            # Extrai texto de todas as páginas para contexto
+            full_text = ""
+            for i in range(min(doc.page_count, 5)):
+                full_text += doc[i].get_text() + "\n"
+
+            # Renderiza até 3 páginas como imagens para Vision
+            page_images = []
+            for i in range(min(doc.page_count, 3)):
+                mat = fitz.Matrix(2.0, 2.0)
+                pix = doc[i].get_pixmap(matrix=mat)
+                page_images.append(pix.tobytes("jpeg"))
+            doc.close()
+
+            # Usa Vision na primeira página (principal) + texto completo como contexto
+            result = await self.extract_from_image_with_text(page_images[0], "image/jpeg", full_text)
+            return result
         except Exception as e:
             logger.error("pdf_extraction_failed", error=str(e))
             raise RuntimeError(f"PDF extraction failed: {e}") from e
 
-    async def _extract_from_text(self, text: str) -> dict:
-        """Extrai dados de texto puro via GPT-4o (fallback do OCR)."""
-        prompt = f"""Extraia dados estruturados do seguinte texto de documento fiscal brasileiro:\n\n{text}\n\n{EXTRACTION_PROMPT}"""
-        response = await self.client.chat.completions.create(
-            model=settings.openai_model,
-            messages=[{"role": "user", "content": prompt}],
+    async def extract_from_image_with_text(self, image_bytes: bytes, media_type: str, extra_text: str = "") -> ExtractedDocumentData:
+        """Processa imagem via Vision com texto adicional como contexto."""
+        image_b64 = self._encode_image(image_bytes)
+        prompt = EXTRACTION_PROMPT
+        if extra_text.strip():
+            prompt = f"TEXTO EXTRAÍDO DO DOCUMENTO (use como referência):\n{extra_text[:3000]}\n\n{EXTRACTION_PROMPT}"
+        raw = await self._call_vision_api_with_prompt(image_b64, media_type, prompt)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        data = json.loads(raw.strip())
+        return self._parse_extracted_data(data)
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10))
+    async def _call_vision_api_with_prompt(self, image_b64: str, media_type: str, prompt: str) -> str:
+        safe_mime = media_type if media_type in ("image/jpeg", "image/png", "image/gif", "image/webp") else "image/jpeg"
+        response = await self.client.messages.create(
+            model=settings.anthropic_model,
             max_tokens=4096,
-            response_format={"type": "json_object"},
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": safe_mime, "data": image_b64}},
+                    {"type": "text", "text": prompt},
+                ],
+            }],
         )
-        return json.loads(response.choices[0].message.content)
+        return response.content[0].text
+
+    async def _extract_from_text(self, text: str) -> dict:
+        """Extrai dados de texto puro via Claude (fallback do OCR)."""
+        prompt = f"Extraia dados estruturados do seguinte texto de documento fiscal brasileiro:\n\n{text}\n\n{EXTRACTION_PROMPT}"
+        response = await self.client.messages.create(
+            model=settings.anthropic_model,
+            max_tokens=4096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return json.loads(raw.strip())
 
     def _parse_extracted_data(self, data: dict) -> ExtractedDocumentData:
         """Converte dict raw em modelo Pydantic validado."""

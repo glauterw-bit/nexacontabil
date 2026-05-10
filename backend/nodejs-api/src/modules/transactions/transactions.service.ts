@@ -38,7 +38,7 @@ export class TransactionsService {
         documentId: dto.documentId,
         description: dto.description,
         date: dto.date,
-        entries: dto.entries,
+        entries: JSON.stringify(dto.entries),
         totalDebit,
         totalCredit,
         isBalanced,

@@ -2,7 +2,9 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
-import { Upload, FileText, CheckCircle, AlertTriangle, Loader2, Eye } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertTriangle, Loader2, Eye, Building2 } from 'lucide-react';
+import Link from 'next/link';
+import { useCompany } from '@/contexts/CompanyContext';
 import { DocumentReviewModal } from '@/components/forms/DocumentReviewModal';
 
 interface ProcessedDoc {
@@ -13,20 +15,22 @@ interface ProcessedDoc {
 }
 
 export default function DocumentsPage() {
+  const { selectedCompany } = useCompany();
   const [docs, setDocs] = useState<ProcessedDoc[]>([]);
   const [processing, setProcessing] = useState(false);
   const [selected, setSelected] = useState<ProcessedDoc | null>(null);
 
   const onDrop = useCallback(async (files: File[]) => {
+    if (!selectedCompany) return;
     setProcessing(true);
     for (const file of files) {
       try {
         const form = new FormData();
         form.append('file', file);
-        form.append('company_id', 'company-demo-001');
+        form.append('company_id', selectedCompany.id);
 
         const res = await axios.post(
-          `${process.env.NEXT_PUBLIC_AI_URL}/api/v1/documents/upload`,
+          `${process.env.NEXT_PUBLIC_AI_URL || 'http://localhost:8000'}/api/v1/documents/upload`,
           form,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
@@ -47,7 +51,7 @@ export default function DocumentsPage() {
       }
     }
     setProcessing(false);
-  }, []);
+  }, [selectedCompany]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -56,25 +60,39 @@ export default function DocumentsPage() {
       'application/pdf': ['.pdf'],
     },
     multiple: true,
+    disabled: !selectedCompany,
   });
 
   const statusIcon = (s: string) => {
     if (s === 'completed') return <CheckCircle className="h-4 w-4 text-green-400" />;
     if (s === 'failed') return <AlertTriangle className="h-4 w-4 text-red-400" />;
-    return <Loader2 className="h-4 w-4 text-brand-500 animate-spin" />;
+    return <Loader2 className="h-4 w-4 text-indigo-400 animate-spin" />;
   };
+
+  if (!selectedCompany) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
+        <Building2 className="h-12 w-12 text-gray-600" />
+        <p className="text-gray-400 text-sm">Selecione uma empresa na barra lateral para enviar documentos.</p>
+        <Link href="/companies" className="btn-primary">Gerenciar Empresas</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-8">
-      <h1 className="text-2xl font-bold text-white">Processamento de Documentos</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-white">Documentos</h1>
+        <p className="text-gray-400 text-sm mt-1">{selectedCompany.name}</p>
+      </div>
 
       {/* Drop Zone */}
       <div
         {...getRootProps()}
         className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${
           isDragActive
-            ? 'border-brand-500 bg-brand-500/10'
-            : 'border-surface-border hover:border-brand-500/50 hover:bg-white/5'
+            ? 'border-indigo-500 bg-indigo-500/10'
+            : 'border-[#1e2740] hover:border-indigo-500/50 hover:bg-white/5'
         }`}
       >
         <input {...getInputProps()} />
@@ -86,7 +104,7 @@ export default function DocumentsPage() {
           Notas Fiscais, Boletos, Extratos — JPG, PNG, PDF (até 20MB)
         </p>
         {processing && (
-          <div className="mt-4 flex items-center justify-center gap-2 text-brand-500">
+          <div className="mt-4 flex items-center justify-center gap-2 text-indigo-400">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span className="text-sm">Processando com IA...</span>
           </div>
@@ -100,7 +118,7 @@ export default function DocumentsPage() {
           {docs.map(doc => (
             <div
               key={doc.id}
-              className="flex items-center gap-4 p-4 bg-surface rounded-lg border border-surface-border hover:border-brand-500/40 transition-colors"
+              className="flex items-center gap-4 p-4 bg-[#0f1117] rounded-lg border border-[#1e2740] hover:border-indigo-500/40 transition-colors"
             >
               <FileText className="h-8 w-8 text-gray-500 flex-shrink-0" />
               <div className="flex-1 min-w-0">
@@ -135,10 +153,7 @@ export default function DocumentsPage() {
       )}
 
       {selected && (
-        <DocumentReviewModal
-          doc={selected}
-          onClose={() => setSelected(null)}
-        />
+        <DocumentReviewModal doc={selected} onClose={() => setSelected(null)} />
       )}
     </div>
   );

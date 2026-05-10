@@ -1,0 +1,29 @@
+[build]
+builder = "DOCKERFILE"
+
+[[services]]
+name = "nexacontabil-api"
+source = "backend/nodejs-api"
+dockerfile = "backend/nodejs-api/Dockerfile"
+
+[services.variables]
+PORT = "3001"
+NODE_ENV = "production"
+DATABASE_URL = "${{DATABASE_URL}}"
+JWT_SECRET = "${{JWT_SECRET}}"
+JWT_EXPIRES_IN = "7d"
+APP_SECRET = "${{APP_SECRET}}"
+ANTHROPIC_API_KEY = "${{ANTHROPIC_API_KEY}}"
+NFEIO_API_KEY = "${{NFEIO_API_KEY}}"
+NFEIO_COMPANY_ID = "${{NFEIO_COMPANY_ID}}"
+ESOCIAL_AMBIENTE = "2"
+
+[[services]]
+name = "nexacontabil-frontend"
+source = "frontend"
+dockerfile = "frontend/Dockerfile"
+
+[services.variables]
+PORT = "3010"
+NODE_ENV = "production"
+NEXT_PUBLIC_API_URL = "${{nexacontabil-api.url}}"

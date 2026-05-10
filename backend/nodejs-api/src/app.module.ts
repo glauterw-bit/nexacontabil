@@ -6,11 +6,52 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'path';
 
 import { PrismaService } from './database/prisma.service';
+import { AuthModule } from './modules/auth/auth.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { PayrollModule } from './modules/payroll/payroll.module';
+import { FiscalNotesModule } from './modules/fiscal-notes/fiscal-notes.module';
+import { BoletosModule } from './modules/boletos/boletos.module';
+import { CalendarModule } from './modules/calendar/calendar.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { BankingModule } from './modules/banking/banking.module';
+import { SignaturesModule } from './modules/signatures/signatures.module';
+import { ExecutiveReportsModule } from './modules/executive-reports/executive-reports.module';
+import { MotorTributarioModule } from './modules/motor-tributario/motor-tributario.module';
+import { NfeModule } from './modules/nfe/nfe.module';
+import { NfseModule } from './modules/nfse/nfse.module';
+import { CertificadoDigitalModule } from './modules/certificado-digital/certificado-digital.module';
+
+// Novos módulos v2
+import { HonorariosModule } from './modules/honorarios/honorarios.module';
+import { CrmClientesModule } from './modules/crm-clientes/crm-clientes.module';
+import { TarefasModule } from './modules/tarefas/tarefas.module';
+import { MeiModule } from './modules/mei/mei.module';
+import { ComunicadosModule } from './modules/comunicados/comunicados.module';
+import { AberturaEmpresaModule } from './modules/abertura-empresa/abertura-empresa.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+
+// Novos módulos
+import { EsocialModule } from './modules/esocial/esocial.module';
+import { SpedModule } from './modules/sped/sped.module';
+import { SimplesNacionalModule } from './modules/simples-nacional/simples-nacional.module';
+import { FeriasRescisaoModule } from './modules/ferias-rescisao/ferias-rescisao.module';
+import { PatrimonioModule } from './modules/patrimonio/patrimonio.module';
+import { XmlCaptureModule } from './modules/xml-capture/xml-capture.module';
+import { PortalClienteModule } from './modules/portal-cliente/portal-cliente.module';
+import { CertidoesModule } from './modules/certidoes/certidoes.module';
+import { PlanejamentoTributarioModule } from './modules/planejamento-tributario/planejamento-tributario.module';
+import { AiModule } from './modules/ai/ai.module';
+
+// Novos módulos Nibo-inspired
+import { RadarEcacModule } from './modules/radar-ecac/radar-ecac.module';
+import { RecalculoGuiasModule } from './modules/recalculo-guias/recalculo-guias.module';
+import { CentralCobrancasModule } from './modules/central-cobrancas/central-cobrancas.module';
+import { ExportacaoContabilModule } from './modules/exportacao-contabil/exportacao-contabil.module';
+import { DashboardEscritorioModule } from './modules/dashboard-escritorio/dashboard-escritorio.module';
 
 @Module({
   imports: [
@@ -26,11 +67,65 @@ import { AuditModule } from './modules/audit/audit.module';
       introspection: process.env.NODE_ENV !== 'production',
     }),
 
+    // Core modules
+    AuthModule,
     CompaniesModule,
     DocumentsModule,
     TransactionsModule,
     ReconciliationModule,
     AuditModule,
+    PayrollModule,
+    FiscalNotesModule,
+    BoletosModule,
+    CalendarModule,
+    ReportsModule,
+    BankingModule,
+    SignaturesModule,
+    ExecutiveReportsModule,
+
+    // Fiscal & Tax
+    MotorTributarioModule,
+    NfeModule,
+    NfseModule,
+    CertificadoDigitalModule,
+    SimplesNacionalModule,
+    PlanejamentoTributarioModule,
+
+    // Obrigações acessórias
+    EsocialModule,
+    SpedModule,
+    CertidoesModule,
+
+    // RH
+    FeriasRescisaoModule,
+
+    // Patrimônio
+    PatrimonioModule,
+
+    // XML & Portal
+    XmlCaptureModule,
+    PortalClienteModule,
+
+    // Gestão do escritório
+    HonorariosModule,
+    CrmClientesModule,
+    TarefasModule,
+    ComunicadosModule,
+    AberturaEmpresaModule,
+    NotificationsModule,
+
+    // MEI
+    MeiModule,
+
+    // IA (Claude)
+    AiModule,
+
+    // Módulos Nibo-inspired
+    RadarEcacModule,
+    RecalculoGuiasModule,
+    CentralCobrancasModule,
+    ExportacaoContabilModule,
+    DashboardEscritorioModule,
   ],
   providers: [PrismaService],
   exports: [PrismaService],

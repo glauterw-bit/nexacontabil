@@ -1,33 +1,32 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import axios from 'axios';
+import { AiService } from '../ai/ai.service';
 
 @Injectable()
 export class ReconciliationService {
-  private readonly aiUrl = process.env.PYTHON_AI_URL || 'http://localhost:8000';
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ai: AiService,
+  ) {}
 
-  constructor(private readonly prisma: PrismaService) {}
-
-  async runReconciliation(companyId: string, sources: any[], targets: any[], matchType: string) {
-    const response = await axios.post(`${this.aiUrl}/api/v1/transactions/reconcile`, {
-      company_id: companyId,
-      sources,
-      targets,
-      match_type: matchType,
-    });
-
-    const result = response.data;
+  async runReconciliation(
+    companyId: string,
+    sources: Array<{ id: string; descricao: string; valor: number; data: string }>,
+    targets: Array<{ id: string; descricao: string; valor: number; data: string }>,
+    matchType: string,
+  ) {
+    const result = await this.ai.reconciliarTransacoes(sources, targets, matchType);
 
     await this.prisma.reconciliationRun.create({
       data: {
         companyId,
         matchType,
         status: 'completed',
-        matchesCount: result.matches?.length ?? 0,
-        unmatchedCount: (result.unmatched_sources?.length ?? 0) + (result.unmatched_targets?.length ?? 0),
-        totalMatchedValue: result.total_matched_value ?? 0,
-        totalUnmatchedValue: result.total_unmatched_value ?? 0,
-        matches: result,
+        matchesCount: result.matches.length,
+        unmatchedCount: result.unmatchedSources.length + result.unmatchedTargets.length,
+        totalMatchedValue: result.totalMatchedValue,
+        totalUnmatchedValue: result.totalUnmatchedValue,
+        matches: result as any,
       },
     });
 

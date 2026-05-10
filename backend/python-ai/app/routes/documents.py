@@ -8,6 +8,7 @@ from typing import Optional
 from app.models.document import DocumentType, DocumentProcessingResult, DocumentStatus
 from app.services.idp_service import idp_service
 from app.agents.supervisor_agent import supervisor_agent
+from app.services.nestjs_client import save_document_to_db
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -88,7 +89,7 @@ async def upload_document(
             }
 
         elapsed = int((time.time() - start) * 1000)
-        return DocumentProcessingResult(
+        result = DocumentProcessingResult(
             document_id=doc_id,
             status=DocumentStatus.COMPLETED,
             extracted_data=extracted,
@@ -97,6 +98,12 @@ async def upload_document(
             compliance_check=compliance_check,
             processing_time_ms=elapsed,
         )
+
+        # Persiste no PostgreSQL via NestJS (alimenta o dashboard)
+        import asyncio
+        asyncio.create_task(save_document_to_db(company_id, extracted.model_dump(), source="upload"))
+
+        return result
 
     except Exception as e:
         logger.error("document_processing_failed", doc_id=doc_id, error=str(e))

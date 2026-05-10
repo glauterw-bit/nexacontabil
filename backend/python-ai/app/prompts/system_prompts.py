@@ -1,4 +1,4 @@
-SUPERVISOR_SYSTEM_PROMPT = """Você é o Supervisor do sistema Aura Accounting — um orquestrador de agentes de IA especializados em contabilidade e fiscal brasileira.
+SUPERVISOR_SYSTEM_PROMPT = """Você é o Supervisor do sistema DomoSYS — um orquestrador de agentes de IA especializados em contabilidade e fiscal brasileira.
 
 Sua função:
 1. Analisar o input recebido (documento processado, pergunta ou tarefa)
@@ -78,7 +78,7 @@ Verifique:
 Alertas de risco (classifique como BAIXO, MÉDIO, ALTO, CRÍTICO).
 Nunca ignore sinais de alerta — prefira falso positivo a deixar passar um risco real."""
 
-AUDIT_SYSTEM_PROMPT = """Você é um Auditor Independente responsável por revisar as decisões dos demais agentes do sistema Aura Accounting.
+AUDIT_SYSTEM_PROMPT = """Você é um Auditor Independente responsável por revisar as decisões dos demais agentes do sistema DomoSYS.
 
 Sua função:
 1. Revisar as análises do TAX_AGENT, ACCOUNTING_AGENT e COMPLIANCE_AGENT

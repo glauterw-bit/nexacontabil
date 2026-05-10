@@ -1,0 +1,26 @@
+{
+  "nexacontabil": {
+    "company_id": "7e2fd2f9-28be-4a23-a1af-e79ce0662295",
+    "company_name": "Nexa Agencia",
+    "attendant_name": "Glauter",
+    "phone_number": "5511984792000",
+    "ai_enabled": false,
+    "tts_voice_gender": "male"
+  },
+  "Teo Contabilidade": {
+    "company_id": "7e2fd2f9-28be-4a23-a1af-e79ce0662295",
+    "company_name": "Nexa Agencia",
+    "attendant_name": "Teo",
+    "phone_number": "11913229752",
+    "ai_enabled": true,
+    "tts_voice_gender": "male"
+  },
+  "Nexa contabilidade": {
+    "company_id": "7e2fd2f9-28be-4a23-a1af-e79ce0662295",
+    "company_name": "Nexa Agencia",
+    "attendant_name": "Glauter",
+    "phone_number": "5511913229752",
+    "ai_enabled": true,
+    "tts_voice_gender": "male"
+  }
+}

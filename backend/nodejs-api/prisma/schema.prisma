@@ -1,0 +1,1137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Empresas ───────────────────────────────────────────────
+model Company {
+  id              String   @id @default(uuid())
+  name            String
+  cnpj            String   @unique
+  taxRegime       String
+  address         String?
+  phone           String?
+  email           String?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Dados adicionais
+  ie              String?  // Inscrição Estadual
+  im              String?  // Inscrição Municipal
+  uf              String?  // Estado
+  municipio       String?  // Município
+  codigoMunicipio String?  // Código IBGE do município
+  cep             String?
+  logradouro      String?
+  numero          String?
+  complemento     String?
+  bairro          String?
+  responsavel     String?  // Contador responsável
+  crc             String?  // CRC do contador
+  nfseConfig      String?  // JSON com config NFS-e por município
+  certificadoId   String?  // FK para CertificadoDigital
+
+  users                User[]
+  documents            Document[]
+  transactions         Transaction[]
+  auditTrails          AuditTrail[]
+  employees            Employee[]
+  fiscalNotes          FiscalNote[]
+  nfseEmissions        NfseEmission[]
+  boletos              Boleto[]
+  fiscalObligations    FiscalObligation[]
+  acessoryObligations  AcessoryObligation[]
+  bankConnections      BankConnection[]
+  signatureRequests    SignatureRequest[]
+  executiveReports     ExecutiveReport[]
+  esocialEvents        EsocialEvent[]
+  spedFiles            SpedFile[]
+  simplesApuracoes     SimplesApuracao[]
+  ferias               Ferias[]
+  rescisoes            Rescisao[]
+  ativos               AtivoImobilizado[]
+  xmlCaptures          XmlCapture[]
+  clientPortal         ClientPortal?
+  taxSimulations       TaxSimulation[]
+  certidoes            Certidao[]
+  certidaoRequests     CertidaoRequest[]
+
+  cnaeCode             String?
+  cnaeDesc             String?
+  whatsappNumber       String?
+  monthlyReportEnabled Boolean  @default(false)
+  reportInstanceName   String?
+
+  honorarios           Honorario[]
+  crmClientes          CrmCliente[]
+  tarefas              Tarefa[]
+  meiApuracoes         MeiApuracao[]
+  comunicados          Comunicado[]
+  aberturas            CompanyOpening[] @relation("EscritorioAberturas")
+  notifications        Notification[]
+
+  @@map("companies")
+}
+
+// ─── Usuários ────────────────────────────────────────────────
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  name        String
+  password    String
+  role        String   @default("user")
+  active      Boolean  @default(true)
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("users")
+}
+
+// ─── Documentos ──────────────────────────────────────────────
+model Document {
+  id                String   @id @default(uuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id])
+  type              String
+  status            String   @default("pending")
+  originalFilename  String?
+  fileUrl           String?
+  mimeType          String?
+  fileSizeBytes     Int?
+  extractedData     String?
+  confidenceScore   Float?
+  number            String?
+  series            String?
+  issueDate         DateTime?
+  dueDate           DateTime?
+  totalValue        Float?
+  issuerName        String?
+  issuerCnpj        String?
+  recipientName     String?
+  recipientCnpj     String?
+  fiscalValidation  String?
+  complianceCheck   String?
+  agentDecisions    String?
+  reconciliationStatus String? @default("pending")
+  reconciledWith    String?
+  processingTimeMs  Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  transactions      Transaction[]
+
+  @@map("documents")
+}
+
+// ─── Transações / Lançamentos Contábeis ─────────────────────
+model Transaction {
+  id          String   @id @default(uuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  documentId  String?
+  document    Document? @relation(fields: [documentId], references: [id])
+  description String
+  date        DateTime
+  status      String   @default("draft")
+  entries     String
+  totalDebit  Float    @default(0)
+  totalCredit Float    @default(0)
+  isBalanced  Boolean  @default(false)
+  aiConfidence   Float?
+  aiReasoning    String?
+  approvedBy     String?
+  approvedAt     DateTime?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  auditTrails AuditTrail[]
+
+  @@map("transactions")
+}
+
+// ─── Trilha de Auditoria (Imutável) ─────────────────────────
+model AuditTrail {
+  id            String   @id @default(uuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  transactionId String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  action        String
+  entityType    String
+  entityId      String
+  performedBy   String
+  agentType     String?
+  oldValues     String?
+  newValues     String?
+  metadata      String?
+  previousHash  String?
+  currentHash   String
+  createdAt     DateTime @default(now())
+
+  @@map("audit_trails")
+}
+
+// ─── Resultados de Reconciliação ────────────────────────────
+model ReconciliationRun {
+  id              String   @id @default(uuid())
+  companyId       String
+  matchType       String
+  status          String   @default("completed")
+  matchesCount    Int      @default(0)
+  unmatchedCount  Int      @default(0)
+  totalMatchedValue   Float @default(0)
+  totalUnmatchedValue Float @default(0)
+  matches         String
+  createdAt       DateTime @default(now())
+
+  @@map("reconciliation_runs")
+}
+
+// ─── Funcionários ────────────────────────────────────────────
+model Employee {
+  id              String    @id @default(uuid())
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  name            String
+  cpf             String
+  ctps            String?
+  pis             String?
+  role            String
+  department      String?
+  admissionDate   DateTime
+  dismissalDate   DateTime?
+  baseSalary      Float
+  workHoursWeekly Int       @default(44)
+  dependents      Int       @default(0)
+  bank            String?
+  bankAgency      String?
+  bankAccount     String?
+  active          Boolean   @default(true)
+  // Dados adicionais eSocial
+  rg              String?
+  orgaoEmissor    String?
+  dataNascimento  DateTime?
+  sexo            String?
+  estadoCivil     String?
+  grauInstrucao   String?
+  naturalidade    String?
+  nacionalidade   String?
+  enderecoResidencial String?
+  cargo           String?
+  cbo             String?   // Código Brasileiro de Ocupações
+  lotacao         String?
+  tipoAdmissao    String?
+  regimePrevidenciario String?
+  tipoRegimeJornada String?
+  regimeJornada   String?
+  natAtividade    String?   // natureza da atividade
+  dtOpcFgts       DateTime?
+  payslips        Payslip[]
+  ferias          Ferias[]
+  rescisoes       Rescisao[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("employees")
+}
+
+model Payslip {
+  id              String   @id @default(uuid())
+  companyId       String
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  referenceMonth  String
+  baseSalary      Float
+  overtimeHours   Float    @default(0)
+  overtimeValue   Float    @default(0)
+  bonuses         Float    @default(0)
+  otherDeductions Float    @default(0)
+  inssEmployee    Float
+  inssEmployer    Float
+  irrf            Float
+  fgts            Float
+  grossSalary     Float
+  netSalary       Float
+  breakdown       String
+  status          String   @default("draft")
+  paymentDate     DateTime?
+  approvedBy      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("payslips")
+}
+
+// ─── Férias ──────────────────────────────────────────────────
+model Ferias {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  periodoAquisitivo String  // ex: "2024-01 a 2025-01"
+  dtInicioGozo    DateTime
+  dtFimGozo       DateTime
+  diasFeriasDireito Int    @default(30)
+  diasVendidos    Int      @default(0)
+  diasUsufruidos  Int
+  salarioBase     Float
+  mediaRemuneracao Float   @default(0)
+  tercoConstitucional Float
+  valorVendido    Float    @default(0)
+  valorTotal      Float
+  inssFerias      Float
+  irrfFerias      Float
+  valorLiquido    Float
+  adiantamento13  Boolean  @default(false)
+  valor13Adiantado Float   @default(0)
+  status          String   @default("programada") // programada|aprovada|paga|cancelada
+  dataPagamento   DateTime?
+  observacao      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("ferias")
+}
+
+// ─── Rescisão ────────────────────────────────────────────────
+model Rescisao {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  tipoRescisao    String   // sem_justa_causa|com_justa_causa|pedido_demissao|acordo|aposentadoria
+  dataDemissao    DateTime
+  dataAviso       DateTime?
+  avisoPrevio     String   // trabalhado|indenizado|dispensado
+  diasAvisoPrevio Int      @default(0)
+  ultimoSalario   Float
+  mediaSalario    Float    @default(0)
+  saldoSalario    Float
+  aviso           Float    @default(0)
+  ferias13        Float    @default(0)  // proporcional 13
+  feriasVencidas  Float    @default(0)
+  feriasProp      Float    @default(0)
+  tercoFerias     Float    @default(0)
+  multa40Fgts     Float    @default(0)
+  indenizacao     Float    @default(0)
+  totalBruto      Float
+  inssRescisao    Float
+  irrfRescisao    Float
+  totalLiquido    Float
+  saldoFgts       Float    @default(0)
+  breakdown       String   // JSON com detalhamento
+  status          String   @default("calculada")
+  homologadaEm    DateTime?
+  observacao      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("rescisoes")
+}
+
+// ─── Notas Fiscais NF-e ──────────────────────────────────────
+model FiscalNote {
+  id               String   @id @default(uuid())
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id])
+  type             String   // nfe|nfce|nfse
+  status           String   @default("draft")
+  number           Int?
+  series           String   @default("1")
+  accessKey        String?
+  protocolNumber   String?
+  xmlContent       String?
+  pdfUrl           String?
+  issueDate        DateTime?
+  recipientName    String
+  recipientCnpjCpf String
+  recipientEmail   String?
+  recipientUf      String?
+  recipientIe      String?
+  cfop             String?
+  natOp            String?  // natureza da operação
+  items            String   // JSON
+  totalValue       Float
+  totalTaxes       String   @default("{}")
+  totalIcms        Float    @default(0)
+  totalIpi         Float    @default(0)
+  totalPis         Float    @default(0)
+  totalCofins      Float    @default(0)
+  totalFrete       Float    @default(0)
+  totalDesconto    Float    @default(0)
+  modalidadeFrete  String?
+  transportadorNome String?
+  transportadorCnpj String?
+  infAdic          String?  // informações adicionais
+  nfeioId          String?  // ID na NFe.io
+  rejectionCode    String?
+  rejectionMessage String?
+  canceledAt       DateTime?
+  cancelReason     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("fiscal_notes")
+}
+
+// ─── NFS-e (Nota Fiscal de Serviço Eletrônica) ───────────────
+model NfseEmission {
+  id               String   @id @default(uuid())
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id])
+  status           String   @default("draft") // draft|enviada|autorizada|cancelada|erro
+  numero           Int?
+  codigoVerificacao String?
+  loteRpsNumero    String?
+  rpsNumero        String
+  rpsSerie         String   @default("1")
+  rpsTipo          String   @default("1")
+  dataEmissao      DateTime @default(now())
+  competencia      String   // mês de competência YYYY-MM
+  tomadorNome      String
+  tomadorCnpjCpf   String
+  tomadorEmail     String?
+  tomadorEndereco  String?
+  tomadorMunicipio String?
+  tomadorUf        String?
+  tomadorIe        String?
+  discriminacao    String   // descrição do serviço
+  codigoServico    String?  // código LC 116
+  cnaeServico      String?
+  valorServicos    Float
+  valorDeducoes    Float    @default(0)
+  valorPis         Float    @default(0)
+  valorCofins      Float    @default(0)
+  valorInss        Float    @default(0)
+  valorIr          Float    @default(0)
+  valorCsll        Float    @default(0)
+  issRetido        Boolean  @default(false)
+  valorIss         Float    @default(0)
+  aliquotaIss      Float    @default(0)
+  valorLiquido     Float
+  municipioPrestacao String?
+  codigoMunicipio  String?
+  xmlContent       String?
+  pdfUrl           String?
+  nfeioId          String?
+  errorMessage     String?
+  canceledAt       DateTime?
+  cancelReason     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("nfse_emissions")
+}
+
+// ─── Boletos ─────────────────────────────────────────────────
+model Boleto {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  beneficiaryName String
+  beneficiaryCnpj String
+  payerName       String
+  payerCnpjCpf    String
+  payerEmail      String?
+  amount          Float
+  dueDate         DateTime
+  issueDate       DateTime @default(now())
+  ourNumber       String   @unique
+  digitableLine   String?
+  barcode         String?
+  bankCode        String   @default("000")
+  status          String   @default("pending")
+  instructions    String?
+  fine            Float    @default(2.0)
+  interest        Float    @default(1.0)
+  discount        Float    @default(0)
+  paidAt          DateTime?
+  paidAmount      Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("boletos")
+}
+
+// ─── Obrigações Fiscais ──────────────────────────────────────
+model FiscalObligation {
+  id             String   @id @default(uuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id])
+  name           String
+  type           String
+  dueDate        DateTime
+  referenceMonth String
+  status         String   @default("pending")
+  amount         Float?
+  notes          String?
+  alertDays      Int      @default(5)
+  deliveryReceipt String?  // comprovante de entrega
+  transmittedAt  DateTime?
+  responsavel    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("fiscal_obligations")
+}
+
+// ─── Obrigações Acessórias ───────────────────────────────────
+model AcessoryObligation {
+  id             String   @id @default(uuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id])
+  type           String
+  referenceMonth String
+  status         String   @default("draft")
+  xmlContent     String?
+  fileContent    String?  // conteúdo do arquivo SPED/EFD
+  dueDate        DateTime
+  transmittedAt  DateTime?
+  recibo         String?  // recibo de transmissão
+  errors         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("acessory_obligations")
+}
+
+// ─── Open Banking ────────────────────────────────────────────
+model BankConnection {
+  id          String         @id @default(uuid())
+  companyId   String
+  company     Company        @relation(fields: [companyId], references: [id])
+  bankName    String
+  bankCode    String
+  status      String         @default("active")
+  accountType String?
+  lastSyncAt  DateTime?
+  statements  BankStatement[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("bank_connections")
+}
+
+model BankStatement {
+  id           String         @id @default(uuid())
+  companyId    String
+  connectionId String
+  connection   BankConnection @relation(fields: [connectionId], references: [id])
+  date         DateTime
+  description  String
+  amount       Float
+  type         String
+  balance      Float?
+  category     String?
+  reconciled   Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+
+  @@map("bank_statements")
+}
+
+// ─── Assinaturas Digitais ────────────────────────────────────
+model SignatureRequest {
+  id           String   @id @default(uuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+  title        String
+  documentUrl  String
+  signers      String
+  status       String   @default("pending")
+  signedDocUrl String?
+  expiresAt    DateTime
+  completedAt  DateTime?
+  auditLog     String   @default("[]")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("signature_requests")
+}
+
+// ─── Relatórios Executivos ───────────────────────────────────
+model ExecutiveReport {
+  id             String   @id @default(uuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id])
+  referenceMonth String
+  content        String
+  status         String   @default("pending")
+  sentAt         DateTime?
+  channel        String   @default("whatsapp")
+  createdAt      DateTime @default(now())
+
+  @@map("executive_reports")
+}
+
+// ─── Benchmarks Setoriais ────────────────────────────────────
+model SectorBenchmark {
+  id             String @id @default(uuid())
+  cnaeCode       String
+  cnaeDesc       String
+  revenueRange   String
+  taxRegime      String
+  avgGrossMargin Float
+  avgNetMargin   Float
+  avgEbitda      Float
+  avgLiquidity   Float
+  avgDebtRatio   Float
+  avgPayroll     Float
+  avgTaxBurden   Float
+  sampleSize     Int
+  referenceYear  Int    @default(2024)
+
+  @@map("sector_benchmarks")
+}
+
+// ─── eSocial Eventos ─────────────────────────────────────────
+model EsocialEvent {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  tipoEvento      String   // S-1000, S-2200, S-1200, etc.
+  grupo           String   // tabelas|nao_periodicos|periodicos
+  employeeId      String?  // se vinculado a funcionário
+  referenceMonth  String?  // para eventos periódicos
+  xmlContent      String   // XML do evento assinado
+  status          String   @default("pendente") // pendente|enviado|processado|erro|excluido
+  loteId          String?  // ID do lote de transmissão
+  recibo          String?  // recibo de processamento
+  nrRecibo        String?  // número do recibo
+  errorCode       String?
+  errorMessage    String?
+  transmittedAt   DateTime?
+  processedAt     DateTime?
+  retificacao     Boolean  @default(false)
+  eventoRetificado String? // ID do evento retificado
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("esocial_events")
+}
+
+// ─── SPED / EFD Arquivos ─────────────────────────────────────
+model SpedFile {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  tipo            String   // sped_fiscal|efd_contribuicoes|ecf|ecd|efd_reinf
+  referenceMonth  String   // YYYY-MM ou YYYY para ECF
+  status          String   @default("gerado") // gerado|validado|transmitido|erro
+  fileContent     String   // conteúdo do arquivo SPED
+  fileHash        String?  // hash MD5 do arquivo
+  linhas          Int      @default(0)
+  recibo          String?
+  transmittedAt   DateTime?
+  validatedAt     DateTime?
+  errors          String?  // JSON com erros de validação
+  createdAt       DateTime @default(now())
+
+  @@map("sped_files")
+}
+
+// ─── Simples Nacional / PGDAS-D ──────────────────────────────
+model SimplesApuracao {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  competencia     String   // YYYY-MM
+  anexo           String   // I|II|III|IV|V
+  rbt12           Float    // Receita Bruta 12 meses
+  receitaMes      Float    // Receita do mês de apuração
+  aliquotaNominal Float
+  fatorR          Float    @default(0)   // para Anexo V
+  valorDeduzir    Float    @default(0)
+  aliquotaEfetiva Float
+  valorDas        Float
+  partilha        String   // JSON com partilha por ente
+  status          String   @default("calculado") // calculado|pgdas_gerado|pago
+  dataPagamento   DateTime?
+  codigoBarras    String?
+  pgdasRecibo     String?
+  observacao      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("simples_apuracoes")
+}
+
+// ─── Patrimônio / Ativo Imobilizado ─────────────────────────
+model AtivoImobilizado {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  descricao       String
+  categoria       String   // imovel|veiculo|maquinario|moveis|equipamentos|intangivel|outros
+  fornecedor      String?
+  notaFiscal      String?
+  dataAquisicao   DateTime
+  valorAquisicao  Float
+  valorResidual   Float    @default(0)
+  vidaUtilAnos    Float
+  taxaDepreciacao Float    // % anual
+  metodoDepreciacao String @default("linear") // linear|acelerada
+  contaContabil   String?  // código da conta no plano de contas
+  ncm             String?
+  localizacao     String?
+  ativo           Boolean  @default(true)
+  dataDesativacao DateTime?
+  motivoDesativacao String?
+  valorVenda      Float?
+  ganhoOuPerda    Float?
+  depreciations   Depreciation[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("ativos_imobilizados")
+}
+
+model Depreciation {
+  id              String           @id @default(uuid())
+  ativoId         String
+  ativo           AtivoImobilizado @relation(fields: [ativoId], references: [id])
+  competencia     String           // YYYY-MM
+  valorDepreciacao Float
+  valorAcumulado  Float
+  valorLiquido    Float
+  contaDebito     String?
+  contaCredito    String?
+  lancamentoId    String?          // FK para Transaction se lançado
+  createdAt       DateTime         @default(now())
+
+  @@map("depreciations")
+}
+
+// ─── Captura Automática de XMLs ──────────────────────────────
+model XmlCapture {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  fonte           String   // email|sefaz|portal|whatsapp|upload
+  tipoDocumento   String   // nfe|nfse|cte|nfce
+  chaveAcesso     String?
+  cnpjEmitente    String?
+  nomeEmitente    String?
+  dataEmissao     DateTime?
+  valorTotal      Float?
+  xmlContent      String
+  status          String   @default("capturado") // capturado|validado|lançado|rejeitado|duplicado
+  validacaoStatus String?  // ok|assinatura_invalida|sefaz_cancelada|xml_invalido
+  validacaoErro   String?
+  lancamentoId    String?  // FK para Transaction se lançado
+  documentoId     String?  // FK para Document
+  emailOrigem     String?
+  emailAssunto    String?
+  manifestacao    String?  // ciencia|confirmacao|desconhecimento|nao_realizada
+  manifestadaEm   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("xml_captures")
+}
+
+// ─── Portal do Cliente ───────────────────────────────────────
+model ClientPortal {
+  id              String   @id @default(uuid())
+  companyId       String   @unique
+  company         Company  @relation(fields: [companyId], references: [id])
+  active          Boolean  @default(true)
+  accessToken     String   @unique
+  clientEmail     String?
+  clientName      String?
+  clientPhone     String?
+  lastAccessAt    DateTime?
+  documentsEnabled Boolean @default(true)
+  reportsEnabled   Boolean @default(true)
+  obligationsEnabled Boolean @default(true)
+  guidesEnabled    Boolean @default(true)
+  chatEnabled      Boolean @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  messages        PortalMessage[]
+
+  @@map("client_portals")
+}
+
+model PortalMessage {
+  id        String      @id @default(uuid())
+  portalId  String
+  portal    ClientPortal @relation(fields: [portalId], references: [id])
+  sender    String       // client|contador
+  message   String
+  attachmentUrl String?
+  readAt    DateTime?
+  createdAt DateTime    @default(now())
+
+  @@map("portal_messages")
+}
+
+// ─── Planejamento Tributário ─────────────────────────────────
+model TaxSimulation {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  anoBase         Int
+  receitaBruta    Float
+  folhaPagamento  Float    @default(0)
+  resultadoSimples Float?
+  impostoSimples  Float?
+  aliquotaSimples Float?
+  resultadoPresumido Float?
+  impostoPresumido Float?
+  aliquotaPresumida Float?
+  resultadoReal   Float?
+  impostoReal     Float?
+  aliquotaReal    Float?
+  melhorRegime    String?
+  economiaMensal  Float?
+  economiaAnual   Float?
+  detalhamento    String   // JSON com detalhamento completo
+  recomendacaoIA  String?
+  createdAt       DateTime @default(now())
+
+  @@map("tax_simulations")
+}
+
+// ─── Certidões Negativas ─────────────────────────────────────
+model Certidao {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  tipo            String   // federal|estadual|municipal|fgts|trabalhista|protestos
+  orgao           String   // RFB|PGFN|Estado|Prefeitura|CEF|TST
+  status          String   // negativa|positiva|positiva_efeito_negativa|erro|nao_consultado
+  cnpjConsultado  String
+  dataEmissao     DateTime?
+  dataValidade    DateTime?
+  codigoControle  String?
+  pdfUrl          String?
+  rawResponse     String?
+  createdAt       DateTime @default(now())
+
+  @@map("certidoes")
+}
+
+model CertidaoRequest {
+  id          String   @id @default(uuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  tipos       String   // JSON array de tipos solicitados
+  status      String   @default("processando")
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@map("certidao_requests")
+}
+
+// ─── Certificado Digital ─────────────────────────────────────
+model CertificadoDigital {
+  id              String   @id @default(uuid())
+  companyId       String
+  nome            String
+  tipo            String   // a1|a3|nuvem_birdid|nuvem_vaultid
+  cnpjCpf         String
+  dataEmissao     DateTime
+  dataValidade    DateTime
+  emissor         String?
+  serialNumber    String?
+  thumbprint      String?
+  // Para A1: PFX criptografado
+  pfxEncrypted    String?
+  pfxIv           String?
+  // Para nuvem: credenciais OAuth
+  oauthClientId   String?
+  oauthToken      String?
+  active          Boolean  @default(true)
+  alertaDias      Int      @default(30)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("certificados_digitais")
+}
+
+// ─── Motor Tributário — Tabelas de Referência ────────────────
+model NcmCode {
+  id          String @id @default(uuid())
+  codigo      String @unique
+  descricao   String
+  aliquotaIpi Float  @default(0)
+  unidade     String @default("UN")
+  ativo       Boolean @default(true)
+  updatedAt   DateTime @updatedAt
+
+  @@map("ncm_codes")
+}
+
+model CfopCode {
+  id          String @id @default(uuid())
+  codigo      String @unique
+  descricao   String
+  tipo        String // entrada|saida
+  aplicacao   String // compra|venda|devolucao|remessa|retorno|transferencia|outros
+  geraCredito Boolean @default(false)
+
+  @@map("cfop_codes")
+}
+
+model TaxRule {
+  id              String  @id @default(uuid())
+  uf              String  // UF de destino
+  ncmPrefix       String  // prefixo NCM (4, 6 ou 8 dígitos)
+  cfop            String?
+  tipoOperacao    String  // saida_estadual|saida_interestadual|entrada
+  regimeTributario String // simples|presumido|real|todos
+  cstIcms         String?
+  aliquotaIcms    Float   @default(0)
+  reducaoBcIcms   Float   @default(0)
+  icmsSt          Boolean @default(false)
+  mvaSt           Float   @default(0)
+  cstIpi          String?
+  aliquotaIpi     Float   @default(0)
+  cstPis          String?
+  aliquotaPis     Float   @default(0)
+  cstCofins       String?
+  aliquotaCofins  Float   @default(0)
+  beneficioFiscal String?
+  vigenciaInicio  DateTime
+  vigenciaFim     DateTime?
+  ativo           Boolean @default(true)
+
+  @@map("tax_rules")
+}
+
+// ─── Abertura de Empresa ─────────────────────────────────────
+model CompanyOpening {
+  id              String   @id @default(uuid())
+  escritorioId    String   // ID do escritório contábil no sistema
+  escritorio      Company? @relation("EscritorioAberturas", fields: [escritorioId], references: [id])
+  nomeEmpresarial String
+  nomeFantasia    String?
+  tipoEmpresa     String   // mei|eireli|ltda|sa|ss|outros
+  objetoSocial    String
+  cnaePrincipal   String
+  cnaesSecundarios String? // JSON array
+  capitalSocial   Float    @default(1000)
+  socios          String   // JSON array com dados dos sócios
+  enderecoComercial String
+  municipio       String
+  uf              String
+  status          String   @default("documentacao") // documentacao|protocolo|aprovacao|concluida|cancelada
+  // Checklist
+  contratoSocialGerado Boolean @default(false)
+  dbeGerado        Boolean @default(false)
+  dbeNumero        String?
+  cnpjEmitido      Boolean @default(false)
+  cnpjNumero       String?
+  inscricaoEstadual Boolean @default(false)
+  ieNumero         String?
+  inscricaoMunicipal Boolean @default(false)
+  imNumero         String?
+  alvara           Boolean @default(false)
+  // Datas
+  dtInicioAtividades DateTime?
+  dtCnpj           DateTime?
+  observacoes      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("company_openings")
+}
+
+// ─── Honorários ───────────────────────────────────────────────
+model Honorario {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  descricao       String
+  competencia     String   // YYYY-MM
+  valor           Float
+  vencimento      DateTime
+  status          String   @default("pendente") // pendente|pago|atrasado|cancelado
+  formaPagamento  String?  // boleto|pix|transferencia
+  notaFiscalId    String?  // FK para NfseEmission se gerou NFS-e
+  observacao      String?
+  paidAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("honorarios")
+}
+
+// ─── CRM de Clientes / Leads ──────────────────────────────────
+model CrmCliente {
+  id              String   @id @default(uuid())
+  companyId       String   // escritório que gerencia
+  company         Company  @relation(fields: [companyId], references: [id])
+  nome            String
+  cnpjCpf         String?
+  email           String?
+  telefone        String?
+  segmento        String?  // comercio|servicos|industria|agronegocio|outros
+  origem          String?  // indicacao|site|whatsapp|ligacao|evento|outros
+  stage           String   @default("lead") // lead|qualificado|proposta|negociacao|cliente|perdido
+  valorEstimado   Float?   // valor mensal estimado do contrato
+  probabilidade   Int      @default(50) // % de fechamento
+  responsavel     String?  // nome do responsável
+  ultimoContato   DateTime?
+  proximoContato  DateTime?
+  observacoes     String?
+  tags            String?  // JSON array
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("crm_clientes")
+}
+
+// ─── Tarefas / Kanban ─────────────────────────────────────────
+model Tarefa {
+  id              String   @id @default(uuid())
+  companyId       String   // empresa relacionada (opcional — escritório)
+  company         Company  @relation(fields: [companyId], references: [id])
+  titulo          String
+  descricao       String?
+  tipo            String   @default("geral") // obrigacao|documento|cobranca|geral|reuniao
+  status          String   @default("backlog") // backlog|a_fazer|em_andamento|revisao|concluida|cancelada
+  prioridade      String   @default("media") // baixa|media|alta|urgente
+  responsavel     String?
+  prazo           DateTime?
+  concluidaEm    DateTime?
+  tags            String?  // JSON array
+  checklist       String?  // JSON array de subtarefas
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("tarefas")
+}
+
+// ─── MEI — DASN-SIMEI ─────────────────────────────────────────
+model MeiApuracao {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  competencia     String   // YYYY-MM ou YYYY (para DASN anual)
+  tipo            String   @default("mensal") // mensal|anual_dasn
+  receitaComercio Float    @default(0)
+  receitaServicos Float    @default(0)
+  receitaTotal    Float    @default(0)
+  limiteAnual     Float    @default(81000)
+  percentualUsado Float    @default(0)
+  dasValor        Float    @default(0)
+  dasInss         Float    @default(0)  // parte INSS
+  dasIss          Float    @default(0)  // se serviços
+  dasIcms         Float    @default(0)  // se comércio
+  status          String   @default("calculado") // calculado|pago|atrasado
+  dataPagamento   DateTime?
+  codigoBarras    String?
+  dasnEnviado     Boolean  @default(false) // para tipo=anual_dasn
+  dasnRecibo      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("mei_apuracoes")
+}
+
+// ─── Comunicados / Avisos ─────────────────────────────────────
+model Comunicado {
+  id              String   @id @default(uuid())
+  escritorioId    String   // escritório remetente
+  company         Company  @relation(fields: [escritorioId], references: [id])
+  titulo          String
+  corpo           String
+  tipo            String   @default("geral") // geral|fiscal|trabalhista|urgente
+  canal           String   @default("portal") // portal|email|whatsapp|todos
+  destinatarios   String   @default("todos") // todos|selecionados (JSON array de companyIds)
+  agendadoPara    DateTime?
+  enviadoEm       DateTime?
+  status          String   @default("rascunho") // rascunho|agendado|enviado|cancelado
+  lidos           Int      @default(0)
+  totalEnviados   Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("comunicados")
+}
+
+// ─── Radar E-CAC / Situação Fiscal ───────────────────────────
+model RadarEcacConsulta {
+  id              String   @id @default(uuid())
+  cnpj            String
+  razaoSocial     String?
+  situacao        String?  // ATIVA|SUSPENSA|INAPTA|BAIXADA
+  dataAbertura    String?
+  capitalSocial   Float?
+  atividade       String?
+  alertas         String?  // JSON array de alertas
+  rawResponse     String?  // JSON da resposta completa
+  fonte           String   @default("brasilapi") // brasilapi|receitaws
+  ultimaConsulta  DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  @@index([cnpj])
+  @@map("radar_ecac_consultas")
+}
+
+// ─── Central de Cobranças ─────────────────────────────────────
+model CobrancaRegra {
+  id              String   @id @default(uuid())
+  companyId       String
+  nome            String
+  diasAntes       String   // JSON array de números (ex: [7, 3, 1])
+  diasDepois      String   // JSON array de números (ex: [1, 5, 10])
+  mensagemTemplate String
+  canal           String   @default("email") // email|whatsapp|ambos
+  ativo           Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  lembretes       CobrancaLembrete[]
+
+  @@index([companyId])
+  @@map("cobranca_regras")
+}
+
+model CobrancaLembrete {
+  id              String   @id @default(uuid())
+  regraId         String
+  regra           CobrancaRegra @relation(fields: [regraId], references: [id])
+  boletoId        String
+  companyId       String
+  tipo            String   // antes|depois
+  diasReferencia  Int      // quantos dias antes/depois do vencimento
+  canal           String
+  status          String   @default("enviado") // enviado|falhou|simulado
+  mensagem        String?
+  enviadoEm       DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  @@index([companyId])
+  @@index([boletoId])
+  @@map("cobranca_lembretes")
+}
+
+// ─── Notificações in-app ──────────────────────────────────────
+model Notification {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  userId          String?
+  tipo            String   // obrigacao_vencendo|certidao_vencendo|nova_mensagem|tarefa_vencendo|honorario_vencendo|das_vencer
+  titulo          String
+  corpo           String
+  link            String?
+  lida            Boolean  @default(false)
+  lidaEm          DateTime?
+  createdAt       DateTime @default(now())
+
+  @@map("notifications")
+}

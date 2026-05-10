@@ -1,0 +1,49 @@
+version: '3.8'
+
+# ─── Evolution API — WhatsApp Gateway ────────────────────────────────────────
+# Rode com: docker-compose -f docker-compose.evolution.yml up -d
+# Painel:   http://localhost:8080
+# API Key:  aura-evolution-key
+
+services:
+  evolution-api:
+    image: atendai/evolution-api:latest
+    container_name: aura-evolution-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_URL: "http://localhost:8080"
+      AUTHENTICATION_TYPE: "apikey"
+      AUTHENTICATION_API_KEY: "aura-evolution-key"
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
+      STORE_MESSAGES: "true"
+      STORE_MESSAGE_UP: "true"
+      STORE_CONTACTS: "true"
+      STORE_CHATS: "true"
+      CLEAN_STORE_CLEANING_INTERVAL: "7200"
+      CLEAN_STORE_MESSAGES: "true"
+      CLEAN_STORE_MESSAGE_UP: "true"
+      CLEAN_STORE_CONTACTS: "true"
+      CLEAN_STORE_CHATS: "true"
+      WEBSOCKET_ENABLED: "false"
+      LOG_LEVEL: "ERROR"
+      LOG_COLOR: "true"
+      LOG_BAILEYS: "error"
+      DEL_INSTANCE: "false"
+      PROVIDER_ENABLED: "false"
+      # Configuração de banco (SQLite local)
+      DATABASE_ENABLED: "false"
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+    networks:
+      - aura-network
+
+volumes:
+  evolution_instances:
+  evolution_store:
+
+networks:
+  aura-network:
+    driver: bridge

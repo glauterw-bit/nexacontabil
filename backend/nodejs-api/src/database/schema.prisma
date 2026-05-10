@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -12,7 +12,7 @@ model Company {
   id              String   @id @default(uuid())
   name            String
   cnpj            String   @unique
-  taxRegime       String   // "simples_nacional" | "lucro_presumido" | "lucro_real"
+  taxRegime       String
   address         String?
   phone           String?
   email           String?
@@ -34,7 +34,7 @@ model User {
   email       String   @unique
   name        String
   password    String
-  role        String   @default("user") // "admin" | "accountant" | "manager" | "user"
+  role        String   @default("user")
   active      Boolean  @default(true)
   companyId   String
   company     Company  @relation(fields: [companyId], references: [id])
@@ -49,51 +49,34 @@ model Document {
   id                String   @id @default(uuid())
   companyId         String
   company           Company  @relation(fields: [companyId], references: [id])
-
-  type              String   // "nota_fiscal" | "boleto" | "extrato_bancario" | etc
-  status            String   @default("pending") // "pending" | "processing" | "completed" | "failed" | "needs_review"
+  type              String
+  status            String   @default("pending")
   originalFilename  String?
   fileUrl           String?
   mimeType          String?
   fileSizeBytes     Int?
-
-  // Dados extraídos pelo IDP
-  extractedData     Json?
+  extractedData     String?
   confidenceScore   Float?
-
-  // Identificação do documento
   number            String?
   series            String?
   issueDate         DateTime?
   dueDate           DateTime?
-  totalValue        Decimal?  @db.Decimal(15, 2)
-
-  // Emitente
+  totalValue        Float?
   issuerName        String?
   issuerCnpj        String?
-
-  // Destinatário
   recipientName     String?
   recipientCnpj     String?
-
-  // Análise IA
-  fiscalValidation  Json?
-  complianceCheck   Json?
-  agentDecisions    Json?
-
-  // Reconciliação
+  fiscalValidation  String?
+  complianceCheck   String?
+  agentDecisions    String?
   reconciliationStatus String? @default("pending")
-  reconciledWith    String[]
-
+  reconciledWith    String?
   processingTimeMs  Int?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   transactions      Transaction[]
 
-  @@index([companyId, type])
-  @@index([issuerCnpj])
-  @@index([status])
   @@map("documents")
 }
 
@@ -104,32 +87,23 @@ model Transaction {
   company     Company  @relation(fields: [companyId], references: [id])
   documentId  String?
   document    Document? @relation(fields: [documentId], references: [id])
-
   description String
   date        DateTime
-  status      String   @default("draft") // "draft" | "pending_review" | "approved" | "reconciled" | "rejected"
-
-  // Partidas dobradas (JSON com entries)
-  entries     Json     // Array de {accountCode, accountName, nature, value, costCenter}
-
-  totalDebit  Decimal  @db.Decimal(15, 2)
-  totalCredit Decimal  @db.Decimal(15, 2)
+  status      String   @default("draft")
+  entries     String
+  totalDebit  Float    @default(0)
+  totalCredit Float    @default(0)
   isBalanced  Boolean  @default(false)
-
-  // Metadados IA
   aiConfidence   Float?
   aiReasoning    String?
   approvedBy     String?
   approvedAt     DateTime?
-
   createdBy   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   auditTrails AuditTrail[]
 
-  @@index([companyId, date])
-  @@index([status])
   @@map("transactions")
 }
 
@@ -140,25 +114,18 @@ model AuditTrail {
   company       Company  @relation(fields: [companyId], references: [id])
   transactionId String?
   transaction   Transaction? @relation(fields: [transactionId], references: [id])
-
-  action        String   // "create" | "update" | "approve" | "reject" | "ai_analysis"
-  entityType    String   // "document" | "transaction" | "user"
+  action        String
+  entityType    String
   entityId      String
-  performedBy   String   // userId ou "ai_agent"
-  agentType     String?  // "tax_agent" | "accounting_agent" | etc
-
-  oldValues     Json?
-  newValues     Json?
-  metadata      Json?
-
-  // Hash para imutabilidade blockchain-like
+  performedBy   String
+  agentType     String?
+  oldValues     String?
+  newValues     String?
+  metadata      String?
   previousHash  String?
   currentHash   String
-
   createdAt     DateTime @default(now())
 
-  @@index([companyId, createdAt])
-  @@index([entityType, entityId])
   @@map("audit_trails")
 }
 
@@ -166,15 +133,14 @@ model AuditTrail {
 model ReconciliationRun {
   id              String   @id @default(uuid())
   companyId       String
-  matchType       String   // "nf_boleto" | "boleto_extrato" | "nf_extrato"
+  matchType       String
   status          String   @default("completed")
   matchesCount    Int      @default(0)
   unmatchedCount  Int      @default(0)
-  totalMatchedValue   Decimal @db.Decimal(15, 2)
-  totalUnmatchedValue Decimal @db.Decimal(15, 2)
-  matches         Json     // Array de ReconciliationMatch
+  totalMatchedValue   Float @default(0)
+  totalUnmatchedValue Float @default(0)
+  matches         String
   createdAt       DateTime @default(now())
 
-  @@index([companyId])
   @@map("reconciliation_runs")
 }

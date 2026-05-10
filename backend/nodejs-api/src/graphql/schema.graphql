@@ -1,0 +1,1386 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type AberturaEmpresaType {
+  alvara: Boolean!
+  capitalSocial: Float!
+  cnaePrincipal: String!
+  cnaesSecundarios: String
+  cnpjEmitido: Boolean!
+  cnpjNumero: String
+  contratoSocialGerado: Boolean!
+  createdAt: DateTime!
+  dbeGerado: Boolean!
+  dbeNumero: String
+  dtCnpj: DateTime
+  dtInicioAtividades: DateTime
+  enderecoComercial: String!
+  escritorioId: String!
+  id: String!
+  inscricaoEstadual: Boolean!
+  inscricaoMunicipal: Boolean!
+  municipio: String!
+  nomeEmpresarial: String!
+  nomeFantasia: String
+  objetoSocial: String!
+  observacoes: String
+  socios: String!
+  status: String!
+  tipoEmpresa: String!
+  uf: String!
+  updatedAt: DateTime!
+}
+
+type AberturaResumoType {
+  canceladas: Int!
+  concluidas: Int!
+  emDocumentacao: Int!
+  emProtocolo: Int!
+  total: Int!
+}
+
+input AccountingEntryInput {
+  accountCode: String!
+  accountName: String!
+  costCenter: String
+  description: String
+  nature: String!
+  value: Float!
+}
+
+type AcessoryObligationType {
+  companyId: String!
+  createdAt: DateTime!
+  dueDate: DateTime!
+  errors: String
+  id: ID!
+  referenceMonth: String!
+  status: String!
+  transmittedAt: DateTime
+  type: String!
+  updatedAt: DateTime!
+  xmlContent: String
+}
+
+type AlertasGeradosType {
+  criadas: Int!
+}
+
+type AtivoImobilizadoType {
+  categoria: String!
+  companyId: String!
+  dataAquisicao: DateTime!
+  dataBaixa: DateTime
+  descricao: String!
+  fornecedor: String
+  id: ID!
+  localizacao: String
+  motivoBaixa: String
+  notaFiscal: String
+  numeroPatrimonio: String
+  observacoes: String
+  resultadoBaixa: Float
+  status: String!
+  taxaDepreciacaoAnual: Float!
+  valorAquisicao: Float!
+  valorResidual: Float!
+  valorVenda: Float
+  vidaUtilAnos: Int!
+}
+
+type AuditTrailType {
+  action: String!
+  agentType: String
+  companyId: String!
+  createdAt: DateTime!
+  currentHash: String!
+  entityId: String!
+  entityType: String!
+  id: String!
+  metadata: JSON
+  newValues: JSON
+  oldValues: JSON
+  performedBy: String!
+  previousHash: String!
+}
+
+type BalanceSummary {
+  approved: Int!
+  pending: Int!
+  total: Int!
+  totalCredit: Float!
+  totalDebit: Float!
+}
+
+type BankConnectionType {
+  accountType: String
+  bankCode: String!
+  bankName: String!
+  companyId: String!
+  createdAt: DateTime!
+  id: ID!
+  lastSyncAt: DateTime
+  statements: [BankStatementType!]!
+  status: String!
+  updatedAt: DateTime!
+}
+
+type BankStatementType {
+  amount: Float!
+  balance: Float
+  category: String
+  companyId: String!
+  connectionId: String!
+  createdAt: DateTime!
+  date: DateTime!
+  description: String!
+  id: ID!
+  reconciled: Boolean!
+  type: String!
+}
+
+type BoletoType {
+  amount: Float!
+  bankCode: String!
+  barcode: String
+  beneficiaryCnpj: String!
+  beneficiaryName: String!
+  companyId: String!
+  createdAt: DateTime!
+  digitableLine: String
+  discount: Float!
+  dueDate: DateTime!
+  fine: Float!
+  id: ID!
+  instructions: String
+  interest: Float!
+  issueDate: DateTime!
+  ourNumber: String!
+  paidAmount: Float
+  paidAt: DateTime
+  payerCnpjCpf: String!
+  payerEmail: String
+  payerName: String!
+  status: String!
+  updatedAt: DateTime!
+}
+
+input CalcImpostosInput {
+  cfop: String!
+  ncm: String!
+  qtd: Float!
+  regimeTributario: String!
+  tipoContribuinte: String
+  ufDestinatario: String!
+  ufEmitente: String!
+  valor: Float!
+}
+
+input CalculatePayslipInput {
+  bonuses: Float
+  companyId: String!
+  employeeId: String!
+  otherDeductions: Float
+  overtimeHours: Float
+  referenceMonth: String!
+}
+
+type CertidaoType {
+  cnpj: String!
+  companyId: String!
+  conteudo: String
+  dataEmissao: DateTime!
+  dataValidade: DateTime
+  id: ID!
+  numeroControle: String
+  orgaoEmissor: String!
+  status: String!
+  tipo: String!
+  url: String
+}
+
+type CertificadoType {
+  active: Boolean!
+  alertaDias: Int!
+  cnpjCpf: String!
+  companyId: String!
+  createdAt: DateTime!
+  dataEmissao: DateTime!
+  dataValidade: DateTime!
+  diasParaVencer: Int
+  emissor: String
+  expirado: Boolean
+  id: ID!
+  nome: String!
+  serialNumber: String
+  thumbprint: String
+  tipo: String!
+  updatedAt: DateTime!
+}
+
+type CfopType {
+  aplicacao: String!
+  codigo: String!
+  descricao: String!
+  tipo: String!
+}
+
+type ChecklistItemType {
+  concluido: Boolean!
+  item: String!
+}
+
+type ClientPortalType {
+  active: Boolean!
+  clientEmail: String
+  clientName: String
+  companyId: String!
+  createdAt: DateTime!
+  id: ID!
+  lastAccessAt: DateTime
+}
+
+type CompanyType {
+  active: Boolean!
+  address: String
+  cnpj: String!
+  createdAt: DateTime!
+  email: String
+  id: ID!
+  name: String!
+  phone: String
+  taxRegime: String!
+}
+
+type ComunicadoResumoType {
+  agendados: Int!
+  enviados: Int!
+  rascunhos: Int!
+  total: Int!
+  totalAlcancados: Int!
+}
+
+type ComunicadoType {
+  agendadoPara: DateTime
+  canal: String!
+  corpo: String!
+  createdAt: DateTime!
+  destinatarios: String!
+  enviadoEm: DateTime
+  escritorioId: String!
+  id: String!
+  lidos: Int!
+  status: String!
+  tipo: String!
+  titulo: String!
+  totalEnviados: Int!
+}
+
+input CreateBankConnectionInput {
+  accountType: String
+  bankCode: String!
+  bankName: String!
+  companyId: String!
+}
+
+input CreateBoletoInput {
+  amount: Float!
+  bankCode: String
+  beneficiaryCnpj: String!
+  beneficiaryName: String!
+  companyId: String!
+  discount: Float
+  dueDate: DateTime!
+  fine: Float
+  instructions: String
+  interest: Float
+  payerCnpjCpf: String!
+  payerEmail: String
+  payerName: String!
+}
+
+input CreateCompanyInput {
+  address: String
+  cnpj: String!
+  email: String
+  name: String!
+  phone: String
+  taxRegime: String!
+}
+
+input CreateEmployeeInput {
+  admissionDate: DateTime!
+  bank: String
+  bankAccount: String
+  bankAgency: String
+  baseSalary: Float!
+  companyId: String!
+  cpf: String!
+  ctps: String
+  department: String
+  dependents: Int
+  name: String!
+  pis: String
+  role: String!
+  workHoursWeekly: Int
+}
+
+input CreateFiscalNoteInput {
+  companyId: String!
+  items: [FiscalNoteItemInput!]!
+  recipientCnpjCpf: String!
+  recipientEmail: String
+  recipientName: String!
+  totalValue: Float!
+  type: String!
+}
+
+input CreateSignatureRequestInput {
+  companyId: String!
+  documentUrl: String!
+  expiresInDays: Int
+  signers: [SignerInput!]!
+  title: String!
+}
+
+input CreateTransactionInput {
+  companyId: String!
+  date: DateTime!
+  description: String!
+  documentId: String
+  entries: [AccountingEntryInput!]!
+}
+
+type CrmClienteType {
+  cnpjCpf: String
+  companyId: String!
+  createdAt: DateTime!
+  email: String
+  id: String!
+  nome: String!
+  observacoes: String
+  origem: String
+  probabilidade: Int!
+  proximoContato: DateTime
+  responsavel: String
+  segmento: String
+  stage: String!
+  tags: String
+  telefone: String
+  ultimoContato: DateTime
+  updatedAt: DateTime!
+  valorEstimado: Float
+}
+
+type CrmMetricasType {
+  pipelineEstimado: Float!
+  receitaMensalEstimada: Float!
+  taxaConversao: String!
+  totalClientes: Int!
+  totalLeads: Int!
+}
+
+type CrmPipelineType {
+  pipeline: [CrmStageType!]!
+  total: Int!
+}
+
+type CrmStageType {
+  clientes: [CrmClienteType!]!
+  stage: String!
+  total: Float!
+}
+
+type DREAccountLine {
+  code: String!
+  credit: Float!
+  debit: Float!
+  name: String!
+  net: Float!
+}
+
+type DREGroup {
+  accounts: [DREAccountLine!]!
+  code: String!
+  name: String!
+  net: Float!
+  totalCredit: Float!
+  totalDebit: Float!
+}
+
+type DREPeriod {
+  from: String!
+  to: String!
+}
+
+type DREResult {
+  companyId: String!
+  ebit: Float!
+  ebt: Float!
+  financialResult: Float!
+  generatedAt: String!
+  grossProfit: Float!
+  grossRevenue: Float!
+  groups: [DREGroup!]!
+  netIncome: Float!
+  operationalExpenses: Float!
+  period: DREPeriod!
+  taxes: Float!
+  totalCosts: Float!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type DecimoTerceiroItemType {
+  avosAquisitivos: Int!
+  employeeId: String!
+  employeeNome: String!
+  inss: Float!
+  irrf: Float!
+  primeiraParcela: Float!
+  salario: Float!
+  segundaParcela: Float!
+  totalBruto: Float!
+  totalLiquido: Float!
+}
+
+type DepreciacaoType {
+  ativoId: String!
+  companyId: String!
+  competencia: String!
+  depreciacaoAcumulada: Float!
+  id: ID!
+  valorAtual: Float!
+  valorDepreciacao: Float!
+}
+
+input DestinatarioNFeInput {
+  cnpjCpf: String!
+  email: String
+  endereco: EnderecoInput!
+  ie: String
+  nome: String!
+}
+
+type DifalResultType {
+  aliquotaInterestadual: Float!
+  aliquotaInterna: Float!
+  difal: Float!
+  partilhaDestino: Float!
+  partilhaOrigem: Float!
+}
+
+type DocumentStatsType {
+  completed: Int!
+  failed: Int!
+  pending: Int!
+  total: Int!
+  totalValue: Float!
+}
+
+type DocumentType {
+  companyId: String!
+  complianceCheck: JSON
+  confidenceScore: Float
+  createdAt: DateTime!
+  dueDate: DateTime
+  extractedData: JSON
+  fiscalValidation: JSON
+  id: ID!
+  issueDate: DateTime
+  issuerCnpj: String
+  issuerName: String
+  number: String
+  status: String!
+  totalValue: Float
+  type: String!
+}
+
+input EmitirNFSeInput {
+  companyId: String!
+  competencia: String!
+  optanteSimplesNacional: Boolean
+  servico: ServicoNFSeInput!
+  tomador: TomadorNFSeInput!
+  valores: ValoresNFSeInput!
+}
+
+input EmitirNFeInput {
+  companyId: String!
+  destinatario: DestinatarioNFeInput!
+  frete: FreteNFeInput
+  infAdic: String
+  items: [ItemNFeInput!]!
+  naturezaOperacao: String!
+  pagamento: [PagamentoNFeInput!]!
+}
+
+type EmployeeType {
+  active: Boolean!
+  admissionDate: DateTime!
+  bank: String
+  bankAccount: String
+  bankAgency: String
+  baseSalary: Float!
+  companyId: String!
+  cpf: String!
+  createdAt: DateTime!
+  ctps: String
+  department: String
+  dependents: Int!
+  dismissalDate: DateTime
+  id: ID!
+  name: String!
+  pis: String
+  role: String!
+  workHoursWeekly: Int!
+}
+
+input EnderecoInput {
+  bairro: String!
+  cep: String!
+  codigoMunicipio: String
+  complemento: String
+  logradouro: String!
+  municipio: String!
+  numero: String!
+  uf: String!
+}
+
+input EnderecoNFSeInput {
+  bairro: String
+  cep: String
+  complemento: String
+  logradouro: String
+  municipio: String
+  numero: String
+  uf: String
+}
+
+type EsocialDashboardType {
+  enviados: Int!
+  erros: Int!
+  pendentes: Int!
+  processados: Int!
+  total: Int!
+}
+
+type EsocialEventType {
+  companyId: String!
+  createdAt: DateTime!
+  employeeId: String
+  errorMessage: String
+  grupo: String!
+  id: ID!
+  loteId: String
+  nrRecibo: String
+  processedAt: DateTime
+  referenceMonth: String
+  status: String!
+  tipoEvento: String!
+  transmittedAt: DateTime
+  xmlContent: String!
+}
+
+type ExecutiveReportType {
+  channel: String!
+  companyId: String!
+  content: String!
+  createdAt: DateTime!
+  id: ID!
+  referenceMonth: String!
+  sentAt: DateTime
+  status: String!
+}
+
+type FeriasType {
+  companyId: String!
+  diasUsufruidos: Int!
+  diasVendidos: Int!
+  dtFimGozo: DateTime!
+  dtInicioGozo: DateTime!
+  employeeId: String!
+  id: ID!
+  inssFerias: Float!
+  irrfFerias: Float!
+  periodoAquisitivo: String!
+  salarioBase: Float!
+  status: String!
+  tercoConstitucional: Float!
+  valorLiquido: Float!
+  valorTotal: Float!
+  valorVendido: Float!
+}
+
+type FiscalNoteBasicType {
+  accessKey: String
+  companyId: String!
+  createdAt: DateTime!
+  id: ID!
+  issueDate: DateTime
+  items: JSON!
+  number: Int
+  pdfUrl: String
+  protocolNumber: String
+  recipientCnpjCpf: String!
+  recipientEmail: String
+  recipientName: String!
+  rejectionCode: String
+  rejectionMessage: String
+  series: String!
+  status: String!
+  totalTaxes: JSON!
+  totalValue: Float!
+  type: String!
+  updatedAt: DateTime!
+  xmlContent: String
+}
+
+input FiscalNoteItemInput {
+  cfop: String
+  description: String!
+  ncm: String
+  quantity: Float!
+  unitValue: Float!
+}
+
+type FiscalNoteType {
+  accessKey: String
+  cancelReason: String
+  canceledAt: DateTime
+  cfop: String
+  companyId: String!
+  createdAt: DateTime!
+  id: ID!
+  infAdic: String
+  issueDate: DateTime
+  items: JSON!
+  modalidadeFrete: String
+  natOp: String
+  nfeioId: String
+  number: Int
+  pdfUrl: String
+  protocolNumber: String
+  recipientCnpjCpf: String!
+  recipientEmail: String
+  recipientIe: String
+  recipientName: String!
+  recipientUf: String
+  rejectionCode: String
+  rejectionMessage: String
+  series: String
+  status: String!
+  totalCofins: Float!
+  totalFrete: Float!
+  totalIcms: Float!
+  totalIpi: Float!
+  totalPis: Float!
+  totalTaxes: JSON!
+  totalValue: Float!
+  transportadorCnpj: String
+  transportadorNome: String
+  type: String!
+  updatedAt: DateTime!
+  xmlContent: String
+}
+
+type FiscalObligationType {
+  alertDays: Int!
+  amount: Float
+  companyId: String!
+  createdAt: DateTime!
+  dueDate: DateTime!
+  id: ID!
+  name: String!
+  notes: String
+  referenceMonth: String!
+  status: String!
+  type: String!
+  updatedAt: DateTime!
+}
+
+input FreteNFeInput {
+  modalidade: String!
+  placa: String
+  transportadorCnpj: String
+  transportadorNome: String
+  uf: String
+  valor: Float
+}
+
+type HonorarioResumoType {
+  quantidade: Int!
+  totalAtrasado: Float!
+  totalPago: Float!
+  totalPendente: Float!
+  vencendoHoje: Int!
+}
+
+type HonorarioType {
+  companyId: String!
+  competencia: String!
+  createdAt: DateTime!
+  descricao: String!
+  formaPagamento: String
+  id: String!
+  observacao: String
+  paidAt: DateTime
+  status: String!
+  valor: Float!
+  vencimento: DateTime!
+}
+
+type IcmsResultType {
+  aliquota: Float!
+  baseCalculo: Float!
+  cst: String!
+  reducaoBc: Float!
+  valor: Float!
+}
+
+type ImpostoResultType {
+  cofins: PisCofinsResultType!
+  icms: IcmsResultType!
+  ipi: IpiResultType!
+  pis: PisCofinsResultType!
+  total: Float!
+}
+
+type ImpostoServicoType {
+  cofins: Float!
+  csll: Float!
+  inss: Float!
+  ir: Float!
+  iss: Float!
+  pis: Float!
+  totalRetencoes: Float!
+  valorLiquido: Float!
+}
+
+type IntegrityCheckType {
+  invalidEntries: [String!]!
+  valid: Boolean!
+}
+
+type IpiResultType {
+  aliquota: Float!
+  cst: String!
+  valor: Float!
+}
+
+input ItemNFeInput {
+  aliquotaCofins: Float
+  aliquotaIcms: Float
+  aliquotaIpi: Float
+  aliquotaPis: Float
+  cfop: String!
+  cstCofins: String
+  cstIcms: String
+  cstIpi: String
+  cstPis: String
+  desconto: Float
+  descricao: String!
+  ncm: String!
+  quantidade: Float!
+  unidade: String!
+  valorTotal: Float!
+  valorUnitario: Float!
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
+
+type KanbanColunaType {
+  label: String!
+  status: String!
+  tarefas: [TarefaType!]!
+}
+
+type MeiApuracaoType {
+  codigoBarras: String
+  companyId: String!
+  competencia: String!
+  createdAt: DateTime!
+  dasIcms: Float!
+  dasInss: Float!
+  dasIss: Float!
+  dasValor: Float!
+  dasnEnviado: Boolean!
+  dasnRecibo: String
+  dataPagamento: DateTime
+  id: String!
+  limiteAnual: Float!
+  percentualUsado: Float!
+  receitaComercio: Float!
+  receitaServicos: Float!
+  receitaTotal: Float!
+  status: String!
+  tipo: String!
+}
+
+type MeiResumoType {
+  dasPago: Float!
+  dasPendente: Float!
+  emRisco: Boolean!
+  limiteRestante: Float!
+  percentualUsado: String!
+  receitaAnual: Float!
+}
+
+type MunicipioType {
+  aliquotaIssMaxima: Float!
+  aliquotaIssMinima: Float!
+  aliquotaIssPadrao: Float!
+  codigoIbge: String!
+  integradoNfeio: Boolean!
+  nome: String!
+  uf: String!
+}
+
+type Mutation {
+  analisarRegimesTributarios(anoBase: Int!, companyId: ID!): JSON!
+  approvePayslip(id: ID!, userId: String!): PayslipType!
+  approveTransaction(id: ID!, userId: String!): TransactionObjectType!
+  assinarComBirdID(companyId: ID!, hash: String!): String!
+  assinarXml(companyId: ID!, xmlContent: String!): String!
+  atualizarChecklistAbertura(alvara: Boolean, cnpjEmitido: Boolean, cnpjNumero: String, contratoSocialGerado: Boolean, dbeGerado: Boolean, id: String!): AberturaEmpresaType!
+  atualizarCrmCliente(email: String, id: String!, nome: String, observacoes: String, telefone: String, valorEstimado: Float): CrmClienteType!
+  atualizarTarefa(checklist: String, descricao: String, id: String!, prioridade: String, titulo: String): TarefaType!
+  avancarStageCrm(id: String!, stage: String!): CrmClienteType!
+  avancarStatusAbertura(id: String!, status: String!): AberturaEmpresaType!
+  baixarAtivo(ativoId: ID!, motivo: String!, valorVenda: Float): AtivoImobilizadoType!
+  cadastrarAtivo(categoria: String!, companyId: ID!, dataAquisicao: String!, descricao: String!, fornecedor: String, localizacao: String, notaFiscal: String, valorAquisicao: Float!, vidaUtilAnos: Int): AtivoImobilizadoType!
+  calcularDasMei(companyId: String!, competencia: String!, receitaComercio: Float!, receitaServicos: Float!): MeiApuracaoType!
+  calcularDepreciacaoMensal(companyId: ID!, competencia: String!): [DepreciacaoType!]!
+  calcularFerias(diasGozo: Int = 30, diasVendidos: Int = 0, dtFimGozo: String!, dtInicioGozo: String!, employeeId: ID!, periodoAquisitivo: String!): FeriasType!
+  calcularPGDAS(companyId: ID!, referenceMonth: String!): SimplesApuracaoType!
+  calcularRescisao(avisoPrevioTrabalhado: Boolean = true, dataDemissao: String!, employeeId: ID!, tipoRescisao: String!): RescisaoType!
+  calculatePayslip(input: CalculatePayslipInput!): PayslipType!
+  cancelBoleto(id: ID!): BoletoType!
+  cancelFiscalNote(id: ID!, reason: String!): FiscalNoteBasicType!
+  cancelSignatureRequest(id: ID!): SignatureRequestType!
+  cancelarComunicado(id: String!): ComunicadoType!
+  cancelarHonorario(id: String!): HonorarioType!
+  cancelarNFSe(id: ID!, motivo: String!): NfseType!
+  cancelarNFe(id: ID!, motivo: String!): FiscalNoteType!
+  configurarBirdID(authCode: String!, clientId: String!, companyId: ID!): CertificadoType!
+  consultarLoteEsocial(loteId: String!): JSON!
+  createBankConnection(input: CreateBankConnectionInput!): BankConnectionType!
+  createBoleto(input: CreateBoletoInput!): BoletoType!
+  createCompany(input: CreateCompanyInput!): CompanyType!
+  createEmployee(input: CreateEmployeeInput!): EmployeeType!
+  createFiscalNote(input: CreateFiscalNoteInput!): FiscalNoteBasicType!
+  createSignatureRequest(input: CreateSignatureRequestInput!): SignatureRequestType!
+  createTransaction(input: CreateTransactionInput!): TransactionObjectType!
+  criarAbertura(capitalSocial: Float, cnaePrincipal: String!, enderecoComercial: String!, escritorioId: String!, municipio: String!, nomeEmpresarial: String!, nomeFantasia: String, objetoSocial: String!, observacoes: String, socios: String!, tipoEmpresa: String!, uf: String!): AberturaEmpresaType!
+  criarComunicado(agendadoPara: String, canal: String, corpo: String!, destinatarios: String, escritorioId: String!, tipo: String, titulo: String!): ComunicadoType!
+  criarCrmCliente(cnpjCpf: String, companyId: String!, email: String, nome: String!, observacoes: String, origem: String, segmento: String, telefone: String, valorEstimado: Float): CrmClienteType!
+  criarHonorario(companyId: String!, competencia: String!, descricao: String!, formaPagamento: String, observacao: String, valor: Float!, vencimento: String!): HonorarioType!
+  criarPortalCliente(clientEmail: String!, clientName: String!, clientPhone: String, companyId: ID!): PortalCriadoType!
+  criarTarefa(companyId: String!, descricao: String, prazo: String, prioridade: String, responsavel: String, tags: String, tipo: String, titulo: String!): TarefaType!
+  deactivateCompany(id: ID!): CompanyType!
+  emitirNFSe(input: EmitirNFSeInput!): NfseType!
+  emitirNFe(input: EmitirNFeInput!): FiscalNoteType!
+  enviarComunicado(id: String!): ComunicadoType!
+  enviarMensagemPortal(conteudo: String!, portalId: ID!): PortalMessageType!
+  generateExecutiveReport(channel: String, companyId: String!, referenceMonth: String!): ExecutiveReportType!
+  gerarAlertas(companyId: String!): AlertasGeradosType!
+  gerarDASSimples(apuracaoId: ID!): SimplesApuracaoType!
+  gerarDasnMei(anoBase: String!, companyId: String!): MeiApuracaoType!
+  gerarEcd(anoBase: Int!, companyId: ID!): SpedFileType!
+  gerarEcf(anoBase: Int!, companyId: ID!): SpedFileType!
+  gerarEfdContribuicoes(companyId: ID!, referenceMonth: String!): SpedFileType!
+  gerarEfdReinf(companyId: ID!, referenceMonth: String!): SpedFileType!
+  gerarMensalidade(companyId: String!, competencia: String!, valor: Float!): HonorarioType!
+  gerarS1000(companyId: ID!): EsocialEventType!
+  gerarS1200(companyId: ID!, referenceMonth: String!): EsocialEventType!
+  gerarS1299(companyId: ID!, referenceMonth: String!): EsocialEventType!
+  gerarS2200(companyId: ID!, employeeId: ID!): EsocialEventType!
+  gerarS2230(companyId: ID!, dtInicioAfast: String!, dtTermAfast: String, employeeId: ID!, tipoAfastamento: String!): EsocialEventType!
+  gerarS2299(companyId: ID!, dataDemissao: String!, employeeId: ID!, tipoDesligamento: String!): EsocialEventType!
+  gerarSpedFiscal(companyId: ID!, referenceMonth: String!): SpedFileType!
+  manifestarNfe(chaveNfe: String!, companyId: ID!, tipoManifestacao: String!): JSON!
+  marcarNotificacaoLida(id: String!): NotificationType!
+  marcarTodasNotificacoesLidas(companyId: String!): AlertasGeradosType!
+  markBoletoAsPaid(id: ID!, paidAmount: Float): BoletoType!
+  markReportAsSent(id: ID!): ExecutiveReportType!
+  moverTarefa(id: String!, status: String!): TarefaType!
+  pagarDasMei(id: String!): MeiApuracaoType!
+  pagarHonorario(id: String!): HonorarioType!
+  processarXmlNfe(companyId: ID!, fileName: String, origem: String!, xmlContent: String!): XmlCaptureType!
+  registrarContatoCrm(id: String!, proximoContato: String): CrmClienteType!
+  rejectTransaction(id: ID!, reason: String!): TransactionObjectType!
+  removerCertificado(id: ID!): Boolean!
+  responderMensagemPortal(mensagemId: ID!, portalId: ID!, resposta: String!): PortalMessageType!
+  runReconciliation(companyId: String!, matchType: String!, sources: JSON!, targets: JSON!): JSON!
+  salvarCertificadoA1(companyId: ID!, nome: String!, pfxBase64: String!, senha: String!): CertificadoType!
+  seedFiscalCalendar(companyId: String!, year: Int!): SeedCalendarResult!
+  sendFiscalNote(id: ID!): FiscalNoteBasicType!
+  signDocument(requestId: ID!, token: String!): SignatureRequestType!
+  solicitarCertidao(companyId: ID!, tipo: String!): CertidaoType!
+  syncBankStatements(connectionId: String!): SyncResult!
+  transmitirLoteEsocial(eventIds: [ID!]!): TransmissaoLoteType!
+  updateCompany(address: String, email: String, id: ID!, name: String, phone: String, taxRegime: String): CompanyType!
+  updateDocumentStatus(id: ID!, status: String!): DocumentType!
+  updateObligationStatus(amount: Float, id: ID!, notes: String, status: String!): FiscalObligationType!
+}
+
+type NFeListResult {
+  items: [FiscalNoteType!]!
+  limit: Int!
+  page: Int!
+  pages: Int!
+  total: Int!
+}
+
+type NcmInfoType {
+  aliquotaIpi: Float!
+  codigo: String!
+  descricao: String!
+  unidade: String!
+}
+
+type NfseType {
+  aliquotaIss: Float!
+  cancelReason: String
+  canceledAt: DateTime
+  cnaeServico: String
+  codigoMunicipio: String
+  codigoServico: String
+  codigoVerificacao: String
+  companyId: String!
+  competencia: String!
+  createdAt: DateTime!
+  dataEmissao: DateTime!
+  discriminacao: String!
+  errorMessage: String
+  id: ID!
+  issRetido: Boolean!
+  municipioPrestacao: String
+  nfeioId: String
+  numero: Int
+  pdfUrl: String
+  rpsNumero: String!
+  rpsSerie: String!
+  status: String!
+  tomadorCnpjCpf: String!
+  tomadorEmail: String
+  tomadorEndereco: String
+  tomadorMunicipio: String
+  tomadorNome: String!
+  tomadorUf: String
+  updatedAt: DateTime!
+  valorCofins: Float!
+  valorCsll: Float!
+  valorDeducoes: Float!
+  valorInss: Float!
+  valorIr: Float!
+  valorIss: Float!
+  valorLiquido: Float!
+  valorPis: Float!
+  valorServicos: Float!
+  xmlContent: String
+}
+
+type NotificationType {
+  companyId: String!
+  corpo: String!
+  createdAt: DateTime!
+  id: String!
+  lida: Boolean!
+  lidaEm: DateTime
+  link: String
+  tipo: String!
+  titulo: String!
+  userId: String
+}
+
+input PagamentoNFeInput {
+  forma: String!
+  valor: Float!
+}
+
+type PayslipType {
+  approvedBy: String
+  baseSalary: Float!
+  bonuses: Float!
+  breakdown: JSON!
+  companyId: String!
+  createdAt: DateTime!
+  employee: EmployeeType
+  employeeId: String!
+  fgts: Float!
+  grossSalary: Float!
+  id: ID!
+  inssEmployee: Float!
+  inssEmployer: Float!
+  irrf: Float!
+  netSalary: Float!
+  otherDeductions: Float!
+  overtimeHours: Float!
+  overtimeValue: Float!
+  paymentDate: DateTime
+  referenceMonth: String!
+  status: String!
+}
+
+type PisCofinsResultType {
+  aliquota: Float!
+  cst: String!
+  valor: Float!
+}
+
+type PortalCriadoType {
+  accessToken: String!
+  active: Boolean!
+  clientEmail: String
+  clientName: String
+  id: ID!
+  linkAcesso: String!
+}
+
+type PortalMessageType {
+  createdAt: DateTime!
+  id: ID!
+  message: String!
+  portalId: String!
+  readAt: DateTime
+  sender: String!
+}
+
+type Query {
+  aberturas(escritorioId: String!): [AberturaEmpresaType!]!
+  aberturasResumo(escritorioId: String!): AberturaResumoType!
+  acessoryObligations(companyId: String!, referenceMonth: String): [AcessoryObligationType!]!
+  auditTrail(companyId: String!, entityType: String): [AuditTrailType!]!
+  baixarArquivoSped(id: ID!): SpedFileType!
+  baixarXmlNFe(id: ID!): String!
+  balanceSummary(companyId: String!): BalanceSummary!
+  bankConnection(id: ID!): BankConnectionType!
+  bankConnections(companyId: String!): [BankConnectionType!]!
+  bankStatements(connectionId: String!, from: String, to: String): [BankStatementType!]!
+  boleto(id: ID!): BoletoType!
+  boletos(companyId: String!, status: String): [BoletoType!]!
+  buscarNcm(codigo: String!): NcmInfoType!
+  calcularDecimoTerceiro(ano: Int!, companyId: ID!): [DecimoTerceiroItemType!]!
+  calcularDifal(aliquotaInterna: Float!, ufDestino: String!, ufOrigem: String!, valor: Float!): DifalResultType!
+  calcularImpostos(input: CalcImpostosInput!): ImpostoResultType!
+  calcularImpostosServico(aliquotaIss: Float!, issRetido: Boolean, regime: String!, valor: Float!): ImpostoServicoType!
+  checklistAbertura(tipoEmpresa: String!): [ChecklistItemType!]!
+  companies: [CompanyType!]!
+  company(id: ID!): CompanyType!
+  comunicados(escritorioId: String!): [ComunicadoType!]!
+  comunicadosResumo(escritorioId: String!): ComunicadoResumoType!
+  consultarMunicipio(codigoIbge: String!): MunicipioType!
+  consultarNFe(id: ID!): FiscalNoteType!
+  consultarNfeSefaz(chave: String!, companyId: ID!): JSON!
+  crmMetricas(companyId: String!): CrmMetricasType!
+  crmPipeline(companyId: String!): CrmPipelineType!
+  document(id: ID!): DocumentType!
+  documentStats(companyId: String!): DocumentStatsType!
+  documents(companyId: String!, status: String, type: String): [DocumentType!]!
+  employee(id: ID!): EmployeeType!
+  employees(companyId: String!): [EmployeeType!]!
+  esocialDashboard(companyId: ID!): EsocialDashboardType!
+  executiveReport(id: ID!): ExecutiveReportType!
+  executiveReports(companyId: String!): [ExecutiveReportType!]!
+  fiscalNote(id: ID!): FiscalNoteBasicType!
+  fiscalNotes(companyId: String!, status: String): [FiscalNoteBasicType!]!
+  fiscalObligations(companyId: String!, month: String, status: String, type: String): [FiscalObligationType!]!
+  gerarDanfe(id: ID!): String!
+  getDRE(companyId: String!, from: String!, to: String!): DREResult!
+  honorarios(companyId: String!): [HonorarioType!]!
+  honorariosResumo(companyId: String!): HonorarioResumoType!
+  listarApuracoesSimples(companyId: ID!): [SimplesApuracaoType!]!
+  listarArquivosSped(companyId: ID!, tipo: String): [SpedFileType!]!
+  listarAtivos(companyId: ID!): [AtivoImobilizadoType!]!
+  listarCertidoes(companyId: ID!): [CertidaoType!]!
+  listarCertificados(companyId: ID!): [CertificadoType!]!
+  listarCfops: [CfopType!]!
+  listarDocumentosPortalCliente(portalId: ID!): JSON!
+  listarEventosEsocial(companyId: ID!, referenceMonth: String, status: String, tipoEvento: String): [EsocialEventType!]!
+  listarFerias(companyId: ID!): [FeriasType!]!
+  listarMensagensPortal(portalId: ID!): [PortalMessageType!]!
+  listarNFSes(companyId: ID!, competencia: String, status: String): [NfseType!]!
+  listarNFes(companyId: ID!, limit: Int, page: Int, status: String): NFeListResult!
+  listarObrigacoesPortal(portalId: ID!): JSON!
+  listarPortaisCliente(companyId: ID!): [ClientPortalType!]!
+  listarRescisoes(companyId: ID!): [RescisaoType!]!
+  listarSimulacoesTributarias(companyId: ID!): [TaxSimulationType!]!
+  listarXmlsCapturados(companyId: ID!, tipoDoc: String): [XmlCaptureType!]!
+  meiApuracoes(companyId: String!): [MeiApuracaoType!]!
+  meiResumo(companyId: String!): MeiResumoType!
+  notificacoesNaoLidas(companyId: String!): Int!
+  notifications(companyId: String!): [NotificationType!]!
+  payslips(companyId: String!, referenceMonth: String): [PayslipType!]!
+  reconciliationHistory(companyId: String!): [ReconciliationRunType!]!
+  relatorioPatrimonio(companyId: ID!): JSON!
+  relatorioSimulacao(simulacaoId: ID!): JSON!
+  signatureRequest(id: ID!): SignatureRequestType!
+  signatureRequests(companyId: String!, status: String): [SignatureRequestType!]!
+  simularRegimesTributarios(companyId: ID!, referenceMonth: String!): SimulacaoRegimesType!
+  sugerirCfop(tipoOperacao: String!, ufDestino: String!, ufOrigem: String!): String!
+  tarefasKanban(companyId: String!): [KanbanColunaType!]!
+  tarefasResumo(companyId: String!): TarefaResumoType!
+  tarefasVencendoHoje(companyId: String!): [TarefaType!]!
+  transaction(id: ID!): TransactionObjectType!
+  transactions(companyId: String!, status: String): [TransactionObjectType!]!
+  upcomingObligations(companyId: String!, days: Int): [FiscalObligationType!]!
+  verificarValidade(companyId: ID!): ValidadeResultType!
+  verificarVencimentosCertidoes(companyId: ID!): VencimentosCertidoesType!
+  verifyAuditIntegrity(companyId: String!): IntegrityCheckType!
+}
+
+type ReconciliationRunType {
+  companyId: String!
+  createdAt: DateTime!
+  id: String!
+  matchType: String!
+  matches: JSON!
+  matchesCount: Int!
+  status: String!
+  totalMatchedValue: Float!
+  totalUnmatchedValue: Float!
+  unmatchedCount: Int!
+}
+
+type RegimeSimulacaoItemType {
+  aliquotaEfetiva: Float!
+  tributacaoAnual: Float!
+  tributacaoMensal: Float!
+}
+
+type RescisaoType {
+  aviso: Float!
+  avisoPrevio: String!
+  companyId: String!
+  dataDemissao: DateTime!
+  diasAvisoPrevio: Int!
+  direitos: [String!]!
+  employeeId: String!
+  ferias13: Float!
+  feriasProp: Float!
+  feriasVencidas: Float!
+  id: ID!
+  inssRescisao: Float!
+  irrfRescisao: Float!
+  mesesTrabalhados: Int!
+  multa40Fgts: Float!
+  saldoFgts: Float!
+  saldoSalario: Float!
+  status: String!
+  tercoFerias: Float!
+  tipoRescisao: String!
+  totalBruto: Float!
+  totalLiquido: Float!
+}
+
+type SeedCalendarResult {
+  companyId: String!
+  createdCount: Int!
+  message: String!
+  taxRegime: String!
+  year: Int!
+}
+
+input ServicoNFSeInput {
+  cnaeServico: String
+  codigoMunicipio: String!
+  codigoServico: String!
+  discriminacao: String!
+  municipioPrestacao: String!
+}
+
+type SignatureRequestType {
+  auditLog: JSON!
+  companyId: String!
+  completedAt: DateTime
+  createdAt: DateTime!
+  documentUrl: String!
+  expiresAt: DateTime!
+  id: ID!
+  signedDocUrl: String
+  signers: JSON!
+  status: String!
+  title: String!
+  updatedAt: DateTime!
+}
+
+input SignerInput {
+  email: String!
+  name: String!
+  role: String
+}
+
+type SimplesApuracaoType {
+  aliquotaEfetiva: Float!
+  anexo: String!
+  codigoBarras: String
+  cofins: Float!
+  companyId: String!
+  cpp: Float!
+  csll: Float!
+  dasTotal: Float!
+  faixaIdx: Int!
+  fatorR: Float!
+  icms: Float!
+  id: ID!
+  ipi: Float!
+  irpj: Float!
+  iss: Float!
+  pis: Float!
+  rbr12: Float!
+  receita: Float!
+  referenceMonth: String!
+  status: String!
+  vencimento: DateTime
+}
+
+type SimplesSimulacaoItemType {
+  aliquota: Float!
+  tributacaoAnual: Float!
+  tributacaoMensal: Float!
+}
+
+type SimulacaoRegimesType {
+  economiaMensal: String!
+  lucroPresumido: RegimeSimulacaoItemType!
+  lucroReal: RegimeSimulacaoItemType!
+  melhorRegime: String!
+  rbr12: Float!
+  receitaMensal: Float!
+  simplesNacional: SimplesSimulacaoItemType!
+}
+
+type SpedFileType {
+  companyId: String!
+  createdAt: DateTime!
+  fileContent: String
+  fileHash: String
+  id: ID!
+  linhas: Int!
+  referenceMonth: String!
+  status: String!
+  tipo: String!
+}
+
+type SyncResult {
+  connectionId: String!
+  lastSyncAt: String!
+  statements: [BankStatementType!]!
+  syncedCount: Int!
+}
+
+type TarefaResumoType {
+  atrasadas: Int!
+  backlog: Int!
+  concluidas: Int!
+  emAndamento: Int!
+  total: Int!
+}
+
+type TarefaType {
+  checklist: String
+  companyId: String!
+  concluidaEm: DateTime
+  createdAt: DateTime!
+  descricao: String
+  id: String!
+  prazo: DateTime
+  prioridade: String!
+  responsavel: String
+  status: String!
+  tags: String
+  tipo: String!
+  titulo: String!
+  updatedAt: DateTime!
+}
+
+type TaxSimulationType {
+  anoBase: Int!
+  companyId: String!
+  createdAt: DateTime!
+  despesaTotal: Float!
+  economiaMaxima: Float!
+  id: ID!
+  lpTotal: Float!
+  lrTotal: Float!
+  lucroLiquido: Float!
+  melhorRegime: String!
+  receitaTotal: Float!
+  simplesTotal: Float!
+}
+
+input TomadorNFSeInput {
+  cnpjCpf: String!
+  email: String
+  endereco: EnderecoNFSeInput
+  nome: String!
+}
+
+type TransactionObjectType {
+  aiConfidence: Float
+  approvedAt: DateTime
+  approvedBy: String
+  companyId: String!
+  createdAt: DateTime!
+  date: DateTime!
+  description: String!
+  documentId: String
+  entries: JSON!
+  id: ID!
+  isBalanced: Boolean!
+  status: String!
+  totalCredit: Float!
+  totalDebit: Float!
+}
+
+type TransmissaoLoteType {
+  eventCount: Int!
+  loteId: String!
+  nrRecibo: String!
+  status: String!
+}
+
+type ValidadeResultType {
+  alertar: Boolean!
+  certificados: [CertificadoType!]!
+  companyId: String!
+  dataValidade: DateTime!
+  diasRestantes: Int!
+  expirado: Boolean!
+}
+
+input ValoresNFSeInput {
+  aliquotaIss: Float
+  deducoes: Float
+  issRetido: Boolean
+  servicos: Float!
+}
+
+type VencimentosCertidoesType {
+  vencendo: [CertidaoType!]!
+  vencidas: [CertidaoType!]!
+}
+
+type XmlCaptureType {
+  chaveNfe: String
+  cnpjEmitente: String
+  companyId: String!
+  createdAt: DateTime!
+  dataEmissao: DateTime
+  fileName: String
+  id: ID!
+  numero: String
+  origem: String!
+  serie: String
+  status: String!
+  tipoDoc: String!
+  valorTotal: Float
+}

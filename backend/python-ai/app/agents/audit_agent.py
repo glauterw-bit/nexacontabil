@@ -13,7 +13,7 @@ from app.prompts.system_prompts import AUDIT_SYSTEM_PROMPT
 
 logger = structlog.get_logger()
 
-AUDIT_REVIEW_PROMPT = """Revise as seguintes análises realizadas pelos agentes especializados do Aura Accounting:
+AUDIT_REVIEW_PROMPT = """Revise as seguintes análises realizadas pelos agentes especializados do DomoSYS:
 
 {decisions_json}
 
