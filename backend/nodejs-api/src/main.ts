@@ -9,7 +9,7 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3010'],
+    origin: true,
     credentials: true,
   });
 
@@ -23,7 +23,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1', { exclude: ['/health', '/graphql'] });
 
-  const port = process.env.APP_PORT || 3001;
+  const port = process.env.PORT || process.env.APP_PORT || 3001;
   await app.listen(port);
   logger.log(`DomoSYS API running on port ${port}`);
   logger.log(`GraphQL playground: http://localhost:${port}/graphql`);
