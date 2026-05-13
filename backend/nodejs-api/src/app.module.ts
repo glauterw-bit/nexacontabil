@@ -61,7 +61,7 @@ import { DashboardEscritorioModule } from './modules/dashboard-escritorio/dashbo
 
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
-      autoSchemaFile: join(process.cwd(), 'src/graphql/schema.graphql'),
+      autoSchemaFile: true,
       sortSchema: true,
       playground: process.env.NODE_ENV !== 'production',
       introspection: process.env.NODE_ENV !== 'production',
