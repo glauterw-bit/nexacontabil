@@ -53,6 +53,12 @@ import { CentralCobrancasModule } from './modules/central-cobrancas/central-cobr
 import { ExportacaoContabilModule } from './modules/exportacao-contabil/exportacao-contabil.module';
 import { DashboardEscritorioModule } from './modules/dashboard-escritorio/dashboard-escritorio.module';
 import { HealthModule } from './modules/health/health.module';
+import { ChartAccountsModule } from './modules/chart-accounts/chart-accounts.module';
+import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
+import { FiscalCalendarModule } from './modules/fiscal-calendar/fiscal-calendar.module';
+import { FinancialStatementsModule } from './modules/financial-statements/financial-statements.module';
+import { LgpdModule } from './modules/lgpd/lgpd.module';
+import { TwoFactorModule } from './modules/two-factor/two-factor.module';
 
 @Module({
   imports: [
@@ -127,6 +133,18 @@ import { HealthModule } from './modules/health/health.module';
     CentralCobrancasModule,
     ExportacaoContabilModule,
     DashboardEscritorioModule,
+
+    // Contabil avancado
+    ChartAccountsModule,
+    CostCentersModule,
+    FinancialStatementsModule,
+
+    // Calendario fiscal + Workflow
+    FiscalCalendarModule,
+
+    // Seguranca & Compliance
+    TwoFactorModule,
+    LgpdModule,
 
     // Operação
     HealthModule,

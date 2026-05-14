@@ -81,16 +81,22 @@ model Company {
 
 // ─── Usuários ────────────────────────────────────────────────
 model User {
-  id          String   @id @default(uuid())
-  email       String   @unique
-  name        String
-  password    String
-  role        String   @default("user")
-  active      Boolean  @default(true)
-  companyId   String?
-  company     Company? @relation(fields: [companyId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(uuid())
+  email           String   @unique
+  name            String
+  password        String
+  role            String   @default("user") // owner|contador|assistente|cliente
+  active          Boolean  @default(true)
+  companyId       String?
+  company         Company? @relation(fields: [companyId], references: [id])
+  totpSecret      String?  // base32 TOTP secret (RFC 6238) — encriptado em repouso
+  totpEnabled     Boolean  @default(false)
+  totpVerifiedAt  DateTime?
+  lastLoginAt     DateTime?
+  lastLoginIp     String?
+  permissions     String?  // JSON com overrides granulares (modulo:acao)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@map("users")
 }
@@ -1135,4 +1141,142 @@ model Notification {
   createdAt       DateTime @default(now())
 
   @@map("notifications")
+}
+
+// ─── Plano de Contas (PCASP-like, configurável por empresa) ───
+model ChartAccount {
+  id          String   @id @default(uuid())
+  companyId   String
+  codigo      String   // 1.1.01.001 (estrutura hierárquica em string)
+  nome        String
+  tipo        String   // ativo|passivo|patrimonio|receita|despesa|conta_resultado
+  natureza    String   // devedora|credora
+  grau        Int      // 1=titulo, 2=subtitulo, 3=conta, 4=subconta
+  parentId    String?
+  parent      ChartAccount?  @relation("ChartAccountToParent", fields: [parentId], references: [id])
+  children    ChartAccount[] @relation("ChartAccountToParent")
+  active      Boolean  @default(true)
+  permiteLancamento Boolean @default(true)
+  spedCode    String?  // codigo SPED Contabil quando aplicavel
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, codigo])
+  @@index([companyId, tipo])
+  @@map("chart_accounts")
+}
+
+// ─── Centro de Custos ─────────────────────────────────────────
+model CostCenter {
+  id          String   @id @default(uuid())
+  companyId   String
+  codigo      String
+  nome        String
+  parentId    String?
+  parent      CostCenter?  @relation("CostCenterToParent", fields: [parentId], references: [id])
+  children    CostCenter[] @relation("CostCenterToParent")
+  responsavel String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, codigo])
+  @@map("cost_centers")
+}
+
+// ─── Calendario Fiscal (obrigações geradas automaticamente) ───
+model FiscalCalendarItem {
+  id              String    @id @default(uuid())
+  companyId       String
+  tipo            String    // DAS|DARF|GPS|FGTS|ISS|ICMS|DCTFWeb|DCTF|SPED_FISCAL|SPED_CONTRIB|ECD|ECF|EFD_REINF|ESOCIAL|DEFIS|DASN-SIMEI|DIRF|DIMOB|DMED
+  descricao       String
+  competencia     String    // YYYY-MM ou YYYY
+  dataVencimento  DateTime
+  valorEstimado   Float?
+  valorPago       Float?
+  status          String    @default("pendente") // pendente|em_apuracao|apurada|paga|vencida|isenta
+  responsavelId   String?
+  prioridade      String    @default("normal")   // baixa|normal|alta|critica
+  alertaEnviadoEm DateTime?
+  comprovanteUrl  String?
+  observacoes     String?
+  recorrencia     String?   // mensal|trimestral|anual|unico
+  geradoEm        DateTime  @default(now())
+  pagoEm          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([companyId, dataVencimento])
+  @@index([status])
+  @@map("fiscal_calendar_items")
+}
+
+// ─── DFC: Demonstracao do Fluxo de Caixa (cabecalho) ───────
+model CashFlowStatement {
+  id              String   @id @default(uuid())
+  companyId       String
+  periodoInicio   DateTime
+  periodoFim      DateTime
+  metodo          String   // direto|indireto
+  geradoEm        DateTime @default(now())
+  geradoPor       String?
+  // totalizadores
+  fcoOperacionais Float    @default(0) // FCO
+  fcoInvestimento Float    @default(0) // FCI
+  fcoFinanciamento Float   @default(0) // FCF
+  variacaoCaixa   Float    @default(0)
+  saldoInicial    Float    @default(0)
+  saldoFinal      Float    @default(0)
+  rubricasJson    String   // detalhamento por rubrica
+  status          String   @default("rascunho") // rascunho|fechada
+  createdAt       DateTime @default(now())
+
+  @@index([companyId, periodoInicio])
+  @@map("cash_flow_statements")
+}
+
+// ─── DMPL: Demonstracao das Mutacoes do PL ────────────────
+model EquityMutationStatement {
+  id              String   @id @default(uuid())
+  companyId       String
+  exercicio       Int
+  // colunas DMPL
+  capitalSocial       Float @default(0)
+  reservasCapital     Float @default(0)
+  reservasLucros      Float @default(0)
+  acoesTesouraria     Float @default(0)
+  lucrosAcumulados    Float @default(0)
+  ajustesAvaliacao    Float @default(0)
+  outrosResultados    Float @default(0)
+  totalPL             Float @default(0)
+  // linhas (movimentos no ano)
+  linhasJson          String // [{ descricao, capitalSocial, reservas, ..., total }]
+  status              String @default("rascunho")
+  geradoEm            DateTime @default(now())
+  createdAt           DateTime @default(now())
+
+  @@unique([companyId, exercicio])
+  @@map("equity_mutation_statements")
+}
+
+// ─── LGPD: Requisições de exportação e exclusão ───────────
+model DataSubjectRequest {
+  id              String    @id @default(uuid())
+  companyId       String?
+  userEmail       String
+  tipo            String    // export|delete|rectify|object
+  motivo          String?
+  status          String    @default("recebida") // recebida|em_analise|atendida|rejeitada
+  legalBasis      String?   // base legal para rejeicao (ex: obrigacao fiscal 5 anos)
+  arquivoUrl      String?   // resultado export quando aplicavel
+  atendidaEm      DateTime?
+  atendidaPor     String?
+  observacoes     String?
+  ipSolicitante   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userEmail])
+  @@index([status])
+  @@map("data_subject_requests")
 }
