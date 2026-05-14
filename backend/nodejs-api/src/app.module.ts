@@ -52,6 +52,7 @@ import { RecalculoGuiasModule } from './modules/recalculo-guias/recalculo-guias.
 import { CentralCobrancasModule } from './modules/central-cobrancas/central-cobrancas.module';
 import { ExportacaoContabilModule } from './modules/exportacao-contabil/exportacao-contabil.module';
 import { DashboardEscritorioModule } from './modules/dashboard-escritorio/dashboard-escritorio.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -126,6 +127,9 @@ import { DashboardEscritorioModule } from './modules/dashboard-escritorio/dashbo
     CentralCobrancasModule,
     ExportacaoContabilModule,
     DashboardEscritorioModule,
+
+    // Operação
+    HealthModule,
   ],
   providers: [PrismaService],
   exports: [PrismaService],
