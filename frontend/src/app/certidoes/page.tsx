@@ -7,9 +7,9 @@ import { ShieldCheck, AlertTriangle, CheckCircle, RefreshCw, Plus } from 'lucide
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
 
-const LISTAR = gql`query ListarCertidoes($companyId: ID!) { listarCertidoes(companyId: $companyId) { id tipo orgao status dataEmissao dataValidade codigoControle cnpjConsultado } }`;
-const VENCIMENTOS = gql`query Vencimentos($companyId: ID!) { verificarVencimentosCertidoes(companyId: $companyId) { vencendo { id tipo orgao dataValidade } vencidas { id tipo orgao dataValidade } } }`;
-const SOLICITAR = gql`mutation Solicitar($companyId: ID!, $tipo: String!) { solicitarCertidao(companyId: $companyId, tipo: $tipo) { id tipo status orgao codigoControle } }`;
+const LISTAR = gql`query ListarCertidoes($companyId: ID!) { listarCertidoes(companyId: $companyId) { id tipo orgaoEmissor status dataEmissao dataValidade numeroControle cnpj } }`;
+const VENCIMENTOS = gql`query Vencimentos($companyId: ID!) { verificarVencimentosCertidoes(companyId: $companyId) { vencendo { id tipo orgaoEmissor dataValidade } vencidas { id tipo orgaoEmissor dataValidade } } }`;
+const SOLICITAR = gql`mutation Solicitar($companyId: ID!, $tipo: String!) { solicitarCertidao(companyId: $companyId, tipo: $tipo) { id tipo status orgaoEmissor numeroControle } }`;
 
 const STATUS_COLORS: Record<string, string> = {
   negativa: 'text-green-400 bg-green-400/10 border-green-400/20',
@@ -93,7 +93,7 @@ export default function CertidoesPage() {
               </div>
               {vencidas.map((c: any) => (
                 <div key={c.id} className="text-sm text-red-300 flex justify-between">
-                  <span>{c.tipo} — {c.orgao}</span>
+                  <span>{c.tipo} — {c.orgaoEmissor}</span>
                   <span>{fmtDate(c.dataValidade)}</span>
                 </div>
               ))}
@@ -107,7 +107,7 @@ export default function CertidoesPage() {
               </div>
               {vencendo.map((c: any) => (
                 <div key={c.id} className="text-sm text-yellow-300 flex justify-between">
-                  <span>{c.tipo} — {c.orgao}</span>
+                  <span>{c.tipo} — {c.orgaoEmissor}</span>
                   <span>{diasParaVencer(c.dataValidade)} dias</span>
                 </div>
               ))}
@@ -164,8 +164,8 @@ export default function CertidoesPage() {
                 return (
                   <tr key={c.id} className="border-b border-[#1e2740] hover:bg-white/5">
                     <td className="px-4 py-3 text-white font-medium">{c.tipo.toUpperCase()}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">{c.orgao}</td>
-                    <td className="px-4 py-3 text-gray-400 font-mono text-xs">{c.cnpjConsultado}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{c.orgaoEmissor}</td>
+                    <td className="px-4 py-3 text-gray-400 font-mono text-xs">{c.cnpj}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium border ${STATUS_COLORS[c.status] || STATUS_COLORS.nao_consultado}`}>
                         {c.status === 'negativa' ? '✓ Negativa' : c.status === 'positiva' ? '✗ Positiva' : c.status}
@@ -177,7 +177,7 @@ export default function CertidoesPage() {
                         {fmtDate(c.dataValidade)} {dias !== null && !venceu ? `(${dias}d)` : venceu ? '(VENCIDA)' : ''}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-600 font-mono text-xs">{c.codigoControle?.substring(0, 20) || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600 font-mono text-xs">{c.numeroControle?.substring(0, 20) || '—'}</td>
                   </tr>
                 );
               })}

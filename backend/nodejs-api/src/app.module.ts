@@ -54,6 +54,7 @@ import { ExportacaoContabilModule } from './modules/exportacao-contabil/exportac
 import { DashboardEscritorioModule } from './modules/dashboard-escritorio/dashboard-escritorio.module';
 import { HealthModule } from './modules/health/health.module';
 import { DesktopAgentModule } from './modules/desktop-agent/desktop-agent.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { ChartAccountsModule } from './modules/chart-accounts/chart-accounts.module';
 import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
 import { FiscalCalendarModule } from './modules/fiscal-calendar/fiscal-calendar.module';
@@ -150,6 +151,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     // Operação
     HealthModule,
     DesktopAgentModule,
+    IntegrationsModule,
   ],
   providers: [PrismaService],
   exports: [PrismaService],

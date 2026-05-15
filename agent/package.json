@@ -21,9 +21,6 @@
       "node_modules/**/*",
       "package.json"
     ],
-    "extraResources": [
-      "src/assets/**/*"
-    ],
     "win": {
       "target": [
         {
@@ -32,8 +29,7 @@
             "x64"
           ]
         }
-      ],
-      "icon": "src/assets/icon.ico"
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -41,19 +37,15 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "NexaContabil Agent",
-      "installerIcon": "src/assets/icon.ico",
-      "uninstallerIcon": "src/assets/icon.ico"
+      "shortcutName": "NexaContabil Agent"
     },
     "mac": {
       "target": "dmg",
-      "category": "public.app-category.business",
-      "icon": "src/assets/icon.icns"
+      "category": "public.app-category.business"
     },
     "linux": {
       "target": "AppImage",
-      "category": "Office",
-      "icon": "src/assets/icon.png"
+      "category": "Office"
     },
     "publish": {
       "provider": "github",

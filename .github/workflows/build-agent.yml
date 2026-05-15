@@ -1,8 +1,5 @@
 name: Build Desktop Agent
 
-# Dispara em tag (formato `agent-v1.2.3`) ou manual.
-# Compila o agente Electron para Windows x64 e publica como GitHub Release.
-
 on:
   push:
     tags:
@@ -40,13 +37,19 @@ jobs:
         working-directory: agent
         run: npm run build
 
+      - name: Rebuild native modules for Electron
+        working-directory: agent
+        run: npx @electron/rebuild
+
       - name: Package Windows installer (NSIS)
         working-directory: agent
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEBUG: electron-builder
         run: npx electron-builder --win --x64 --publish ${{ (github.event_name == 'push' || inputs.release) && 'always' || 'never' }}
 
       - name: Upload artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: nexacontabil-agent-windows-x64
@@ -54,3 +57,49 @@ jobs:
             agent/release/*.exe
             agent/release/latest.yml
           retention-days: 90
+          if-no-files-found: warn
+
+  build-mac:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: agent/package-lock.json
+
+      - name: Install dependencies
+        working-directory: agent
+        run: npm install --no-audit --no-fund
+
+      - name: Build TypeScript
+        working-directory: agent
+        run: npm run build
+
+      - name: Rebuild native modules for Electron
+        working-directory: agent
+        run: npx @electron/rebuild
+
+      - name: Package macOS installer (DMG)
+        working-directory: agent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Sem signing por enquanto — usuario precisa permitir em System Preferences
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --mac --x64 --arm64 --publish ${{ (github.event_name == 'push' || inputs.release) && 'always' || 'never' }}
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexacontabil-agent-mac
+          path: |
+            agent/release/*.dmg
+            agent/release/*.yml
+          retention-days: 90
+          if-no-files-found: warn
