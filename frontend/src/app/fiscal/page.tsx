@@ -1,12 +1,30 @@
 'use client';
 import { useState } from 'react';
-import { Plus, Download, X, Search, Filter, FileText } from 'lucide-react';
+import { useQuery, useMutation, gql } from '@apollo/client';
+import { Plus, Download, X, Search, Filter, FileText, Loader2 } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 
-type NFStatus = 'rascunho' | 'autorizada' | 'rejeitada' | 'cancelada';
-type NFTipo = 'NF-e' | 'NFS-e' | 'NF-CE';
+const LIST_NOTES = gql`
+  query FiscalNotes($companyId: String!) {
+    fiscalNotes(companyId: $companyId) {
+      id type status number series accessKey issueDate
+      recipientName recipientCnpjCpf totalValue
+      rejectionMessage createdAt
+    }
+  }
+`;
+
+const CANCEL_NOTE = gql`
+  mutation CancelFiscalNote($id: ID!, $reason: String!) {
+    cancelFiscalNote(id: $id, reason: $reason) { id status }
+  }
+`;
+
+type NFStatus = 'rascunho' | 'autorizada' | 'rejeitada' | 'cancelada' | 'draft' | 'authorized' | 'rejected' | 'cancelled';
+type NFTipo = 'NF-e' | 'NFS-e' | 'NF-CE' | 'nfe' | 'nfse';
 
 interface NotaFiscal {
   id: string;
@@ -20,7 +38,8 @@ interface NotaFiscal {
   chaveAcesso?: string;
 }
 
-const MOCK_NOTAS: NotaFiscal[] = [
+// kept for legacy reference but not used; the page now consumes GraphQL data.
+const MOCK_NOTAS_LEGACY: NotaFiscal[] = [
   { id: '1', numero: '000001234', tipo: 'NF-e', destinatario: 'Empresa ABC Ltda', cnpjCpf: '12.345.678/0001-90', valor: 15800.00, dataEmissao: '2026-03-20', status: 'autorizada', chaveAcesso: '35260312345678000190550010000012341000012345' },
   { id: '2', numero: '000001235', tipo: 'NFS-e', destinatario: 'Comércio XYZ SA', cnpjCpf: '98.765.432/0001-10', valor: 8500.00, dataEmissao: '2026-03-18', status: 'autorizada', chaveAcesso: '35260398765432000110550010000012351000012346' },
   { id: '3', numero: '000001236', tipo: 'NF-e', destinatario: 'Indústria DEF', cnpjCpf: '11.222.333/0001-44', valor: 32000.00, dataEmissao: '2026-03-15', status: 'autorizada', chaveAcesso: '35260311222333000144550010000012361000012347' },
@@ -43,16 +62,58 @@ const tipoColors: Record<NFTipo, string> = {
   'NF-CE': 'bg-cyan-600/20 text-cyan-400',
 };
 
+// normaliza tipo/status do backend pro vocab da UI legada
+function normTipo(t: string): NFTipo {
+  const m: Record<string, NFTipo> = { nfe: 'NF-e', nfse: 'NFS-e', cte: 'NF-e', boleto: 'NF-e' };
+  return (m[t?.toLowerCase()] ?? 'NF-e') as NFTipo;
+}
+function normStatus(s: string): NFStatus {
+  const m: Record<string, NFStatus> = {
+    draft: 'rascunho', rascunho: 'rascunho',
+    authorized: 'autorizada', autorizada: 'autorizada', autorized: 'autorizada',
+    rejected: 'rejeitada', rejeitada: 'rejeitada',
+    cancelled: 'cancelada', canceled: 'cancelada', cancelada: 'cancelada',
+  };
+  return (m[s?.toLowerCase()] ?? 'rascunho') as NFStatus;
+}
+
 export default function FiscalPage() {
   const { selectedCompany } = useCompany();
-  const [notas, setNotas] = useState<NotaFiscal[]>(MOCK_NOTAS);
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [statusFiltro, setStatusFiltro] = useState<string>('todos');
   const [tipoFiltro, setTipoFiltro] = useState<string>('todos');
 
+  const companyId = selectedCompany?.id ?? '';
+  const { data, loading, refetch } = useQuery(LIST_NOTES, {
+    variables: { companyId },
+    skip: !companyId,
+  });
+  const [cancelMutation] = useMutation(CANCEL_NOTE, {
+    onCompleted: () => { toast.push('Nota cancelada', { variant: 'success' }); refetch(); },
+    onError: (e) => toast.push(e.message, { variant: 'error', title: 'Erro' }),
+  });
+
+  const rawNotes: any[] = data?.fiscalNotes ?? [];
+  const notas: NotaFiscal[] = rawNotes.map((r) => ({
+    id: r.id,
+    numero: r.number ? String(r.number).padStart(9, '0') : r.id.slice(0, 9),
+    tipo: normTipo(r.type),
+    destinatario: r.recipientName,
+    cnpjCpf: r.recipientCnpjCpf,
+    valor: r.totalValue,
+    dataEmissao: r.issueDate ?? r.createdAt,
+    status: normStatus(r.status),
+    chaveAcesso: r.accessKey,
+  }));
+
   const cancelar = (id: string) => {
-    if (!confirm('Confirmar cancelamento desta nota?')) return;
-    setNotas(prev => prev.map(n => n.id === id ? { ...n, status: 'cancelada' as NFStatus } : n));
+    const reason = prompt('Motivo do cancelamento (mínimo 15 caracteres):');
+    if (!reason || reason.trim().length < 15) {
+      toast.push('Motivo obrigatório com pelo menos 15 caracteres', { variant: 'warning' });
+      return;
+    }
+    cancelMutation({ variables: { id, reason } });
   };
 
   const filtered = notas.filter(n => {
