@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { CompanyAccessGuard } from './common/company-access.guard';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'path';
@@ -153,7 +156,11 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     DesktopAgentModule,
     IntegrationsModule,
   ],
-  providers: [PrismaService],
+  providers: [
+    PrismaService,
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: CompanyAccessGuard },
+  ],
   exports: [PrismaService],
 })
 export class AppModule {}

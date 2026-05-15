@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { Public } from '../../common/public.decorator';
 
 type Status = 'configured' | 'missing' | 'partial';
 
@@ -18,6 +19,7 @@ export class IntegrationsController {
    * Retorna status das integrações externas que o sistema PODE usar.
    * O frontend renderiza isso em /integracoes com instruções passo-a-passo.
    */
+  @Public()
   @Get('status')
   status(): { integrations: IntegrationStatus[]; summary: { total: number; configured: number; missing: number } } {
     const integrations: IntegrationStatus[] = [

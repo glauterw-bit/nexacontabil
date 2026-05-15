@@ -13,6 +13,7 @@ import { IsString, IsOptional, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { Public } from '../../common/public.decorator';
 
 class UpdateProfileDto {
   @IsOptional()
@@ -29,12 +30,14 @@ class UpdateProfileDto {
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
+  @Public()
   @Post('login')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(200)

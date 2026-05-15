@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { Public } from '../../common/public.decorator';
 
 const GITHUB_OWNER = 'glauterw-bit';
 const GITHUB_REPO = 'nexacontabil';
@@ -21,6 +22,7 @@ export class DesktopAgentController {
    * Retorna metadata do último release do agente desktop.
    * Consulta GitHub API publica (sem token — limite ~60 req/h por IP).
    */
+  @Public()
   @Get('release')
   async getLatestRelease(): Promise<ReleaseInfo | { error: string }> {
     try {
