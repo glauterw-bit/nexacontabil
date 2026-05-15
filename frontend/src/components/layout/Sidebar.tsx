@@ -37,7 +37,7 @@ interface NavGroup {
 const NAV_MAIN: NavItem[] = [
   { href: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/documents',    icon: FileText,         label: 'Documentos' },
-  { href: '/lote',         icon: FileText,         label: 'Análise em lote', badge: 'AI' },
+  { href: '/inteligencia', icon: FileText,         label: 'Análise em Lote', badge: 'AI' },
   { href: '/transactions', icon: ArrowLeftRight,   label: 'Lançamentos' },
   { href: '/copilot',      icon: Bot,              label: 'Copilot IA',  badge: 'AI' },
   { href: '/whatsapp',     icon: MessageCircle,    label: 'WhatsApp IA', badge: 'WA' },
