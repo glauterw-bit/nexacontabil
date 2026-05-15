@@ -98,6 +98,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/companies',      icon: Building2, label: 'Empresas' },
       { href: '/onboarding-cliente', icon: Building2, label: 'Onboarding Cliente', badge: 'Novo' },
       { href: '/fechamento',     icon: ShieldCheck, label: 'Fechamento Mensal', badge: 'Novo' },
+      { href: '/pacote-mensal',  icon: FileText,  label: 'Pacote Mensal', badge: 'AI' },
       { href: '/audit',          icon: Hash,      label: 'Auditoria' },
       { href: '/settings',       icon: Settings,  label: 'Configurações' },
     ],

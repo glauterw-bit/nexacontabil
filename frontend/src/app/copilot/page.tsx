@@ -54,25 +54,32 @@ export default function CopilotPage() {
     setLoading(true);
 
     try {
+      const token = localStorage.getItem('aura_token') ?? '';
+      const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
       const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_AI_URL || 'http://localhost:8000'}/api/v1/agents/copilot`,
+        `${API}/api/v1/copilot/chat`,
         {
-          company_id: selectedCompany.id,
-          messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
-        }
+          companyId: selectedCompany.id,
+          question: text,
+          history: messages.map((m) => ({ role: m.role, content: m.content })),
+        },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
       );
-      setMessages(prev => [
+      const sources: string[] = res.data.sources ?? [];
+      setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: res.data.message,
-          suggested_actions: res.data.suggested_actions,
+          content: res.data.answer,
+          suggested_actions: sources.length
+            ? [`Fontes consultadas: ${sources.join(' · ')}`]
+            : undefined,
         },
       ]);
-    } catch {
+    } catch (err: any) {
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: 'Erro ao processar sua pergunta. Verifique a conexão com o servidor.' },
+        { role: 'assistant', content: `Erro ao processar: ${err?.response?.data?.message ?? err?.message ?? 'desconhecido'}` },
       ]);
     } finally {
       setLoading(false);
