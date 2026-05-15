@@ -43,24 +43,35 @@ export class DocumentsService {
         type: extracted.tipo ?? 'outro',
         status: extracted.confidence > 0.6 ? 'completed' : 'needs_review',
         confidenceScore: extracted.confidence,
-        extractedData: extracted as any,
+        extractedData: JSON.stringify(extracted),
         number: extracted.numero ?? null,
-        issueDate: extracted.dataEmissao
-          ? new Date(extracted.dataEmissao.split('/').reverse().join('-'))
-          : null,
-        dueDate: extracted.dataVencimento
-          ? new Date(extracted.dataVencimento.split('/').reverse().join('-'))
-          : null,
+        issueDate: this.parseBrDate(extracted.dataEmissao),
+        dueDate: this.parseBrDate(extracted.dataVencimento),
         totalValue: extracted.valorTotal ?? null,
         issuerName: extracted.emitenteNome ?? null,
         issuerCnpj: extracted.emitenteCnpj ?? null,
-        fiscalValidation: { chaveAcesso: extracted.chaveAcesso, impostos: extracted.impostos } as any,
-        agentDecisions: extracted.sugestoesContabeis as any,
+        fiscalValidation: JSON.stringify({ chaveAcesso: extracted.chaveAcesso, impostos: extracted.impostos }),
+        agentDecisions: JSON.stringify(extracted.sugestoesContabeis ?? []),
         processingTimeMs: Date.now() - startedAt,
       },
     });
 
     return doc;
+  }
+
+  private parseBrDate(v?: string | null): Date | null {
+    if (!v) return null;
+    // Aceita DD/MM/AAAA ou YYYY-MM-DD
+    try {
+      if (v.includes('/')) {
+        const [d, m, y] = v.split('/');
+        if (d && m && y) return new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+      }
+      const dt = new Date(v);
+      return isNaN(dt.getTime()) ? null : dt;
+    } catch {
+      return null;
+    }
   }
 
   // ─── Processar XML fiscal com Claude ──────────────────────────────────────
@@ -75,15 +86,13 @@ export class DocumentsService {
         type: extracted.tipo ?? 'nfe',
         status: 'completed',
         confidenceScore: extracted.confidence,
-        extractedData: extracted as any,
+        extractedData: JSON.stringify(extracted),
         number: extracted.numero ?? null,
-        issueDate: extracted.dataEmissao
-          ? new Date(extracted.dataEmissao.split('/').reverse().join('-'))
-          : null,
+        issueDate: this.parseBrDate(extracted.dataEmissao),
         totalValue: extracted.valorTotal ?? null,
         issuerName: extracted.emitenteNome ?? null,
         issuerCnpj: extracted.emitenteCnpj ?? null,
-        agentDecisions: extracted.sugestoesContabeis as any,
+        agentDecisions: JSON.stringify(extracted.sugestoesContabeis ?? []),
         processingTimeMs: Date.now() - startedAt,
       },
     });
@@ -96,19 +105,15 @@ export class DocumentsService {
         type: result.extracted_data?.document_type || 'other',
         status: result.status || 'completed',
         confidenceScore: result.extracted_data?.confidence_score,
-        extractedData: result.extracted_data,
+        extractedData: result.extracted_data ? JSON.stringify(result.extracted_data) : null,
         number: result.extracted_data?.number,
-        issueDate: result.extracted_data?.issue_date
-          ? new Date(result.extracted_data.issue_date.split('/').reverse().join('-'))
-          : null,
-        dueDate: result.extracted_data?.due_date
-          ? new Date(result.extracted_data.due_date.split('/').reverse().join('-'))
-          : null,
+        issueDate: this.parseBrDate(result.extracted_data?.issue_date),
+        dueDate: this.parseBrDate(result.extracted_data?.due_date),
         totalValue: result.extracted_data?.total_value,
         issuerName: result.extracted_data?.issuer_name,
         issuerCnpj: result.extracted_data?.issuer_cnpj,
-        fiscalValidation: result.fiscal_validation,
-        agentDecisions: result.accounting_suggestions,
+        fiscalValidation: result.fiscal_validation ? JSON.stringify(result.fiscal_validation) : null,
+        agentDecisions: result.accounting_suggestions ? JSON.stringify(result.accounting_suggestions) : null,
         processingTimeMs: result.processing_time_ms,
       },
     });
