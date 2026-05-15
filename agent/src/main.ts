@@ -8,7 +8,7 @@ import { startWatchers, stopWatchers } from './watcher';
 import { ApiClient } from './api-client';
 import { syncOnce, isRunning, requestStop } from './sync';
 
-const store = new Store<AppSettings>({ defaults: INITIAL_SETTINGS });
+const store: any = new Store<AppSettings>({ defaults: INITIAL_SETTINGS });
 const api = new ApiClient(store.get('apiUrl') ?? INITIAL_SETTINGS.apiUrl, store.get('jwt'));
 
 let tray: Tray | null = null;
@@ -228,9 +228,8 @@ ipcMain.handle('file:showInFolder', (_e, p: string) => shell.showItemInFolder(p)
 
 // ─── App lifecycle ──────────────────────────────────────────────────────────
 
-app.on('window-all-closed', (e: any) => {
+app.on('window-all-closed', () => {
   // não sai quando todas as janelas fecham — fica no tray
-  e.preventDefault?.();
 });
 
 app.whenReady().then(() => {
