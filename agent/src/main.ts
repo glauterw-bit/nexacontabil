@@ -185,13 +185,62 @@ ipcMain.handle('companies:select', (_e, companyId: string) => {
   return companyId;
 });
 
+function isRootLikePath(p: string): boolean {
+  // Windows: C:\ ou C:\Users (mas C:\Users\<name> ok)
+  if (/^[A-Z]:[\\\/]?$/i.test(p)) return true;
+  if (/^[A-Z]:[\\\/]Users[\\\/]?$/i.test(p)) return true;
+  if (/^[A-Z]:[\\\/]ProgramData[\\\/]?$/i.test(p)) return true;
+  // Unix
+  if (p === '/' || p === '/home' || p === '/Users') return true;
+  return false;
+}
+
 ipcMain.handle('folders:add', async () => {
   const r = await dialog.showOpenDialog({
     properties: ['openDirectory', 'multiSelections'],
     title: 'Selecione pastas para monitorar',
+    buttonLabel: 'Monitorar esta pasta',
   });
   if (r.canceled) return getSettings().watchFolders;
+
+  // Aviso se selecionou pasta raiz — performance pode degradar
+  const roots = r.filePaths.filter(isRootLikePath);
+  if (roots.length > 0) {
+    const choice = await dialog.showMessageBox({
+      type: 'warning',
+      buttons: ['Cancelar', 'Monitorar mesmo assim'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'Pasta raiz selecionada',
+      message: 'Você escolheu uma pasta raiz do sistema.',
+      detail:
+        'Selecionar pastas raízes (ex: C:\\) pode demorar 30-90 min na primeira indexação e ' +
+        'consumir muita memória. O agente já ignora Windows, Program Files, AppData, $Recycle.Bin, ' +
+        'node_modules e diretórios de cache automaticamente.\n\n' +
+        'Recomendação: aponte para pastas específicas — Z:\\NF-e\\, C:\\Users\\<seu>\\Documentos\\Contábil\\, etc.\n\n' +
+        'Deseja continuar mesmo assim?',
+    });
+    if (choice.response === 0) return getSettings().watchFolders;
+  }
+
   const set = new Set([...getSettings().watchFolders, ...r.filePaths]);
+  const list = Array.from(set);
+  saveSettings({ watchFolders: list });
+  startWatchers(list, {
+    onFileSeen: refreshTrayMenu,
+    onError: (err) => console.error('Watcher:', err.message),
+  });
+  return list;
+});
+
+ipcMain.handle('folders:addCommon', async (_e, kind: 'documents' | 'downloads' | 'desktop') => {
+  let target: string;
+  switch (kind) {
+    case 'documents': target = app.getPath('documents'); break;
+    case 'downloads': target = app.getPath('downloads'); break;
+    case 'desktop':   target = app.getPath('desktop'); break;
+  }
+  const set = new Set([...getSettings().watchFolders, target]);
   const list = Array.from(set);
   saveSettings({ watchFolders: list });
   startWatchers(list, {

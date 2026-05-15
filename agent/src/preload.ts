@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('agent', {
   },
   folders: {
     add: () => ipcRenderer.invoke('folders:add'),
+    addCommon: (kind: 'documents' | 'downloads' | 'desktop') =>
+      ipcRenderer.invoke('folders:addCommon', kind),
     remove: (folder: string) => ipcRenderer.invoke('folders:remove', folder),
   },
   stats: () => ipcRenderer.invoke('stats'),
@@ -37,7 +39,11 @@ declare global {
       settings: { get: () => Promise<any>; set: (p: any) => Promise<any> };
       auth: { login: (e: string, p: string) => Promise<any>; logout: () => Promise<boolean> };
       companies: { list: () => Promise<any[]>; select: (id: string) => Promise<string> };
-      folders: { add: () => Promise<string[]>; remove: (f: string) => Promise<string[]> };
+      folders: {
+        add: () => Promise<string[]>;
+        addCommon: (kind: 'documents' | 'downloads' | 'desktop') => Promise<string[]>;
+        remove: (f: string) => Promise<string[]>;
+      };
       stats: () => Promise<any>;
       search: { local: (q: string) => Promise<any[]>; remote: (q: string) => Promise<any> };
       sync: { now: () => Promise<void> };

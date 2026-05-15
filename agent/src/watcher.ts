@@ -4,6 +4,40 @@ import * as fs from 'fs';
 import { ACCEPTED_EXTENSIONS, MAX_FILE_SIZE_BYTES } from './config';
 import { upsertFile } from './database';
 
+/**
+ * Pastas excluídas automaticamente — Windows system folders, app data,
+ * caches e diretórios de desenvolvimento. Tudo case-insensitive.
+ *
+ * Mesmo que o usuário aponte para C:\, esses caminhos são ignorados.
+ */
+const EXCLUDED_FOLDER_NAMES = new Set([
+  // Windows
+  'windows', 'program files', 'program files (x86)', 'programdata',
+  '$recycle.bin', '$windows.~bt', '$windows.~ws', 'system volume information',
+  'recovery', 'msocache', 'perflogs', 'inetpub',
+  // User cache / app data
+  'appdata', 'application data', 'local settings', 'temporary internet files',
+  '.cache', '.local', 'temp', 'tmp',
+  // Dev
+  'node_modules', '.git', '.svn', '.hg', '.vscode', '.idea',
+  '__pycache__', '.venv', 'venv', 'env',
+  // macOS / Linux system
+  '.trash', '.trashes', '.fseventsd', '.spotlight-v100', 'lost+found',
+  'system', 'library',
+  // Browser / app caches
+  'cache', 'caches', 'cachestorage', 'gpucache',
+]);
+
+function isExcludedPath(absPath: string): boolean {
+  const segments = absPath.split(path.sep).map((s) => s.toLowerCase());
+  for (const seg of segments) {
+    if (EXCLUDED_FOLDER_NAMES.has(seg)) return true;
+    // arquivos/pastas ocultos por convenção (.something) — exceto raízes de drives
+    if (seg.startsWith('.') && seg.length > 1 && !seg.match(/^\.[a-z]:$/)) return true;
+  }
+  return false;
+}
+
 export interface WatcherEvents {
   onFileSeen: () => void;
   onError: (err: Error) => void;
@@ -46,9 +80,11 @@ export function startWatchers(folders: string[], ev: WatcherEvents) {
     ignoreInitial: false,
     awaitWriteFinish: { stabilityThreshold: 1500, pollInterval: 500 },
     ignored: (p) => {
-      // ignora arquivos ocultos e temporários
       const base = path.basename(p);
-      if (base.startsWith('.') || base.startsWith('~$')) return true;
+      // arquivos temporários de Office (~$file.xlsx)
+      if (base.startsWith('~$')) return true;
+      // pastas/arquivos do sistema operacional e dev
+      if (isExcludedPath(p)) return true;
       // se for arquivo, só aceita extensões válidas
       try {
         const st = fs.statSync(p);
@@ -56,8 +92,9 @@ export function startWatchers(folders: string[], ev: WatcherEvents) {
       } catch {}
       return false;
     },
-    depth: 99,
+    depth: 12, // varredura recursiva mas com limite — cobre Z:\NF-e\<empresa>\<ano>\<mes>\
     usePolling: false,
+    followSymlinks: false,
   });
 
   watcher

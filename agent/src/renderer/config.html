@@ -54,10 +54,20 @@
 
   <h2>Pastas monitoradas</h2>
   <div id="folders"></div>
-  <button id="btn-add-folder">+ Adicionar pasta</button>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+    <button id="btn-add-folder">+ Escolher pasta…</button>
+    <button class="secondary" id="btn-add-documents">+ Documentos</button>
+    <button class="secondary" id="btn-add-downloads">+ Downloads</button>
+    <button class="secondary" id="btn-add-desktop">+ Desktop</button>
+  </div>
   <p style="font-size:11px;color:#6b7280;margin-top:8px">
-    Dica: aponte para pastas locais ou drives mapeados (ex: <code>Z:\NF-e\2026</code>).
-    Subpastas são monitoradas recursivamente.
+    Dica: aponte para pastas locais ou drives mapeados (<code>Z:\NF-e\2026</code>, <code>\\servidor\contabil</code>).
+    Subpastas são monitoradas recursivamente (até 12 níveis). O agente ignora automaticamente
+    <code>Windows</code>, <code>Program Files</code>, <code>AppData</code>, <code>node_modules</code>,
+    <code>$Recycle.Bin</code> e diretórios de cache.
+  </p>
+  <p style="font-size:11px;color:#fbbf24;margin-top:4px">
+    Selecionar <code>C:\</code> raiz funciona mas pode demorar 30-90 min para indexar tudo. Prefira pastas específicas.
   </p>
 
   <h2>Status</h2>
@@ -159,6 +169,18 @@ document.getElementById('company-select').addEventListener('change', async (e) =
 
 document.getElementById('btn-add-folder').addEventListener('click', async () => {
   await window.agent.folders.add();
+  refresh();
+});
+document.getElementById('btn-add-documents').addEventListener('click', async () => {
+  await window.agent.folders.addCommon('documents');
+  refresh();
+});
+document.getElementById('btn-add-downloads').addEventListener('click', async () => {
+  await window.agent.folders.addCommon('downloads');
+  refresh();
+});
+document.getElementById('btn-add-desktop').addEventListener('click', async () => {
+  await window.agent.folders.addCommon('desktop');
   refresh();
 });
 
