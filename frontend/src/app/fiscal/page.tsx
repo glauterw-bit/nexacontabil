@@ -49,14 +49,14 @@ const MOCK_NOTAS_LEGACY: NotaFiscal[] = [
   { id: '7', numero: '000001240', tipo: 'NF-e', destinatario: 'Tech Solutions Ltda', cnpjCpf: '22.333.444/0001-55', valor: 18900.00, dataEmissao: '2026-03-22', status: 'rascunho' },
 ];
 
-const statusConfig: Record<NFStatus, { label: string; color: string; bg: string; border: string }> = {
+const statusConfig: Partial<Record<NFStatus, { label: string; color: string; bg: string; border: string }>> = {
   rascunho: { label: 'Rascunho', color: 'text-gray-400', bg: 'bg-gray-400/10', border: 'border-gray-400/30' },
   autorizada: { label: 'Autorizada', color: 'text-green-400', bg: 'bg-green-400/10', border: 'border-green-400/30' },
   rejeitada: { label: 'Rejeitada', color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/30' },
   cancelada: { label: 'Cancelada', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30' },
 };
 
-const tipoColors: Record<NFTipo, string> = {
+const tipoColors: Partial<Record<NFTipo, string>> = {
   'NF-e': 'bg-indigo-600/20 text-indigo-400',
   'NFS-e': 'bg-purple-600/20 text-purple-400',
   'NF-CE': 'bg-cyan-600/20 text-cyan-400',
@@ -192,7 +192,7 @@ export default function FiscalPage() {
           </thead>
           <tbody className="divide-y divide-[#1e2740]">
             {filtered.map(n => {
-              const cfg = statusConfig[n.status];
+              const cfg = statusConfig[n.status] ?? { label: n.status, color: 'text-gray-400', bg: 'bg-gray-400/10', border: 'border-gray-400/30' };
               return (
                 <tr key={n.id} className={`hover:bg-white/5 transition-colors ${n.status === 'cancelada' ? 'opacity-50' : ''}`}>
                   <td className="py-3 text-sm font-mono text-gray-300">{n.numero}</td>

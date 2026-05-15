@@ -59,6 +59,7 @@ import { HealthModule } from './modules/health/health.module';
 import { DesktopAgentModule } from './modules/desktop-agent/desktop-agent.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { PeriodClosingModule } from './modules/period-closing/period-closing.module';
+import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { ChartAccountsModule } from './modules/chart-accounts/chart-accounts.module';
 import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
 import { FiscalCalendarModule } from './modules/fiscal-calendar/fiscal-calendar.module';
@@ -157,6 +158,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     DesktopAgentModule,
     IntegrationsModule,
     PeriodClosingModule,
+    WhatsappModule,
   ],
   providers: [
     PrismaService,
