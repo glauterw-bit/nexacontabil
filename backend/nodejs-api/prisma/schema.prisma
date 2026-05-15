@@ -1281,6 +1281,62 @@ model DataSubjectRequest {
   @@map("data_subject_requests")
 }
 
+// ─── Carteira de Clientes por Analista ───────────────────────
+model ClientAssignment {
+  id           String   @id @default(uuid())
+  companyId    String
+  analystId    String   // User.id do analista responsavel
+  assignedById String   // quem atribuiu (gerente/owner)
+  assignedAt   DateTime @default(now())
+  unassignedAt DateTime?
+  active       Boolean  @default(true)
+  motivo       String?  // motivo da atribuicao/desatribuicao
+  observacoes  String?
+
+  @@index([analystId, active])
+  @@index([companyId, active])
+  @@map("client_assignments")
+}
+
+// ─── Workflow Task (Kanban operacional) ──────────────────────
+model WorkflowTask {
+  id           String   @id @default(uuid())
+  companyId    String
+  analystId    String?  // pode ser nulo (nao atribuida)
+  stage        String   // recepcao|lancamento|conciliacao|apuracao|obrigacoes|revisao|entregue
+  competencia  String   // YYYY-MM
+  status       String   @default("pendente") // pendente|em_andamento|concluida|bloqueada
+  prioridade   String   @default("normal")   // baixa|normal|alta|critica
+  slaDate      DateTime // prazo do estagio
+  startedAt    DateTime?
+  completedAt  DateTime?
+  completedBy  String?
+  tempoSegundos Int?    // tempo real para completar (audit)
+  observacoes  String?
+  blockedReason String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([companyId, stage, competencia])
+  @@index([analystId, status])
+  @@index([companyId, competencia])
+  @@index([stage, status])
+  @@map("workflow_tasks")
+}
+
+// ─── Comentarios em Tasks (historico imutavel) ──────────────
+model WorkflowComment {
+  id        String   @id @default(uuid())
+  taskId    String
+  userId    String
+  userName  String   // snapshot do nome (audit)
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+  @@map("workflow_comments")
+}
+
 // ─── Fechamento Mensal (lock de periodo) ─────────────────────
 model AccountingPeriodClosing {
   id              String   @id @default(uuid())

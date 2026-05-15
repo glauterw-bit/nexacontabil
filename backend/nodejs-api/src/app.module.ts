@@ -62,6 +62,7 @@ import { PeriodClosingModule } from './modules/period-closing/period-closing.mod
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { MonthlyPackageModule } from './modules/monthly-package/monthly-package.module';
 import { CopilotModule } from './modules/copilot/copilot.module';
+import { WorkflowModule } from './modules/workflow/workflow.module';
 import { ChartAccountsModule } from './modules/chart-accounts/chart-accounts.module';
 import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
 import { FiscalCalendarModule } from './modules/fiscal-calendar/fiscal-calendar.module';
@@ -163,6 +164,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     WhatsappModule,
     MonthlyPackageModule,
     CopilotModule,
+    WorkflowModule,
   ],
   providers: [
     PrismaService,
