@@ -2,6 +2,10 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Sidebar } from './Sidebar';
+import { TopBar } from './TopBar';
+import { CommandPalette } from './CommandPalette';
+import { WelcomeOnboarding } from './WelcomeOnboarding';
+import { ToastProvider } from '@/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Zap } from 'lucide-react';
 
@@ -47,14 +51,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Usuário autenticado → layout completo
   if (user) {
     return (
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto bg-[#0f1117]">
-          {children}
-        </main>
-      </div>
+      <ToastProvider>
+        <AuthenticatedShell>{children}</AuthenticatedShell>
+      </ToastProvider>
     );
   }
 
   return <Spinner />;
+}
+
+function AuthenticatedShell({ children }: { children: React.ReactNode }) {
+  const [cmdOpen, setCmdOpen] = useState(false);
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden bg-[#0f1117]">
+        <TopBar onOpenCommand={() => setCmdOpen(true)} />
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+      </div>
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
+      <WelcomeOnboarding />
+    </div>
+  );
 }
