@@ -1,12 +1,35 @@
 'use client';
-import { useState } from 'react';
-import { Calendar, List, CheckCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Download, Filter } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Calendar, List, CheckCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight, Download, Filter, RefreshCw, Sparkles } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
+
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+function mapBackendToObrigacao(item: any): Obrigacao {
+  const tipoMap: Record<string, ObrigacaoTipo> = {
+    DAS: 'DAS', DARF: 'DARF', GPS: 'GPS', FGTS: 'FGTS', ICMS: 'ICMS',
+    ISS: 'ISS', PIS: 'PIS', COFINS: 'COFINS', IRPJ: 'IRPJ', CSLL: 'CSLL',
+  };
+  const statusMap: Record<string, ObrigacaoStatus> = {
+    pendente: 'pendente', em_apuracao: 'pendente', apurada: 'pendente',
+    paga: 'pago', vencida: 'vencido',
+  };
+  return {
+    id: item.id,
+    tipo: (tipoMap[item.tipo] || 'DARF') as ObrigacaoTipo,
+    descricao: item.descricao,
+    vencimento: String(item.dataVencimento).slice(0, 10),
+    valor: item.valorEstimado || item.valorPago || 0,
+    status: statusMap[item.status] || 'pendente',
+    competencia: item.competencia,
+  };
+}
 
 type ObrigacaoStatus = 'pendente' | 'pago' | 'vencido';
-type ObrigacaoTipo = 'DARF' | 'GPS' | 'FGTS' | 'SIMPLES' | 'DAS' | 'IRPJ' | 'CSLL' | 'PIS' | 'COFINS' | 'ISS';
+type ObrigacaoTipo = 'DARF' | 'GPS' | 'FGTS' | 'SIMPLES' | 'DAS' | 'IRPJ' | 'CSLL' | 'PIS' | 'COFINS' | 'ISS' | 'ICMS';
 
 interface Obrigacao {
   id: string;
@@ -51,21 +74,85 @@ const tipoColors: Record<ObrigacaoTipo, string> = {
   PIS: 'bg-pink-600/20 text-pink-400',
   COFINS: 'bg-rose-600/20 text-rose-400',
   ISS: 'bg-teal-600/20 text-teal-400',
+  ICMS: 'bg-emerald-600/20 text-emerald-400',
 };
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 export default function AgendaPage() {
   const { selectedCompany } = useCompany();
+  const toast = useToast();
   const [view, setView] = useState<'lista' | 'calendario'>('lista');
-  const [mes, setMes] = useState(2); // 0-indexed, March = 2
-  const [ano, setAno] = useState(2026);
+  const [mes, setMes] = useState(new Date().getMonth());
+  const [ano, setAno] = useState(new Date().getFullYear());
   const [tipoFiltro, setTipoFiltro] = useState<string>('todos');
   const [obrigacoes, setObrigacoes] = useState<Obrigacao[]>(MOCK_OBRIGACOES);
+  const [usandoDadosReais, setUsandoDadosReais] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
-  const marcarPago = (id: string) => {
+  async function carregar() {
+    if (!selectedCompany) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/v1/fiscal-calendar?companyId=${selectedCompany.id}`);
+      if (!res.ok) throw new Error('fetch failed');
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setObrigacoes(data.map(mapBackendToObrigacao));
+        setUsandoDadosReais(true);
+      } else {
+        setUsandoDadosReais(false);
+      }
+    } catch (e) {
+      setUsandoDadosReais(false);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCompany?.id]);
+
+  async function gerarCalendario() {
+    if (!selectedCompany) return;
+    setGenerating(true);
+    try {
+      const res = await fetch(`${API}/api/v1/fiscal-calendar/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId: selectedCompany.id, ano }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || 'Erro ao gerar');
+      toast.push(`${data.generated} obrigações criadas para ${ano}`, { variant: 'success', title: 'Calendário gerado' });
+      await carregar();
+    } catch (e: any) {
+      toast.push(e?.message || 'Falha ao gerar calendário', { variant: 'error' });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function marcarPago(id: string) {
     setObrigacoes(prev => prev.map(o => o.id === id ? { ...o, status: 'pago' as ObrigacaoStatus } : o));
-  };
+    if (usandoDadosReais && selectedCompany) {
+      const o = obrigacoes.find(x => x.id === id);
+      if (!o) return;
+      try {
+        await fetch(`${API}/api/v1/fiscal-calendar/${id}/pagar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ valorPago: o.valor }),
+        });
+        toast.push(`Obrigação marcada como paga`, { variant: 'success' });
+      } catch (e) {
+        toast.push('Falha ao sincronizar com servidor (mudança local mantida)', { variant: 'warning' });
+      }
+    }
+  }
 
   const mesAtual = `${ano}-${String(mes + 1).padStart(2, '0')}`;
   const obrigacoesFiltradas = obrigacoes.filter(o => {
@@ -106,6 +193,19 @@ export default function AgendaPage() {
 
   return (
     <div className="p-8 space-y-6">
+      {!usandoDadosReais && (
+        <div className="flex items-start gap-3 px-4 py-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm text-amber-300 font-medium">Dados de demonstração</p>
+            <p className="text-xs text-amber-200/70 mt-0.5">
+              Clique em <strong>Gerar Calendário {ano}</strong> para criar todas as obrigações fiscais reais
+              dessa empresa, conforme o regime tributário. O calendário inclui DAS, DARF, FGTS, eSocial,
+              DCTFWeb, EFD-REINF, ECD, ECF, DEFIS e demais obrigações aplicáveis.
+            </p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
@@ -113,9 +213,22 @@ export default function AgendaPage() {
           <p className="text-gray-400 text-sm mt-1">{selectedCompany.name}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button className="btn-ghost flex items-center gap-2 text-sm">
-            <Download className="h-4 w-4" />
-            Gerar Calendário do Ano
+          <button
+            onClick={gerarCalendario}
+            disabled={generating || !selectedCompany}
+            className="btn-ghost flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title={`Gera todas as obrigações fiscais de ${ano} para essa empresa, conforme o regime tributário`}
+          >
+            {generating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {generating ? 'Gerando...' : `Gerar Calendário ${ano}`}
+          </button>
+          <button
+            onClick={carregar}
+            disabled={loading}
+            className="btn-ghost flex items-center gap-2 text-sm"
+            title="Atualizar"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <div className="flex rounded-lg border border-[#1e2740] overflow-hidden">
             <button
