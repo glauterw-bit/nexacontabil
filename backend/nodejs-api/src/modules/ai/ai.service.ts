@@ -298,6 +298,84 @@ Retorne APENAS um JSON válido:
     }
   }
 
+  // ─── Busca natural: NL → filtros SQL Prisma ──────────────────────────────
+
+  /**
+   * Recebe uma query em linguagem natural ("imposto de 2023 da empresa Padaria")
+   * e retorna um objeto de filtros estruturados que o backend usa para montar
+   * a query Prisma em `documents`. Fallback: busca livre por palavras-chave.
+   */
+  async parseDocumentSearch(query: string): Promise<{
+    type?: string[];                 // ['nfe','nfse','das','darf','boleto','extrato','recibo']
+    year?: number;                   // 2023
+    monthStart?: number;             // 1-12
+    monthEnd?: number;
+    issuerKeyword?: string;          // parte do nome/CNPJ do emissor
+    cnpj?: string;                   // 14 digitos sem mascara
+    minValue?: number;
+    maxValue?: number;
+    keywords?: string[];             // fallback texto livre
+  }> {
+    if (!this.hasKey) {
+      // sem IA: heurística simples para amanhã ainda funcionar minimamente
+      const lower = query.toLowerCase();
+      const yearMatch = lower.match(/20\d{2}/);
+      const types: string[] = [];
+      if (/(imposto|tribut|darf|das|gps|fgts)/.test(lower)) types.push('das','darf','boleto');
+      if (/(nf-?e|nota\s*fiscal)/.test(lower)) types.push('nfe','nfse');
+      if (/(boleto|cobran)/.test(lower)) types.push('boleto');
+      if (/(holerite|folha)/.test(lower)) types.push('holerite');
+      if (/(extrato|banco)/.test(lower)) types.push('extrato');
+      return {
+        type: types.length ? types : undefined,
+        year: yearMatch ? Number(yearMatch[0]) : undefined,
+        keywords: lower.split(/\s+/).filter((w) => w.length > 3),
+      };
+    }
+
+    try {
+      const msg = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 512,
+        messages: [{
+          role: 'user',
+          content: `Voce e um parser que transforma buscas em linguagem natural sobre documentos contabeis brasileiros em filtros JSON.
+
+Query do usuario: "${query}"
+
+Tipos disponiveis: nfe, nfse, cte, boleto, extrato, recibo, contrato, das, darf, holerite, outro
+
+Responda APENAS com um JSON valido com esta estrutura (campos opcionais):
+{
+  "type": ["..."],
+  "year": 2023,
+  "monthStart": 1,
+  "monthEnd": 3,
+  "issuerKeyword": "nome ou parte",
+  "cnpj": "14 digitos sem mascara",
+  "minValue": 100.0,
+  "maxValue": 5000.0,
+  "keywords": ["palavra1","palavra2"]
+}
+
+Regras:
+- "imposto" / "tributo" -> type inclui "das","darf","boleto"
+- "nota fiscal" -> "nfe","nfse"
+- Se ano nao explicito mas frase tipo "ano passado" e hoje 2026 -> 2025
+- "empresa X" -> issuerKeyword = "X"
+- Se nao tiver certeza de algum campo, omita.`,
+        }],
+      });
+      const text = msg.content[0].type === 'text' ? msg.content[0].text : '';
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return { keywords: query.split(/\s+/) };
+      return JSON.parse(jsonMatch[0]);
+    } catch (err: any) {
+      this.logger.warn(`parseDocumentSearch falhou: ${err.message}`);
+      return { keywords: query.split(/\s+/).filter((w) => w.length > 2) };
+    }
+  }
+
   // ─── Chat Copilot Contábil ────────────────────────────────────────────────
 
   async chat(

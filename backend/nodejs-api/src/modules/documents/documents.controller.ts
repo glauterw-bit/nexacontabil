@@ -1,5 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { DocumentsService } from './documents.service';
+import { AiService } from '../ai/ai.service';
+import { PrismaService } from '../../database/prisma.service';
 
 type AnalyzeBody = {
   companyId: string;
@@ -30,7 +32,11 @@ function detectMediaType(filename: string, declared?: AnalyzeBody['mediaType']):
 
 @Controller('documents')
 export class DocumentsController {
-  constructor(private readonly documentsService: DocumentsService) {}
+  constructor(
+    private readonly documentsService: DocumentsService,
+    private readonly ai: AiService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /**
    * Persiste resultado vindo do worker Python (legado).
@@ -131,5 +137,64 @@ export class DocumentsController {
   @Get('stats/:companyId')
   async stats(@Param('companyId') companyId: string) {
     return this.documentsService.getStats(companyId);
+  }
+
+  /**
+   * Busca em linguagem natural sobre documentos JA INDEXADOS no banco.
+   *
+   * Exemplos de queries que funcionam:
+   *   - "imposto de 2023 da empresa Padaria"
+   *   - "notas fiscais acima de 5000 reais em janeiro"
+   *   - "boletos vencidos do CNPJ 12345678000190"
+   *   - "DAS dos ultimos 6 meses"
+   *
+   * Body: { companyId, query }
+   * Resposta: { filters, total, results: Document[] }
+   */
+  @Post('search-natural')
+  async searchNatural(@Body() body: { companyId: string; query: string; limit?: number }) {
+    if (!body.companyId || !body.query) {
+      return { error: 'companyId e query obrigatorios' };
+    }
+    const filters = await this.ai.parseDocumentSearch(body.query);
+    const where: any = { companyId: body.companyId };
+
+    if (filters.type && filters.type.length > 0) {
+      where.type = { in: filters.type };
+    }
+    if (filters.year) {
+      const start = new Date(filters.year, (filters.monthStart ?? 1) - 1, 1);
+      const end = new Date(filters.year, (filters.monthEnd ?? 12), 0, 23, 59, 59);
+      where.issueDate = { gte: start, lte: end };
+    }
+    if (filters.cnpj) {
+      where.issuerCnpj = filters.cnpj.replace(/\D/g, '');
+    } else if (filters.issuerKeyword) {
+      where.issuerName = { contains: filters.issuerKeyword, mode: 'insensitive' };
+    }
+    if (filters.minValue !== undefined || filters.maxValue !== undefined) {
+      where.totalValue = {};
+      if (filters.minValue !== undefined) where.totalValue.gte = filters.minValue;
+      if (filters.maxValue !== undefined) where.totalValue.lte = filters.maxValue;
+    }
+
+    const results = await this.prisma.document.findMany({
+      where,
+      orderBy: { issueDate: 'desc' },
+      take: body.limit ?? 50,
+      select: {
+        id: true, type: true, status: true, number: true,
+        issueDate: true, dueDate: true, totalValue: true,
+        issuerCnpj: true, issuerName: true,
+        confidenceScore: true, createdAt: true,
+      },
+    });
+
+    return {
+      query: body.query,
+      filters,
+      total: results.length,
+      results,
+    };
   }
 }

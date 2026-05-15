@@ -14,6 +14,8 @@ const COMMANDS: Item[] = [
   // Principal
   { group: 'Principal', label: 'Dashboard', href: '/dashboard', keywords: ['inicio', 'home', 'visão geral'] },
   { group: 'Principal', label: 'Documentos', href: '/documents', keywords: ['nota', 'xml', 'pdf', 'upload'] },
+  { group: 'Principal', label: 'Analise em Lote (IA)', href: '/inteligencia', keywords: ['pasta', 'rede', 'batch', 'ocr', 'ia'] },
+  { group: 'Principal', label: 'Busca IA em documentos', href: '/buscar', keywords: ['procurar', 'achar', 'localizar', 'imposto', '2023', 'empresa'] },
   { group: 'Principal', label: 'Lançamentos contábeis', href: '/transactions', keywords: ['lcto', 'debito', 'credito', 'partida'] },
   { group: 'Principal', label: 'Empresas / Clientes', href: '/companies', keywords: ['cnpj', 'cliente', 'empresa', 'novo cliente'] },
 
