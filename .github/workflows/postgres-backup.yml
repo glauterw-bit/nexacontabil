@@ -1,0 +1,54 @@
+name: Backup Postgres
+
+# Backup diário do banco de produção via DATABASE_PUBLIC_URL do Railway.
+# O dump é guardado como GitHub Artifact (retention 90 dias) — gratuito e auditável.
+# Para retenção legal de 5 anos, baixar o dump mensalmente e arquivar em B2/S3.
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # diariamente às 06:00 UTC (03:00 BRT)
+  workflow_dispatch: # permite rodar manualmente pelo painel do GitHub
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Install Postgres 16 client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-16
+
+      - name: Run pg_dump (custom format, compressed)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_PUBLIC_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_PUBLIC_URL secret is missing. Add it in Settings → Secrets → Actions."
+            exit 1
+          fi
+          STAMP=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+          OUT="nexacontabil-${STAMP}.dump"
+          echo "Dumping to ${OUT}…"
+          pg_dump --no-owner --no-privileges --format=custom --compress=9 --file="${OUT}" "$DATABASE_URL"
+          ls -lh "$OUT"
+          echo "DUMP_FILE=${OUT}" >> "$GITHUB_ENV"
+
+      - name: Upload dump as artifact (90d retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DUMP_FILE }}
+          path: ${{ env.DUMP_FILE }}
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Summary
+        run: |
+          echo "### Backup concluído ✅" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Arquivo: \`${DUMP_FILE}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tamanho: $(stat -c%s "$DUMP_FILE" | numfmt --to=iec)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Retenção GitHub: 90 dias (baixar mensalmente para B2/S3 para retenção legal de 5 anos)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Restore: \`pg_restore --no-owner --clean --if-exists -d \$DATABASE_URL ${DUMP_FILE}\`" >> "$GITHUB_STEP_SUMMARY"
