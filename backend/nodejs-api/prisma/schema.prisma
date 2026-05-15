@@ -1280,3 +1280,26 @@ model DataSubjectRequest {
   @@index([status])
   @@map("data_subject_requests")
 }
+
+// ─── Fechamento Mensal (lock de periodo) ─────────────────────
+model AccountingPeriodClosing {
+  id              String   @id @default(uuid())
+  companyId       String
+  ano             Int
+  mes             Int      // 1-12
+  status          String   @default("em_andamento") // em_andamento|fechado|reaberto
+  checklistJson   String?  // estado do checklist do fechamento
+  closedAt        DateTime?
+  closedBy        String?
+  reopenedAt      DateTime?
+  reopenedBy      String?
+  reopenedMotivo  String?
+  hash            String?  // hash dos lancamentos no momento do lock (audit imutavel)
+  observacoes     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([companyId, ano, mes])
+  @@index([companyId, status])
+  @@map("accounting_period_closings")
+}
