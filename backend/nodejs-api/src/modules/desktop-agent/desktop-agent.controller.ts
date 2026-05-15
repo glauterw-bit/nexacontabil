@@ -32,13 +32,19 @@ export class DesktopAgentController {
         return this.fallback('Nenhum release disponivel ainda. Build em https://github.com/glauterw-bit/nexacontabil/actions/workflows/build-agent.yml');
       }
       const all = (await res.json()) as Array<any>;
-      const release = all.find((r) => (r.tag_name ?? '').startsWith('agent-v') && !r.draft);
+      // aceita tag 'agent-v*' OU 'v*' (electron-builder usa version do package.json)
+      const release = all.find(
+        (r) => !r.draft && (
+          (r.tag_name ?? '').startsWith('agent-v') ||
+          ((r.tag_name ?? '').startsWith('v') && (r.assets ?? []).some((a: any) => /\.(exe|dmg|AppImage)$/i.test(a.name ?? '')))
+        ),
+      );
       if (!release) {
         return this.fallback('Nenhum release publicado do agent. Rode o workflow Build Desktop Agent.');
       }
 
       const info: ReleaseInfo = {
-        version: (release.tag_name ?? '').replace(/^agent-v/, ''),
+        version: (release.tag_name ?? '').replace(/^(agent-)?v/, ''),
         publishedAt: release.published_at,
         installInstructions: this.installInstructions(),
       };

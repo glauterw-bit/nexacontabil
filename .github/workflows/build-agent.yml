@@ -29,9 +29,16 @@ jobs:
           cache: 'npm'
           cache-dependency-path: agent/package-lock.json
 
+      - name: Setup Python (para node-gyp compilar better-sqlite3)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install dependencies
         working-directory: agent
-        run: npm install --no-audit --no-fund
+        env:
+          npm_config_build_from_source: 'true'
+        run: npm ci --no-audit --no-fund --include=optional || npm install --no-audit --no-fund
 
       - name: Build TypeScript
         working-directory: agent
@@ -73,9 +80,16 @@ jobs:
           cache: 'npm'
           cache-dependency-path: agent/package-lock.json
 
+      - name: Setup Python (para node-gyp compilar better-sqlite3)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install dependencies
         working-directory: agent
-        run: npm install --no-audit --no-fund
+        env:
+          npm_config_build_from_source: 'true'
+        run: npm ci --no-audit --no-fund --include=optional || npm install --no-audit --no-fund
 
       - name: Build TypeScript
         working-directory: agent
