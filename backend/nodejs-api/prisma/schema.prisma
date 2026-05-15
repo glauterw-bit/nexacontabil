@@ -1298,6 +1298,24 @@ model ClientAssignment {
   @@map("client_assignments")
 }
 
+// ─── Workflow Stage Config (estagios customizaveis) ─────────
+model WorkflowStageConfig {
+  id          String   @id @default(uuid())
+  companyId   String?  // null = config global do escritorio; preenchido = override por cliente
+  stageKey    String   // chave estavel: recepcao|lancamento|...
+  label       String
+  slaDias     Int      @default(3)
+  ordem       Int      @default(0)
+  color       String   @default("#6366f1")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, stageKey])
+  @@index([companyId])
+  @@map("workflow_stage_configs")
+}
+
 // ─── Workflow Task (Kanban operacional) ──────────────────────
 model WorkflowTask {
   id           String   @id @default(uuid())
@@ -1324,14 +1342,19 @@ model WorkflowTask {
   @@map("workflow_tasks")
 }
 
-// ─── Comentarios em Tasks (historico imutavel) ──────────────
+// ─── Comentarios em Tasks (historico imutavel com hash chain) ─
 model WorkflowComment {
-  id        String   @id @default(uuid())
-  taskId    String
-  userId    String
-  userName  String   // snapshot do nome (audit)
-  text      String
-  createdAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  taskId       String
+  userId       String
+  userName     String   // snapshot do nome (audit)
+  text         String
+  // hash chain: cada comentario tem hash do anterior, formando audit imutavel
+  prevHash     String?
+  hash         String?  // sha256 do conteudo + prevHash
+  attachmentUrl String?
+  attachmentName String?
+  createdAt    DateTime @default(now())
 
   @@index([taskId])
   @@map("workflow_comments")

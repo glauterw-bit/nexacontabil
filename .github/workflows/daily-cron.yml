@@ -1,0 +1,61 @@
+name: NexaContabil Daily Cron
+
+# Executa diariamente as 06:00 UTC (03:00 BRT) tarefas operacionais:
+# - SLA D-1: notifica analistas que tem task vencendo amanha
+# - Mark overdue: marca obrigacoes fiscais vencidas
+# - Geracao de mes: no dia 1 de cada mes, gera tasks de todos clientes
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: SLA D-1 alerts
+        env:
+          SERVICE_TOKEN: ${{ secrets.CRON_SERVICE_TOKEN }}
+          API_BASE: https://backend-production-9eeec.up.railway.app
+        run: |
+          if [ -z "$SERVICE_TOKEN" ]; then
+            echo "::warning::CRON_SERVICE_TOKEN missing — skipping authenticated calls"
+            exit 0
+          fi
+          echo "▸ SLA alerts"
+          curl -fsSL -X POST "$API_BASE/api/v1/workflow/tasks/sla-alerts" \
+            -H "Authorization: Bearer $SERVICE_TOKEN" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo
+
+      - name: Fiscal calendar mark overdue
+        env:
+          SERVICE_TOKEN: ${{ secrets.CRON_SERVICE_TOKEN }}
+          API_BASE: https://backend-production-9eeec.up.railway.app
+        run: |
+          if [ -z "$SERVICE_TOKEN" ]; then exit 0; fi
+          echo "▸ Mark overdue"
+          curl -fsSL -X POST "$API_BASE/api/v1/fiscal-calendar/mark-overdue" \
+            -H "Authorization: Bearer $SERVICE_TOKEN" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo
+
+      - name: Monthly task generation (day 1 only)
+        env:
+          SERVICE_TOKEN: ${{ secrets.CRON_SERVICE_TOKEN }}
+          API_BASE: https://backend-production-9eeec.up.railway.app
+        run: |
+          if [ -z "$SERVICE_TOKEN" ]; then exit 0; fi
+          DAY=$(date -u +%d)
+          if [ "$DAY" != "01" ]; then
+            echo "Hoje é dia $DAY — pulando geração mensal"
+            exit 0
+          fi
+          COMP=$(date -u +%Y-%m)
+          echo "▸ Gerar tasks do mês $COMP"
+          curl -fsSL -X POST "$API_BASE/api/v1/workflow/tasks/generate-month" \
+            -H "Authorization: Bearer $SERVICE_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"competencia\":\"$COMP\"}" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo

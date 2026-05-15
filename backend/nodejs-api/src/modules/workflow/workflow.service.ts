@@ -1,5 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { EmailService } from '../email/email.service';
+import * as crypto from 'crypto';
 
 export const STAGES = [
   { key: 'recepcao',     label: 'Recepção de Documentos',  slaDias: 3, color: '#6366f1' },
@@ -26,7 +28,10 @@ function addBusinessDays(date: Date, days: number): Date {
 
 @Injectable()
 export class WorkflowService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+  ) {}
 
   // ─── Atribuição de clientes ─────────────────────────────────
 
@@ -36,9 +41,64 @@ export class WorkflowService {
       where: { companyId, active: true },
       data: { active: false, unassignedAt: new Date() },
     });
-    return this.prisma.clientAssignment.create({
+    const assignment = await this.prisma.clientAssignment.create({
       data: { companyId, analystId, assignedById, motivo },
     });
+    // cria notificacao para o analista
+    await this.prisma.notification.create({
+      data: {
+        companyId,
+        userId: analystId,
+        tipo: 'cliente_atribuido',
+        titulo: 'Novo cliente na sua carteira',
+        corpo: motivo ?? 'Você foi designado como responsável por uma nova empresa.',
+        link: '/minha-carteira',
+      },
+    });
+    return assignment;
+  }
+
+  async bulkReassign(fromAnalystId: string, toAnalystId: string, assignedById: string, motivo: string) {
+    if (fromAnalystId === toAnalystId) {
+      throw new BadRequestException('Origem e destino sao o mesmo analista');
+    }
+    const ativas = await this.prisma.clientAssignment.findMany({
+      where: { analystId: fromAnalystId, active: true },
+    });
+    if (ativas.length === 0) return { moved: 0 };
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const a of ativas) {
+        await tx.clientAssignment.update({
+          where: { id: a.id },
+          data: { active: false, unassignedAt: new Date() },
+        });
+        await tx.clientAssignment.create({
+          data: {
+            companyId: a.companyId,
+            analystId: toAnalystId,
+            assignedById,
+            motivo,
+          },
+        });
+        await tx.notification.create({
+          data: {
+            companyId: a.companyId,
+            userId: toAnalystId,
+            tipo: 'cliente_atribuido',
+            titulo: 'Cliente transferido para sua carteira',
+            corpo: motivo,
+            link: '/minha-carteira',
+          },
+        });
+        // reatribui tasks abertas para o novo analista
+        await tx.workflowTask.updateMany({
+          where: { companyId: a.companyId, status: { in: ['pendente', 'em_andamento'] } },
+          data: { analystId: toAnalystId },
+        });
+      }
+    });
+    return { moved: ativas.length };
   }
 
   async listAssignments(filter: { analystId?: string; active?: boolean } = {}) {
@@ -218,16 +278,54 @@ export class WorkflowService {
   }
 
   async assignTask(taskId: string, analystId: string) {
-    return this.prisma.workflowTask.update({
+    const task = await this.prisma.workflowTask.update({
       where: { id: taskId },
       data: { analystId },
     });
+    await this.prisma.notification.create({
+      data: {
+        companyId: task.companyId,
+        userId: analystId,
+        tipo: 'tarefa_atribuida',
+        titulo: `Tarefa atribuída: ${STAGES.find((s) => s.key === task.stage)?.label}`,
+        corpo: `Vencimento: ${new Date(task.slaDate).toLocaleDateString('pt-BR')}`,
+        link: '/minha-carteira',
+      },
+    });
+    return task;
   }
 
-  async addComment(taskId: string, userId: string, userName: string, text: string) {
-    return this.prisma.workflowComment.create({
-      data: { taskId, userId, userName, text },
+  async addComment(taskId: string, userId: string, userName: string, text: string, attachmentUrl?: string, attachmentName?: string) {
+    // hash chain — pega o ultimo comentario para encadear
+    const last = await this.prisma.workflowComment.findFirst({
+      where: { taskId },
+      orderBy: { createdAt: 'desc' },
     });
+    const prevHash = last?.hash ?? null;
+    const payload = JSON.stringify({ taskId, userId, userName, text, attachmentUrl, prevHash, ts: new Date().toISOString() });
+    const hash = crypto.createHash('sha256').update(payload).digest('hex');
+    return this.prisma.workflowComment.create({
+      data: { taskId, userId, userName, text, attachmentUrl, attachmentName, prevHash, hash },
+    });
+  }
+
+  /**
+   * Verifica integridade da cadeia de comentarios. Util para audit.
+   */
+  async verifyCommentChain(taskId: string) {
+    const comments = await this.prisma.workflowComment.findMany({
+      where: { taskId },
+      orderBy: { createdAt: 'asc' },
+    });
+    let prevHash: string | null = null;
+    const broken: string[] = [];
+    for (const c of comments) {
+      if (c.prevHash !== prevHash) {
+        broken.push(c.id);
+      }
+      prevHash = c.hash;
+    }
+    return { total: comments.length, broken, valid: broken.length === 0 };
   }
 
   async getComments(taskId: string) {
@@ -325,5 +423,98 @@ export class WorkflowService {
 
   getStages() {
     return STAGES;
+  }
+
+  // ─── Stage config customizavel ──────────────────────────────
+
+  async getStageConfig(companyId?: string) {
+    const overrides = await this.prisma.workflowStageConfig.findMany({
+      where: { OR: [{ companyId: null }, ...(companyId ? [{ companyId }] : [])], active: true },
+      orderBy: { ordem: 'asc' },
+    });
+    if (overrides.length === 0) {
+      // retorna defaults
+      return STAGES.map((s, i) => ({
+        stageKey: s.key,
+        label: s.label,
+        slaDias: s.slaDias,
+        ordem: i,
+        color: s.color,
+        active: true,
+        scope: 'default' as const,
+      }));
+    }
+    return overrides.map((o) => ({ ...o, scope: o.companyId ? 'company' : 'office' as const }));
+  }
+
+  async upsertStageConfig(stageKey: string, data: { label?: string; slaDias?: number; color?: string; ordem?: number; companyId?: string | null }) {
+    const existing = await this.prisma.workflowStageConfig.findUnique({
+      where: { companyId_stageKey: { companyId: data.companyId ?? null as any, stageKey } },
+    }).catch(() => null);
+    if (existing) {
+      return this.prisma.workflowStageConfig.update({
+        where: { id: existing.id },
+        data: { label: data.label, slaDias: data.slaDias, color: data.color, ordem: data.ordem },
+      });
+    }
+    const stage = STAGES.find((s) => s.key === stageKey);
+    return this.prisma.workflowStageConfig.create({
+      data: {
+        companyId: data.companyId,
+        stageKey,
+        label: data.label ?? stage?.label ?? stageKey,
+        slaDias: data.slaDias ?? stage?.slaDias ?? 3,
+        color: data.color ?? stage?.color ?? '#6366f1',
+        ordem: data.ordem ?? 0,
+      },
+    });
+  }
+
+  // ─── SLA Alerts (chamado via cron diario) ──────────────────
+
+  async checkSlaAlerts() {
+    const tomorrow = new Date();
+    tomorrow.setHours(0, 0, 0, 0);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfter = new Date(tomorrow);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+
+    const tasks = await this.prisma.workflowTask.findMany({
+      where: {
+        status: { in: ['pendente', 'em_andamento'] },
+        slaDate: { gte: tomorrow, lt: dayAfter },
+        analystId: { not: null },
+      },
+    });
+
+    let emailsSent = 0;
+    for (const t of tasks) {
+      const stage = STAGES.find((s) => s.key === t.stage);
+      await this.prisma.notification.create({
+        data: {
+          companyId: t.companyId,
+          userId: t.analystId!,
+          tipo: 'sla_vencendo',
+          titulo: `SLA amanhã: ${stage?.label ?? t.stage}`,
+          corpo: `Vence em ${new Date(t.slaDate).toLocaleDateString('pt-BR')}`,
+          link: '/minha-carteira',
+        },
+      });
+      // envia e-mail
+      const analyst = await this.prisma.user.findUnique({ where: { id: t.analystId! } });
+      const company = await this.prisma.company.findUnique({ where: { id: t.companyId } });
+      if (analyst?.email && company) {
+        const r = await this.email.send(
+          analyst.email,
+          `[NexaContábil] SLA amanhã: ${stage?.label ?? t.stage}`,
+          `<p>Olá <strong>${analyst.name}</strong>,</p>
+           <p>A tarefa <strong>${stage?.label}</strong> da empresa <strong>${company.name}</strong>
+           vence em <strong>${new Date(t.slaDate).toLocaleDateString('pt-BR')}</strong>.</p>
+           <p><a href="https://frontend-production-2825.up.railway.app/minha-carteira">Abrir minha carteira</a></p>`,
+        );
+        if (r.ok) emailsSent++;
+      }
+    }
+    return { alertados: tasks.length, emailsSent };
   }
 }

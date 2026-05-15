@@ -5,6 +5,7 @@ import {
   Put,
   Body,
   Request,
+  Query,
   UseGuards,
   HttpCode,
 } from '@nestjs/common';
@@ -49,6 +50,12 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@Request() req: any) {
     return this.authService.me(req.user.id);
+  }
+
+  @Get('users')
+  @UseGuards(JwtAuthGuard)
+  listUsers(@Request() req: any, @Query('role') role?: string) {
+    return this.authService.listUsers(req.user, role);
   }
 
   @Put('profile')

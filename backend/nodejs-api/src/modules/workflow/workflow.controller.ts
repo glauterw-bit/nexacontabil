@@ -18,6 +18,30 @@ export class WorkflowController {
     return this.service.assignCompany(body.companyId, body.analystId, req.user.id, body.motivo);
   }
 
+  @Post('assignments/bulk-reassign')
+  bulkReassign(@Req() req: any, @Body() body: { fromAnalystId: string; toAnalystId: string; motivo: string }) {
+    return this.service.bulkReassign(body.fromAnalystId, body.toAnalystId, req.user.id, body.motivo);
+  }
+
+  @Get('tasks/:id/verify-chain')
+  verifyChain(@Param('id') id: string) {
+    return this.service.verifyCommentChain(id);
+  }
+
+  @Post('tasks/:id/comments/with-attachment')
+  addCommentWithAttachment(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() body: { text: string; attachmentUrl?: string; attachmentName?: string },
+  ) {
+    return this.service.addComment(id, req.user.id, req.user.name, body.text, body.attachmentUrl, body.attachmentName);
+  }
+
+  @Post('tasks/sla-alerts')
+  slaAlerts() {
+    return this.service.checkSlaAlerts();
+  }
+
   @Get('assignments')
   listAssignments(@Query('analystId') analystId?: string, @Query('active') active?: string) {
     return this.service.listAssignments({

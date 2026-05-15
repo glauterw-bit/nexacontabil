@@ -60,6 +60,16 @@ export class AuthService {
     return user;
   }
 
+  async listUsers(currentUser: any, role?: string) {
+    // cliente nao lista outros usuarios
+    if (currentUser?.role === 'cliente') return [];
+    return this.prisma.user.findMany({
+      where: { active: true, ...(role ? { role } : {}) },
+      select: { id: true, name: true, email: true, role: true, companyId: true, createdAt: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async updateProfile(userId: string, data: { name?: string; password?: string }) {
     const update: any = {};
     if (data.name) update.name = data.name;
