@@ -75,7 +75,7 @@ async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
 export default function LotePage() {
   const { selectedCompany } = useCompany();

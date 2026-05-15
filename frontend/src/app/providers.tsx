@@ -5,7 +5,7 @@ import { CompanyProvider } from '@/contexts/CompanyContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 
 const httpLink = new HttpLink({
-  uri: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/graphql`,
+  uri: `${process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app'}/graphql`,
 });
 
 const authLink = setContext((_, { headers }) => {

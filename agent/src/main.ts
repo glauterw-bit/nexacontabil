@@ -291,10 +291,10 @@ app.whenReady().then(() => {
       onFileSeen: refreshTrayMenu,
       onError: (err) => console.error('Watcher error:', err.message),
     });
-  } else {
-    // primeira vez: abre configuração
-    openConfigWindow();
   }
+  // Sempre abre a janela de configurações na inicialização — usuário pode fechá-la
+  // que o agent continua no tray.
+  openConfigWindow();
 
   // auto-start no boot do sistema
   app.setLoginItemSettings({ openAtLogin: getSettings().autoStart });

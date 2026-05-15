@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Building2 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
 function mapBackendToObrigacao(item: any): Obrigacao {
   const tipoMap: Record<string, ObrigacaoTipo> = {
