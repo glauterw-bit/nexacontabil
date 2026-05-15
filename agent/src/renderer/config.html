@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>NexaContabil Agent</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; margin: 0; background: #0f1117; color: #e5e7eb; }
+    main { padding: 24px; max-width: 680px; margin: 0 auto; }
+    h1 { font-size: 18px; margin: 0 0 4px; font-weight: 600; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-top: 24px; margin-bottom: 8px; }
+    p.lead { color: #9ca3af; font-size: 13px; margin: 0 0 24px; }
+    .card { background: #161b2e; border: 1px solid #1e2740; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+    label { font-size: 12px; color: #9ca3af; display: block; margin-bottom: 4px; }
+    input, select { width: 100%; padding: 9px 12px; background: #0f1117; border: 1px solid #1e2740; border-radius: 8px; color: #fff; font-size: 13px; box-sizing: border-box; }
+    button { padding: 9px 14px; background: #4f46e5; color: #fff; border: 0; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; }
+    button.secondary { background: #1e2740; }
+    button.danger { background: #dc2626; }
+    button:hover { opacity: 0.9; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .folder-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #0f1117; border: 1px solid #1e2740; border-radius: 6px; margin-bottom: 6px; font-size: 12px; font-family: monospace; }
+    .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .stat { background: #0f1117; border: 1px solid #1e2740; border-radius: 8px; padding: 10px; text-align: center; }
+    .stat-value { font-size: 18px; font-weight: 600; color: #fff; }
+    .stat-label { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+    .badge-ok { color: #34d399; }
+    .badge-err { color: #f87171; }
+    .badge-pending { color: #fbbf24; }
+    a { color: #818cf8; text-decoration: none; }
+    code { background: #0f1117; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>NexaContabil Agent</h1>
+  <p class="lead">Indexa documentos da rede local e sincroniza com a IA contábil na cloud.</p>
+
+  <div id="auth-block" class="card">
+    <h2 style="margin-top:0">Acesso</h2>
+    <div id="logged-out">
+      <label>E-mail</label>
+      <input id="email" type="email" placeholder="seu@email.com" />
+      <label style="margin-top:8px">Senha</label>
+      <input id="password" type="password" />
+      <div id="login-error" style="color:#f87171;font-size:12px;margin-top:8px;display:none"></div>
+      <button id="btn-login" style="margin-top:12px;width:100%">Entrar</button>
+    </div>
+    <div id="logged-in" style="display:none">
+      <p style="margin:0 0 8px;font-size:13px"><strong id="user-email"></strong></p>
+      <label>Cliente / Empresa</label>
+      <select id="company-select"></select>
+      <button id="btn-logout" class="secondary" style="margin-top:12px">Sair</button>
+    </div>
+  </div>
+
+  <h2>Pastas monitoradas</h2>
+  <div id="folders"></div>
+  <button id="btn-add-folder">+ Adicionar pasta</button>
+  <p style="font-size:11px;color:#6b7280;margin-top:8px">
+    Dica: aponte para pastas locais ou drives mapeados (ex: <code>Z:\NF-e\2026</code>).
+    Subpastas são monitoradas recursivamente.
+  </p>
+
+  <h2>Status</h2>
+  <div class="stat-row">
+    <div class="stat"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Indexados</div></div>
+    <div class="stat"><div class="stat-value badge-pending" id="stat-pending">0</div><div class="stat-label">Pendentes</div></div>
+    <div class="stat"><div class="stat-value badge-ok" id="stat-processed">0</div><div class="stat-label">Processados</div></div>
+    <div class="stat"><div class="stat-value badge-err" id="stat-errored">0</div><div class="stat-label">Erros</div></div>
+  </div>
+
+  <h2>Comportamento</h2>
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:13px">Iniciar com o sistema</div>
+        <div style="font-size:11px;color:#6b7280">Agente sobe no boot do Windows.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="auto-start" />
+      </label>
+    </div>
+  </div>
+
+  <h2>Atalho global</h2>
+  <p style="font-size:12px;color:#9ca3af">Pressione <code>Ctrl+Shift+F</code> em qualquer aplicação para abrir busca rápida.</p>
+
+  <h2>Versão</h2>
+  <p style="font-size:11px;color:#6b7280">NexaContabil Agent v<span id="version">0.1.0</span> · <a href="#" id="open-web">Abrir painel web</a></p>
+</main>
+
+<script>
+async function refresh() {
+  const s = await window.agent.settings.get();
+  document.getElementById('version').textContent = '0.1.0';
+  document.getElementById('logged-in').style.display = s.jwt ? 'block' : 'none';
+  document.getElementById('logged-out').style.display = s.jwt ? 'none' : 'block';
+  document.getElementById('user-email').textContent = s.userEmail || '';
+  document.getElementById('auto-start').checked = !!s.autoStart;
+
+  if (s.jwt) {
+    try {
+      const companies = await window.agent.companies.list();
+      const sel = document.getElementById('company-select');
+      sel.innerHTML = '';
+      for (const c of companies) {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.name} — ${c.cnpj}`;
+        if (s.companyId === c.id) opt.selected = true;
+        sel.appendChild(opt);
+      }
+    } catch {}
+  }
+
+  const folders = document.getElementById('folders');
+  folders.innerHTML = '';
+  for (const f of (s.watchFolders || [])) {
+    const div = document.createElement('div');
+    div.className = 'folder-item';
+    div.innerHTML = `<span>${f}</span><button class="danger" data-folder="${f}">Remover</button>`;
+    folders.appendChild(div);
+  }
+  for (const btn of folders.querySelectorAll('button[data-folder]')) {
+    btn.addEventListener('click', async (e) => {
+      await window.agent.folders.remove(e.target.dataset.folder);
+      refresh();
+    });
+  }
+
+  const stats = await window.agent.stats();
+  document.getElementById('stat-total').textContent = stats.total;
+  document.getElementById('stat-pending').textContent = stats.pending;
+  document.getElementById('stat-processed').textContent = stats.processed;
+  document.getElementById('stat-errored').textContent = stats.errored;
+}
+
+document.getElementById('btn-login').addEventListener('click', async () => {
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  try {
+    await window.agent.auth.login(email, password);
+    document.getElementById('login-error').style.display = 'none';
+    refresh();
+  } catch (err) {
+    const e = document.getElementById('login-error');
+    e.textContent = err.message || 'Erro no login';
+    e.style.display = 'block';
+  }
+});
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  await window.agent.auth.logout();
+  refresh();
+});
+
+document.getElementById('company-select').addEventListener('change', async (e) => {
+  await window.agent.companies.select(e.target.value);
+});
+
+document.getElementById('btn-add-folder').addEventListener('click', async () => {
+  await window.agent.folders.add();
+  refresh();
+});
+
+document.getElementById('auto-start').addEventListener('change', async (e) => {
+  await window.agent.settings.set({ autoStart: e.target.checked });
+});
+
+document.getElementById('open-web').addEventListener('click', (e) => {
+  e.preventDefault();
+  window.open('https://frontend-production-2825.up.railway.app/', '_blank');
+});
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

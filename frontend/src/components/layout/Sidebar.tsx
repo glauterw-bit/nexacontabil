@@ -39,6 +39,7 @@ const NAV_MAIN: NavItem[] = [
   { href: '/documents',    icon: FileText,         label: 'Documentos' },
   { href: '/inteligencia', icon: FileText,         label: 'Análise em Lote', badge: 'AI' },
   { href: '/buscar',       icon: Bot,              label: 'Busca IA',        badge: 'AI' },
+  { href: '/agent',        icon: Bot,              label: 'Agent Desktop',   badge: 'Novo' },
   { href: '/transactions', icon: ArrowLeftRight,   label: 'Lançamentos' },
   { href: '/copilot',      icon: Bot,              label: 'Copilot IA',  badge: 'AI' },
   { href: '/whatsapp',     icon: MessageCircle,    label: 'WhatsApp IA', badge: 'WA' },

@@ -1,0 +1,78 @@
+{
+  "name": "nexacontabil-agent",
+  "version": "0.1.0",
+  "description": "Agente desktop NexaContábil — varredura contínua de pastas locais/rede, indexação SQLite FTS5 e sincronização com a cloud.",
+  "main": "dist/main.js",
+  "author": "NexaContabil",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "dev": "tsc -w & electron .",
+    "build": "tsc && copyfiles -u 1 'src/renderer/**/*' dist/renderer && copyfiles -u 1 'src/assets/**/*' dist/assets",
+    "pack": "npm run build && electron-builder --win --x64 --publish never",
+    "pack:all": "npm run build && electron-builder -mwl --publish never",
+    "release": "npm run build && electron-builder --win --x64 --publish always"
+  },
+  "build": {
+    "appId": "br.com.nexacontabil.agent",
+    "productName": "NexaContabil Agent",
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      "src/assets/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "src/assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NexaContabil Agent",
+      "installerIcon": "src/assets/icon.ico",
+      "uninstallerIcon": "src/assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.business",
+      "icon": "src/assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Office",
+      "icon": "src/assets/icon.png"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "glauterw-bit",
+      "repo": "nexacontabil",
+      "releaseType": "release"
+    }
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "chokidar": "^4.0.1",
+    "electron-store": "^10.0.0",
+    "electron-updater": "^6.3.9",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.5",
+    "@types/pdf-parse": "^1.1.4",
+    "copyfiles": "^2.4.1",
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.6.2"
+  }
+}

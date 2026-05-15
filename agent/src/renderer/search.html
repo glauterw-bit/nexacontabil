@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Buscar arquivos</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; margin: 0; background: #0f1117; color: #e5e7eb; }
+    main { padding: 16px 20px; max-width: 700px; margin: 0 auto; }
+    input { width: 100%; padding: 12px 16px; background: #161b2e; border: 1px solid #1e2740; border-radius: 8px; color: #fff; font-size: 14px; box-sizing: border-box; }
+    input:focus { outline: none; border-color: #4f46e5; }
+    .result { padding: 10px 12px; margin-top: 6px; background: #161b2e; border: 1px solid #1e2740; border-radius: 8px; cursor: pointer; }
+    .result:hover { border-color: #4f46e5; }
+    .filename { font-size: 13px; color: #fff; font-weight: 500; }
+    .path { font-size: 11px; color: #6b7280; font-family: monospace; word-break: break-all; }
+    .meta { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; font-size: 10px; border-radius: 4px; margin-right: 6px; }
+    .badge-nfe { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+    .badge-boleto { background: rgba(245,158,11,0.15); color: #fcd34d; }
+    .badge-extrato { background: rgba(6,182,212,0.15); color: #67e8f9; }
+    .badge-recibo { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+    .badge-das { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+    .empty { text-align: center; padding: 40px 20px; color: #6b7280; font-size: 12px; }
+    .actions { display: flex; gap: 6px; margin-top: 8px; }
+    .actions button { padding: 4px 10px; font-size: 11px; background: #1e2740; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+    .actions button:hover { background: #2a3550; }
+    .tabs { display: flex; gap: 8px; margin: 12px 0 8px; font-size: 11px; }
+    .tab { padding: 4px 10px; background: #161b2e; border: 1px solid #1e2740; border-radius: 4px; cursor: pointer; color: #9ca3af; }
+    .tab.active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+    .hint { font-size: 11px; color: #6b7280; margin-top: 4px; }
+  </style>
+</head>
+<body>
+<main>
+  <input id="q" type="text" autofocus placeholder='Ex.: "imposto 2023 padaria" — Ctrl+Shift+F para reabrir' />
+  <div class="hint">A busca opera primeiro no índice local (rápido) e depois na cloud.</div>
+  <div class="tabs">
+    <div class="tab active" id="tab-local">Local (offline)</div>
+    <div class="tab" id="tab-remote">Cloud (com IA)</div>
+  </div>
+  <div id="results"></div>
+</main>
+<script>
+const tabLocal = document.getElementById('tab-local');
+const tabRemote = document.getElementById('tab-remote');
+let mode = 'local';
+tabLocal.addEventListener('click', () => { mode = 'local'; tabLocal.classList.add('active'); tabRemote.classList.remove('active'); run(); });
+tabRemote.addEventListener('click', () => { mode = 'remote'; tabRemote.classList.add('active'); tabLocal.classList.remove('active'); run(); });
+
+let last = 0;
+async function run() {
+  const q = document.getElementById('q').value.trim();
+  const results = document.getElementById('results');
+  if (!q) {
+    results.innerHTML = '<div class="empty">Digite para buscar…</div>';
+    return;
+  }
+  const stamp = ++last;
+  let items = [];
+  try {
+    if (mode === 'local') {
+      items = await window.agent.search.local(q);
+    } else {
+      const r = await window.agent.search.remote(q);
+      items = (r.results || []).map((d) => ({
+        filename: d.number ? `${d.type.toUpperCase()} #${d.number}` : (d.issuerName || d.type),
+        abs_path: null,
+        type: d.type,
+        issuer_name: d.issuerName,
+        issuer_cnpj: d.issuerCnpj,
+        total_value: d.totalValue,
+        issue_date: d.issueDate,
+      }));
+    }
+  } catch (err) {
+    results.innerHTML = '<div class="empty">Erro: ' + err.message + '</div>';
+    return;
+  }
+  if (stamp !== last) return;
+  if (items.length === 0) {
+    results.innerHTML = '<div class="empty">Nenhum resultado.</div>';
+    return;
+  }
+  results.innerHTML = '';
+  for (const it of items) {
+    const div = document.createElement('div');
+    div.className = 'result';
+    const badge = `<span class="badge badge-${it.type || 'outro'}">${(it.type || 'outro').toUpperCase()}</span>`;
+    const value = it.total_value ? `R$ ${Number(it.total_value).toLocaleString('pt-BR', {minimumFractionDigits:2})}` : '';
+    const date = it.issue_date ? new Date(it.issue_date).toLocaleDateString('pt-BR') : '';
+    div.innerHTML = `
+      <div class="filename">${badge}${it.filename}</div>
+      ${it.abs_path ? `<div class="path">${it.abs_path}</div>` : ''}
+      <div class="meta">${it.issuer_name || ''} ${it.issuer_cnpj ? '· ' + it.issuer_cnpj : ''} ${value ? '· ' + value : ''} ${date ? '· ' + date : ''}</div>
+      <div class="actions">
+        ${it.abs_path ? `<button data-open="${encodeURI(it.abs_path)}">Abrir</button>
+        <button data-show="${encodeURI(it.abs_path)}">Mostrar no Explorer</button>` : '<button disabled>Sem caminho local (somente nuvem)</button>'}
+      </div>
+    `;
+    results.appendChild(div);
+  }
+  for (const btn of results.querySelectorAll('button[data-open]')) {
+    btn.addEventListener('click', () => window.agent.file.open(decodeURI(btn.dataset.open)));
+  }
+  for (const btn of results.querySelectorAll('button[data-show]')) {
+    btn.addEventListener('click', () => window.agent.file.showInFolder(decodeURI(btn.dataset.show)));
+  }
+}
+
+let debounce;
+document.getElementById('q').addEventListener('input', () => {
+  clearTimeout(debounce);
+  debounce = setTimeout(run, 200);
+});
+</script>
+</body>
+</html>
