@@ -64,6 +64,7 @@ import { MonthlyPackageModule } from './modules/monthly-package/monthly-package.
 import { CopilotModule } from './modules/copilot/copilot.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { EmailModule } from './modules/email/email.module';
+import { CloudModule } from './modules/cloud/cloud.module';
 import { ChartAccountsModule } from './modules/chart-accounts/chart-accounts.module';
 import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
 import { FiscalCalendarModule } from './modules/fiscal-calendar/fiscal-calendar.module';
@@ -166,6 +167,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     MonthlyPackageModule,
     CopilotModule,
     WorkflowModule,
+    CloudModule,
     EmailModule,
   ],
   providers: [

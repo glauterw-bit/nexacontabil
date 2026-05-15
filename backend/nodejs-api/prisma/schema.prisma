@@ -1360,6 +1360,64 @@ model WorkflowComment {
   @@map("workflow_comments")
 }
 
+// ─── Cloud Connections (Google Drive / OneDrive / SharePoint) ─
+model CloudConnection {
+  id              String   @id @default(uuid())
+  provider        String   // google_drive | microsoft_onedrive | microsoft_sharepoint
+  label           String   // apelido escolhido pelo admin (ex: "Drive Escritorio")
+  accountEmail    String   // e-mail do owner da conta Drive conectada
+  scope           String   // 'readonly' | 'full'
+  encryptedAccessToken  String  // AES-256-GCM encrypted
+  encryptedRefreshToken String? // refresh para renovacao automatica
+  tokenExpiresAt  DateTime
+  rootFolderId    String?  // opcional: limitar busca a uma pasta especifica
+  createdById     String   // user que conectou
+  active          Boolean  @default(true)
+  lastUsedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([provider, active])
+  @@map("cloud_connections")
+}
+
+// ─── Document Query History (buscas em linguagem natural) ────
+model DocumentQuery {
+  id              String   @id @default(uuid())
+  userId          String
+  companyId       String?
+  queryText       String   // pergunta original em linguagem natural
+  parsedFilters   String?  // JSON dos filtros derivados pela IA
+  filesFoundCount Int      @default(0)
+  filesAnalyzed   Int      @default(0)
+  analysisResult  String?  // JSON com analise estruturada
+  durationMs      Int?
+  tokensUsed      Int?     // estimativa custo Claude
+  createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([companyId])
+  @@map("document_queries")
+}
+
+// ─── Generated Reports (relatorios PDF/JSON gerados) ─────────
+model GeneratedReport {
+  id              String   @id @default(uuid())
+  companyId       String?
+  userId          String
+  queryId         String?  // referencia para DocumentQuery
+  title           String
+  contentJson     String   // dados estruturados do relatorio
+  format          String   @default("json") // json | pdf | xlsx
+  fileUrl         String?  // R2/B2 quando salvo
+  hash            String   // SHA-256 do contentJson para integridade
+  createdAt       DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([userId])
+  @@map("generated_reports")
+}
+
 // ─── Fechamento Mensal (lock de periodo) ─────────────────────
 model AccountingPeriodClosing {
   id              String   @id @default(uuid())

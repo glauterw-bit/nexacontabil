@@ -19,6 +19,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
     "@apollo/server": "^4.11.0",
+    "@azure/msal-node": "^5.2.1",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "@nestjs/apollo": "^12.2.0",
     "@nestjs/cache-manager": "^2.3.0",
     "@nestjs/common": "^10.4.0",
@@ -37,6 +39,7 @@
     "cache-manager-redis-store": "^3.0.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "googleapis": "^171.4.0",
     "graphql": "^16.9.0",
     "graphql-type-json": "^0.3.2",
     "node-forge": "^1.4.0",
