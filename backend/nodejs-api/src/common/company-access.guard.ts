@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { GqlExecutionContext } from '@nestjs/graphql';
 import { PrismaService } from '../database/prisma.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
 
@@ -26,15 +27,31 @@ export class CompanyAccessGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const req = ctx.switchToHttp().getRequest();
+    // GraphQL: extrai req do contexto Apollo; REST: switchToHttp
+    let req: any;
+    let gqlArgs: any = null;
+    if (ctx.getType<any>() === 'graphql') {
+      const gqlCtx = GqlExecutionContext.create(ctx);
+      req = gqlCtx.getContext()?.req;
+      gqlArgs = gqlCtx.getArgs();
+    } else {
+      req = ctx.switchToHttp().getRequest();
+    }
+
+    if (!req) return false;
     const user = req.user;
     if (!user) {
       // JwtAuthGuard deveria ter bloqueado antes; defensivo
       return false;
     }
 
+    // companyId pode vir de params/query/body (REST) ou de args do resolver (GraphQL)
     const companyId: string | undefined =
-      req.params?.companyId || req.query?.companyId || req.body?.companyId;
+      req.params?.companyId ||
+      req.query?.companyId ||
+      req.body?.companyId ||
+      gqlArgs?.companyId ||
+      gqlArgs?.input?.companyId;
 
     if (!companyId) return true;
 
