@@ -76,6 +76,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/cashflow',      icon: TrendingUp, label: 'Fluxo de Caixa' },
       { href: '/benchmark',     icon: Target,     label: 'Benchmark' },
       { href: '/saude-fiscal',  icon: HeartPulse, label: 'Saúde Fiscal' },
+      { href: '/reforma-tributaria', icon: Scale, label: 'Reforma Tributária', badge: 'CBS/IBS' },
     ],
   },
   {
@@ -97,6 +98,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/assinaturas',    icon: PenLine,   label: 'Assinaturas' },
       { href: '/companies',      icon: Building2, label: 'Empresas' },
       { href: '/onboarding-cliente', icon: Building2, label: 'Onboarding Cliente', badge: 'Novo' },
+      { href: '/migracao',         icon: ArrowLeftRight, label: 'Migração em Massa', badge: 'Novo' },
       { href: '/fechamento',     icon: ShieldCheck, label: 'Fechamento Mensal', badge: 'Novo' },
       { href: '/kanban',         icon: Kanban,      label: 'Kanban Operacional', badge: 'Novo' },
       { href: '/minha-carteira', icon: Briefcase,   label: 'Minha Carteira' },
