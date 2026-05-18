@@ -65,6 +65,8 @@ import { CopilotModule } from './modules/copilot/copilot.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { EmailModule } from './modules/email/email.module';
 import { CloudModule } from './modules/cloud/cloud.module';
+import { CbsIbsModule } from './modules/tax-reform/cbs-ibs.module';
+import { MigrationModule } from './modules/migration/migration.module';
 import { ChartAccountsModule } from './modules/chart-accounts/chart-accounts.module';
 import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
 import { FiscalCalendarModule } from './modules/fiscal-calendar/fiscal-calendar.module';
@@ -84,6 +86,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
       sortSchema: true,
       playground: process.env.NODE_ENV !== 'production',
       introspection: process.env.NODE_ENV !== 'production',
+      context: ({ req }: any) => ({ req }),
     }),
 
     // Core modules
@@ -168,6 +171,8 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     CopilotModule,
     WorkflowModule,
     CloudModule,
+    CbsIbsModule,
+    MigrationModule,
     EmailModule,
   ],
   providers: [
