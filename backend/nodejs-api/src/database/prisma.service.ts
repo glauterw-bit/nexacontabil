@@ -85,7 +85,23 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit() {
-    await this.$connect();
+    // Retry com backoff exponencial: se o pool do Postgres está saturado por
+    // conexões zumbis de deploys anteriores, espera conn timeout natural.
+    // 6 tentativas: 2s, 4s, 8s, 16s, 32s, 60s (cap) — total ~2 min de janela.
+    const maxAttempts = 6;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await this.$connect();
+        if (attempt > 1) console.log(`[PRISMA] conectado após ${attempt} tentativa(s)`);
+        return;
+      } catch (err: any) {
+        const isPoolError = err?.errorCode === 'P2037' || /too many clients/i.test(err?.message ?? '');
+        if (!isPoolError || attempt === maxAttempts) throw err;
+        const delay = Math.min(2000 * Math.pow(2, attempt - 1), 60_000);
+        console.warn(`[PRISMA] P2037 pool saturado — tentativa ${attempt}/${maxAttempts}, aguardando ${delay}ms`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
   }
 
   async onModuleDestroy() {
