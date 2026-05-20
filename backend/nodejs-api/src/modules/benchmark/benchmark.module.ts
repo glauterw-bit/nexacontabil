@@ -3,6 +3,7 @@ import { Public } from '../../common/public.decorator';
 import { BenchmarkService } from './benchmark.service';
 import { PrismaService } from '../../database/prisma.service';
 import { ReportsModule } from '../reports/reports.module';
+import { BalanceSheetModule } from '../balance-sheet/balance-sheet.module';
 
 @Controller('benchmark')
 class BenchmarkController {
@@ -24,7 +25,7 @@ class BenchmarkController {
 }
 
 @Module({
-  imports: [ReportsModule],
+  imports: [ReportsModule, BalanceSheetModule],
   controllers: [BenchmarkController],
   providers: [BenchmarkService, PrismaService],
 })

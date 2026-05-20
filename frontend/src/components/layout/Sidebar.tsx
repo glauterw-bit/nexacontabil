@@ -50,7 +50,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Contabilidade',
     items: [
-      { href: '/relatorios/dre',    icon: BarChart3,  label: 'DRE / Balanço' },
+      { href: '/relatorios/dre',    icon: BarChart3,  label: 'DRE' },
+      { href: '/balanco',           icon: Scale,      label: 'Balanço Patrimonial' },
       { href: '/folha',             icon: Users,      label: 'Folha de Pag.' },
       { href: '/ferias-rescisao',   icon: UserCheck,  label: 'Férias / Rescisão' },
       { href: '/patrimonio',        icon: Package,    label: 'Patrimônio' },

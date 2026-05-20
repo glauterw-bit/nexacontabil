@@ -39,7 +39,6 @@ const ROUTE_LABELS: Record<string, string> = {
   'portal-cliente': 'Portal do Cliente',
   banking: 'Open Finance',
   'risco-fiscal': 'Risco Fiscal',
-  benchmark: 'Benchmark',
   companies: 'Empresas',
   audit: 'Auditoria',
   settings: 'Configurações',

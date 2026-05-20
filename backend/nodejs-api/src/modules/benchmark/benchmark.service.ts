@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { ReportsService } from '../reports/reports.service';
+import { BalanceSheetService } from '../balance-sheet/balance-sheet.service';
 
 /**
  * Médias setoriais BR — fontes:
@@ -27,6 +28,7 @@ export class BenchmarkService {
   constructor(
     private prisma: PrismaService,
     private reports: ReportsService,
+    private balance: BalanceSheetService,
   ) {}
 
   listSetores() {
@@ -45,12 +47,15 @@ export class BenchmarkService {
     const from = new Date();
     from.setMonth(from.getMonth() - 12);
 
-    const dre = await this.reports.getDRE(companyId, from, to);
+    const [dre, balanceMetrics] = await Promise.all([
+      this.reports.getDRE(companyId, from, to),
+      this.balance.getMetrics(companyId, to).catch(() => null),
+    ]);
 
     const receita = Number(dre.grossRevenue || 0);
     const netIncome = Number(dre.netIncome || 0);
     const ebit = Number(dre.ebit || 0);
-    // Sem balanço patrimonial detalhado, estimamos depreciação como 3% da receita (média BR)
+    // Sem detalhamento de depreciação, estimamos 3% da receita (média BR)
     const depEstimada = receita * 0.03;
     const ebitda = ebit + depEstimada;
 
@@ -62,21 +67,26 @@ export class BenchmarkService {
     const margemEbitda = receita > 0 ? (ebitda / receita) * 100 : 0;
     const receitaFuncionario = empregadosAtivos > 0 ? receita / empregadosAtivos / 1000 : 0;
 
+    const patrimonioLiq = Number(balanceMetrics?.patrimonioLiquido || 0);
+    const roe = patrimonioLiq > 0 ? round((netIncome / patrimonioLiq) * 100) : null;
+    const liquidez = balanceMetrics?.liquidezCorrente ?? null;
+    const endividamento = balanceMetrics?.endividamento ?? null;
+
     const empresa = {
       margemLiquida: round(margemLiquida),
       margemEbitda: round(margemEbitda),
-      roe: null as number | null,
-      liquidez: null as number | null,
-      endividamento: null as number | null,
+      roe,
+      liquidez,
+      endividamento,
       receitaFuncionario: round(receitaFuncionario),
     };
 
     const metricas = [
       { dimensao: 'Margem Líquida', empresa: empresa.margemLiquida, setor: setorAvg.margemLiquida, unidade: '%', descricao: 'Lucro líquido / Receita líquida', menorMelhor: false },
       { dimensao: 'Margem EBITDA', empresa: empresa.margemEbitda, setor: setorAvg.margemEbitda, unidade: '%', descricao: 'EBITDA / Receita líquida (depr. estimada 3%)', menorMelhor: false },
-      { dimensao: 'ROE', empresa: null, setor: setorAvg.roe, unidade: '%', descricao: 'Retorno sobre patrimônio (requer balanço patrimonial)', menorMelhor: false },
-      { dimensao: 'Liquidez Corrente', empresa: null, setor: setorAvg.liquidez, unidade: 'x', descricao: 'Ativo circulante / Passivo circulante (requer balanço)', menorMelhor: false },
-      { dimensao: 'Endividamento', empresa: null, setor: setorAvg.endividamento, unidade: '%', descricao: 'Dívida total / Ativo total (requer balanço)', menorMelhor: true },
+      { dimensao: 'ROE', empresa: empresa.roe, setor: setorAvg.roe, unidade: '%', descricao: 'Lucro líquido / Patrimônio líquido', menorMelhor: false },
+      { dimensao: 'Liquidez Corrente', empresa: empresa.liquidez, setor: setorAvg.liquidez, unidade: 'x', descricao: 'Ativo circulante / Passivo circulante', menorMelhor: false },
+      { dimensao: 'Endividamento', empresa: empresa.endividamento, setor: setorAvg.endividamento, unidade: '%', descricao: 'Passivo total / Ativo total', menorMelhor: true },
       { dimensao: 'Receita/Funcionário', empresa: empresa.receitaFuncionario, setor: setorAvg.receitaFuncionario, unidade: 'k/ano', descricao: 'Receita anual por colaborador ativo (R$ mil)', menorMelhor: false },
     ];
 
@@ -93,7 +103,9 @@ export class BenchmarkService {
       acimaDaMedia: acima,
       totalMetricasComputaveis: computaveis.length,
       metricas,
-      observacao: 'Métricas baseadas em DRE dos últimos 12 meses + headcount ativo. Indicadores patrimoniais (ROE, Liquidez, Endividamento) requerem Balanço Patrimonial estruturado — em breve.',
+      observacao: balanceMetrics?.balanceado
+        ? 'Métricas baseadas em DRE dos últimos 12 meses + Balanço Patrimonial + headcount ativo.'
+        : 'Métricas DRE + headcount disponíveis. Indicadores patrimoniais (ROE, Liquidez, Endividamento) requerem Balanço Patrimonial balanceado — verifique se há lançamentos contábeis aprovados.',
     };
   }
 }
