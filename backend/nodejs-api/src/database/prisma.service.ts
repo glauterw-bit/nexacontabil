@@ -30,8 +30,18 @@ const COMPANY_SCOPED_MODELS = new Set([
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
+    // Limita pool de conexões pra evitar P2037 em Postgres com slots restritos
+    // (Railway free/starter tier permite ~22 connections — múltiplos deploys
+    // simultâneos durante o swap estouravam o limite e crashavam o boot).
+    const dbUrl = process.env.DATABASE_URL;
+    const limit = process.env.PRISMA_CONNECTION_LIMIT ?? '5';
+    const datasourceUrl = dbUrl && !dbUrl.includes('connection_limit=')
+      ? `${dbUrl}${dbUrl.includes('?') ? '&' : '?'}connection_limit=${limit}`
+      : dbUrl;
+
     super({
       log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+      ...(datasourceUrl ? { datasourceUrl } : {}),
     });
 
     // Middleware multi-tenant: para user role 'cliente', filtra automaticamente
