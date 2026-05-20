@@ -38,17 +38,6 @@ interface NotaFiscal {
   chaveAcesso?: string;
 }
 
-// kept for legacy reference but not used; the page now consumes GraphQL data.
-const MOCK_NOTAS_LEGACY: NotaFiscal[] = [
-  { id: '1', numero: '000001234', tipo: 'NF-e', destinatario: 'Empresa ABC Ltda', cnpjCpf: '12.345.678/0001-90', valor: 15800.00, dataEmissao: '2026-03-20', status: 'autorizada', chaveAcesso: '35260312345678000190550010000012341000012345' },
-  { id: '2', numero: '000001235', tipo: 'NFS-e', destinatario: 'Comércio XYZ SA', cnpjCpf: '98.765.432/0001-10', valor: 8500.00, dataEmissao: '2026-03-18', status: 'autorizada', chaveAcesso: '35260398765432000110550010000012351000012346' },
-  { id: '3', numero: '000001236', tipo: 'NF-e', destinatario: 'Indústria DEF', cnpjCpf: '11.222.333/0001-44', valor: 32000.00, dataEmissao: '2026-03-15', status: 'autorizada', chaveAcesso: '35260311222333000144550010000012361000012347' },
-  { id: '4', numero: '000001237', tipo: 'NF-e', destinatario: 'João da Silva', cnpjCpf: '123.456.789-00', valor: 1200.00, dataEmissao: '2026-03-14', status: 'rejeitada' },
-  { id: '5', numero: '000001238', tipo: 'NFS-e', destinatario: 'Serviços Beta', cnpjCpf: '55.666.777/0001-88', valor: 4800.00, dataEmissao: '2026-03-10', status: 'cancelada', chaveAcesso: '35260355666777000188550010000012381000012349' },
-  { id: '6', numero: '000001239', tipo: 'NF-CE', destinatario: 'Maria Aparecida', cnpjCpf: '987.654.321-00', valor: 389.90, dataEmissao: '2026-03-08', status: 'autorizada' },
-  { id: '7', numero: '000001240', tipo: 'NF-e', destinatario: 'Tech Solutions Ltda', cnpjCpf: '22.333.444/0001-55', valor: 18900.00, dataEmissao: '2026-03-22', status: 'rascunho' },
-];
-
 const statusConfig: Partial<Record<NFStatus, { label: string; color: string; bg: string; border: string }>> = {
   rascunho: { label: 'Rascunho', color: 'text-gray-400', bg: 'bg-gray-400/10', border: 'border-gray-400/30' },
   autorizada: { label: 'Autorizada', color: 'text-green-400', bg: 'bg-green-400/10', border: 'border-green-400/30' },

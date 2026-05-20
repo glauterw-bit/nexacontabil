@@ -42,20 +42,6 @@ interface Obrigacao {
   codigoReceita?: string;
 }
 
-const MOCK_OBRIGACOES: Obrigacao[] = [
-  { id: '1', tipo: 'DAS', descricao: 'DAS - Simples Nacional', vencimento: '2026-03-20', valor: 4820.50, status: 'pago', competencia: 'Fev/2026', codigoReceita: '6015' },
-  { id: '2', tipo: 'FGTS', descricao: 'FGTS - Guia Mensal', vencimento: '2026-03-07', valor: 2340.00, status: 'pago', competencia: 'Fev/2026' },
-  { id: '3', tipo: 'GPS', descricao: 'GPS - INSS Empregadores', vencimento: '2026-03-20', valor: 3150.75, status: 'pago', competencia: 'Fev/2026' },
-  { id: '4', tipo: 'DARF', descricao: 'IRRF - Imposto Retido Fontes', vencimento: '2026-03-20', valor: 1280.00, status: 'vencido', competencia: 'Fev/2026', codigoReceita: '0561' },
-  { id: '5', tipo: 'DAS', descricao: 'DAS - Simples Nacional', vencimento: '2026-04-20', valor: 5100.00, status: 'pendente', competencia: 'Mar/2026', codigoReceita: '6015' },
-  { id: '6', tipo: 'FGTS', descricao: 'FGTS - Guia Mensal', vencimento: '2026-04-07', valor: 2340.00, status: 'pendente', competencia: 'Mar/2026' },
-  { id: '7', tipo: 'GPS', descricao: 'GPS - INSS Empregadores', vencimento: '2026-04-20', valor: 3210.50, status: 'pendente', competencia: 'Mar/2026' },
-  { id: '8', tipo: 'DARF', descricao: 'IRRF - Imposto Retido Fontes', vencimento: '2026-04-20', valor: 1350.00, status: 'pendente', competencia: 'Mar/2026', codigoReceita: '0561' },
-  { id: '9', tipo: 'DARF', descricao: 'PIS/COFINS Cumulativo', vencimento: '2026-04-25', valor: 890.00, status: 'pendente', competencia: 'Mar/2026', codigoReceita: '8109' },
-  { id: '10', tipo: 'ISS', descricao: 'ISS - Imposto Sobre Serviços', vencimento: '2026-04-10', valor: 640.00, status: 'pendente', competencia: 'Mar/2026' },
-  { id: '11', tipo: 'IRPJ', descricao: 'IRPJ - Estimativa Mensal', vencimento: '2026-04-30', valor: 2800.00, status: 'pendente', competencia: 'Mar/2026', codigoReceita: '2362' },
-  { id: '12', tipo: 'CSLL', descricao: 'CSLL - Estimativa Mensal', vencimento: '2026-04-30', valor: 1008.00, status: 'pendente', competencia: 'Mar/2026', codigoReceita: '2484' },
-];
 
 const statusConfig: Record<ObrigacaoStatus, { label: string; color: string; bg: string; border: string; icon: any }> = {
   pendente: { label: 'Pendente', color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/30', icon: Clock },
@@ -86,7 +72,7 @@ export default function AgendaPage() {
   const [mes, setMes] = useState(new Date().getMonth());
   const [ano, setAno] = useState(new Date().getFullYear());
   const [tipoFiltro, setTipoFiltro] = useState<string>('todos');
-  const [obrigacoes, setObrigacoes] = useState<Obrigacao[]>(MOCK_OBRIGACOES);
+  const [obrigacoes, setObrigacoes] = useState<Obrigacao[]>([]);
   const [usandoDadosReais, setUsandoDadosReais] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -98,13 +84,15 @@ export default function AgendaPage() {
       const res = await fetch(`${API}/api/v1/fiscal-calendar?companyId=${selectedCompany.id}`);
       if (!res.ok) throw new Error('fetch failed');
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setObrigacoes(data.map(mapBackendToObrigacao));
         setUsandoDadosReais(true);
       } else {
+        setObrigacoes([]);
         setUsandoDadosReais(false);
       }
     } catch (e) {
+      setObrigacoes([]);
       setUsandoDadosReais(false);
     } finally {
       setLoading(false);

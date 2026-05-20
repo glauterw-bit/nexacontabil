@@ -76,6 +76,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/cashflow',      icon: TrendingUp, label: 'Fluxo de Caixa' },
       { href: '/benchmark',     icon: Target,     label: 'Benchmark' },
       { href: '/saude-fiscal',  icon: HeartPulse, label: 'Saúde Fiscal' },
+      { href: '/risco-fiscal',  icon: ShieldCheck, label: 'Risco Fiscal', badge: 'AI' },
       { href: '/reforma-tributaria', icon: Scale, label: 'Reforma Tributária', badge: 'CBS/IBS' },
     ],
   },
