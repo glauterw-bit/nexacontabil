@@ -69,6 +69,7 @@ import { CloudModule } from './modules/cloud/cloud.module';
 import { CbsIbsModule } from './modules/tax-reform/cbs-ibs.module';
 import { MigrationModule } from './modules/migration/migration.module';
 import { HealthScoreModule } from './modules/health-score/health-score.module';
+import { PredictiveModule } from './modules/predictive/predictive.module';
 import { ChartAccountsModule } from './modules/chart-accounts/chart-accounts.module';
 import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
 import { FiscalCalendarModule } from './modules/fiscal-calendar/fiscal-calendar.module';
@@ -176,6 +177,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     CbsIbsModule,
     MigrationModule,
     HealthScoreModule,
+    PredictiveModule,
     EmailModule,
   ],
   providers: [

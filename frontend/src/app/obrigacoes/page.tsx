@@ -1,210 +1,210 @@
 'use client';
-import { useState } from 'react';
-import { Download, CheckCircle, Clock, Send, FileText, ChevronRight, RefreshCw, ChevronLeft } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import {
+  ClipboardList, Loader2, CheckCircle, Clock, AlertTriangle, Building2, FileText,
+} from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import Link from 'next/link';
-import { Building2 } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 
-type ObStatus = 'rascunho' | 'validado' | 'transmitido' | 'aceito' | 'erro';
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
-interface Obrigacao {
+interface ObrigacaoItem {
   id: string;
-  nome: string;
+  tipo: string;
+  descricao: string;
   competencia: string;
-  status: ObStatus;
-  arquivo?: string;
-  erros?: string[];
-  dataTransmissao?: string;
-  protocolo?: string;
+  dataVencimento: string;
+  valorEstimado?: number;
+  valorPago?: number;
+  status: string;
+  prioridade: string;
 }
 
-const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+function authHeaders(): Record<string, string> {
+  const t = typeof window !== 'undefined' ? localStorage.getItem('aura_token') : null;
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
 
-const MOCK_OBRIGACOES: Record<string, Obrigacao[]> = {
-  dctf: [
-    { id: '1', nome: 'DCTF Mensal', competencia: 'Fev/2026', status: 'aceito', arquivo: 'DCTF_2026_02.xml', dataTransmissao: '2026-03-15', protocolo: '15032026001234' },
-    { id: '2', nome: 'DCTF Mensal', competencia: 'Jan/2026', status: 'aceito', arquivo: 'DCTF_2026_01.xml', dataTransmissao: '2026-02-14', protocolo: '14022026005678' },
-    { id: '3', nome: 'DCTF Mensal', competencia: 'Mar/2026', status: 'rascunho' },
-  ],
-  efdreinf: [
-    { id: '4', nome: 'EFD-Reinf R-1000', competencia: 'Fev/2026', status: 'aceito', arquivo: 'EFD_R1000_2026_02.xml', dataTransmissao: '2026-03-15', protocolo: '15032026009012' },
-    { id: '5', nome: 'EFD-Reinf R-2010', competencia: 'Fev/2026', status: 'transmitido', arquivo: 'EFD_R2010_2026_02.xml', dataTransmissao: '2026-03-20' },
-    { id: '6', nome: 'EFD-Reinf R-1000', competencia: 'Mar/2026', status: 'rascunho' },
-  ],
-  esocial: [
-    { id: '7', nome: 'eSocial S-1200', competencia: 'Fev/2026', status: 'aceito', arquivo: 'ESOCIAL_S1200_2026_02.xml', dataTransmissao: '2026-03-10', protocolo: '10032026003456' },
-    { id: '8', nome: 'eSocial S-1210', competencia: 'Fev/2026', status: 'validado', arquivo: 'ESOCIAL_S1210_2026_02.xml' },
-    { id: '9', nome: 'eSocial S-1200', competencia: 'Mar/2026', status: 'rascunho' },
-  ],
-  ecf: [
-    { id: '10', nome: 'ECF Anual 2025', competencia: 'Ano 2025', status: 'transmitido', arquivo: 'ECF_2025.txt', dataTransmissao: '2026-03-01', protocolo: '01032026007890' },
-  ],
-  sped: [
-    { id: '11', nome: 'SPED Contribuições', competencia: 'Fev/2026', status: 'aceito', arquivo: 'SPED_PIS_COFINS_2026_02.txt', dataTransmissao: '2026-03-14', protocolo: '14032026002345' },
-    { id: '12', nome: 'SPED Contribuições', competencia: 'Mar/2026', status: 'rascunho' },
-  ],
-};
-
-const statusConfig: Record<ObStatus, { label: string; color: string; bg: string; border: string; icon: any; step: number }> = {
-  rascunho:    { label: 'Rascunho',    color: 'text-gray-400',   bg: 'bg-gray-400/10',   border: 'border-gray-400/30',   icon: FileText,     step: 0 },
-  validado:    { label: 'Validado',    color: 'text-blue-400',   bg: 'bg-blue-400/10',   border: 'border-blue-400/30',   icon: CheckCircle,  step: 1 },
-  transmitido: { label: 'Transmitido', color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/30', icon: Send,         step: 2 },
-  aceito:      { label: 'Aceito',      color: 'text-green-400',  bg: 'bg-green-400/10',  border: 'border-green-400/30',  icon: CheckCircle,  step: 3 },
-  erro:        { label: 'Erro',        color: 'text-red-400',    bg: 'bg-red-400/10',    border: 'border-red-400/30',    icon: FileText,     step: -1 },
-};
-
-const TABS = [
-  { id: 'dctf', label: 'DCTF' },
-  { id: 'efdreinf', label: 'EFD-Reinf' },
-  { id: 'esocial', label: 'eSocial' },
-  { id: 'ecf', label: 'ECF' },
-  { id: 'sped', label: 'SPED Contrib.' },
+const GRUPOS = [
+  { label: 'Federais (DAS / DARF / GPS)', tipos: ['DAS', 'DARF', 'GPS'] },
+  { label: 'FGTS', tipos: ['FGTS'] },
+  { label: 'eSocial', tipos: ['ESOCIAL'] },
+  { label: 'DCTFWeb / EFD-Reinf', tipos: ['DCTFWeb', 'EFD_REINF'] },
+  { label: 'Estaduais / Municipais', tipos: ['ICMS', 'ISS'] },
+  { label: 'SPED (Anuais e Mensais)', tipos: ['ECD', 'ECF', 'SPED_FISCAL', 'SPED_CONTRIB'] },
+  { label: 'Anuais Simples / MEI', tipos: ['DEFIS', 'DASN-SIMEI'] },
 ];
 
-const STEPS = ['Gerado', 'Validado', 'Transmitido', 'Aceito'];
+const STATUS_CONFIG: Record<string, { label: string; classes: string; icon: any }> = {
+  pendente: { label: 'Pendente', classes: 'border-gray-500/30 bg-gray-500/10 text-gray-300', icon: FileText },
+  em_apuracao: { label: 'Em apuração', classes: 'border-blue-500/30 bg-blue-500/10 text-blue-300', icon: Clock },
+  apurada: { label: 'Apurada', classes: 'border-amber-500/30 bg-amber-500/10 text-amber-300', icon: Clock },
+  paga: { label: 'Paga', classes: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300', icon: CheckCircle },
+  vencida: { label: 'Vencida', classes: 'border-red-500/30 bg-red-500/10 text-red-300', icon: AlertTriangle },
+  isenta: { label: 'Isenta', classes: 'border-gray-500/30 bg-gray-500/10 text-gray-400', icon: CheckCircle },
+};
 
 export default function ObrigacoesPage() {
   const { selectedCompany } = useCompany();
-  const [tab, setTab] = useState('dctf');
-  const [mes, setMes] = useState(2);
-  const [ano, setAno] = useState(2026);
-  const [obrigacoes, setObrigacoes] = useState(MOCK_OBRIGACOES);
+  const toast = useToast();
+  const [items, setItems] = useState<ObrigacaoItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState(0);
+  const [statusFilter, setStatusFilter] = useState('todos');
 
-  const avancar = (id: string, tabKey: string) => {
-    const ordem: ObStatus[] = ['rascunho', 'validado', 'transmitido', 'aceito'];
-    setObrigacoes(prev => ({
-      ...prev,
-      [tabKey]: prev[tabKey].map(o => {
-        if (o.id !== id) return o;
-        const idx = ordem.indexOf(o.status);
-        const next = idx < ordem.length - 1 ? ordem[idx + 1] : o.status;
-        return { ...o, status: next, dataTransmissao: next === 'transmitido' ? new Date().toISOString().split('T')[0] : o.dataTransmissao, protocolo: next === 'aceito' ? String(Date.now()).slice(-14) : o.protocolo, arquivo: o.arquivo || `${tabKey.toUpperCase()}_${ano}_${String(mes + 1).padStart(2, '0')}.xml` };
-      }),
-    }));
-  };
+  async function load() {
+    if (!selectedCompany) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/v1/fiscal-calendar?companyId=${selectedCompany.id}`, { headers: authHeaders() });
+      const d = await r.json();
+      setItems(Array.isArray(d) ? d : []);
+    } catch (e: any) {
+      toast.push(e?.message ?? 'Erro', { variant: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, [selectedCompany?.id]);
+
+  const grupoAtual = GRUPOS[activeTab];
+  const filtered = useMemo(() => {
+    return items.filter((i) => {
+      if (!grupoAtual.tipos.includes(i.tipo)) return false;
+      if (statusFilter !== 'todos' && i.status !== statusFilter) return false;
+      return true;
+    });
+  }, [items, grupoAtual, statusFilter]);
+
+  async function marcarPaga(id: string, valor: number) {
+    try {
+      await fetch(`${API}/api/v1/fiscal-calendar/${id}/pagar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ valorPago: valor }),
+      });
+      toast.push('Marcada como paga', { variant: 'success' });
+      load();
+    } catch (e: any) {
+      toast.push(e?.message ?? 'Erro', { variant: 'error' });
+    }
+  }
 
   if (!selectedCompany) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
         <Building2 className="h-12 w-12 text-gray-600" />
-        <p className="text-gray-400 text-sm">Selecione uma empresa para gerenciar obrigações acessórias.</p>
-        <Link href="/companies" className="btn-primary">Gerenciar Empresas</Link>
+        <p className="text-gray-400 text-sm">Selecione uma empresa.</p>
+        <Link href="/companies" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">Gerenciar</Link>
       </div>
     );
   }
 
-  const current = obrigacoes[tab] || [];
+  const counts = items.reduce((acc, i) => {
+    acc[i.status] = (acc[i.status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
-    <div className="p-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Obrigações Acessórias</h1>
-          <p className="text-gray-400 text-sm mt-1">{selectedCompany.name}</p>
+    <div className="p-6 md:p-8 max-w-6xl space-y-5">
+      <div>
+        <div className="flex items-center gap-2 mb-0.5">
+          <ClipboardList className="h-5 w-5 text-indigo-400" />
+          <h1 className="text-xl font-semibold text-white">Obrigações Acessórias</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => { if (mes === 0) { setMes(11); setAno(a => a - 1); } else setMes(m => m - 1); }} className="btn-ghost p-1.5"><ChevronLeft className="h-4 w-4" /></button>
-          <span className="text-white font-medium min-w-[130px] text-center">{MESES[mes]} {ano}</span>
-          <button onClick={() => { if (mes === 11) { setMes(0); setAno(a => a + 1); } else setMes(m => m + 1); }} className="btn-ghost p-1.5"><ChevronRight className="h-4 w-4" /></button>
-        </div>
+        <p className="text-sm text-gray-400">{selectedCompany.name} · {items.length} obrigação(ões) no ano</p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-[#161b2e] border border-[#1e2740] rounded-xl p-1">
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${tab === t.id ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-            {t.label}
-          </button>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <Stat label="Pendentes" value={counts.pendente ?? 0} color="text-gray-300" />
+        <Stat label="Apuradas" value={counts.apurada ?? 0} color="text-amber-400" />
+        <Stat label="Pagas" value={counts.paga ?? 0} color="text-emerald-400" />
+        <Stat label="Vencidas" value={counts.vencida ?? 0} color="text-red-400" />
+        <Stat label="Total" value={items.length} color="text-white" />
+      </div>
+
+      <div className="flex flex-wrap gap-1.5 border-b border-[#1e2740] pb-2">
+        {GRUPOS.map((g, i) => (
+          <button
+            key={i}
+            onClick={() => setActiveTab(i)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-t ${
+              activeTab === i ? 'bg-indigo-500/15 text-indigo-300 border-b-2 border-indigo-500' : 'text-gray-400 hover:text-white'
+            }`}
+          >{g.label}</button>
         ))}
       </div>
 
-      {/* Status summary */}
-      <div className="grid grid-cols-4 gap-3">
-        {STEPS.map((step, i) => {
-          const count = current.filter(o => statusConfig[o.status].step >= i).length;
-          return (
-            <div key={step} className={`card-aura text-center ${i === 3 ? 'border-green-500/30' : ''}`}>
-              <p className="text-xs text-gray-500 mb-1">{step}</p>
-              <p className={`text-2xl font-bold ${i === 3 ? 'text-green-400' : i === 2 ? 'text-yellow-400' : i === 1 ? 'text-blue-400' : 'text-gray-400'}`}>{count}</p>
-            </div>
-          );
-        })}
-      </div>
+      <select
+        value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value)}
+        className="px-3 py-1.5 bg-[#161b2e] border border-[#1e2740] rounded text-sm text-white outline-none"
+      >
+        <option value="todos">Todos status</option>
+        <option value="pendente">Pendentes</option>
+        <option value="apurada">Apuradas</option>
+        <option value="paga">Pagas</option>
+        <option value="vencida">Vencidas</option>
+      </select>
 
-      {/* List */}
-      <div className="card-aura space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">{TABS.find(t => t.id === tab)?.label}</h2>
-          <button onClick={() => avancar(current.find(o => o.status === 'rascunho')?.id || '', tab)} className="btn-primary text-sm">
-            <FileText className="h-4 w-4" /> Gerar Arquivo
-          </button>
+      {loading ? (
+        <div className="text-center py-10 text-sm text-gray-500 flex items-center justify-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
         </div>
-
-        {current.length === 0 ? (
-          <div className="text-center py-12">
-            <FileText className="h-12 w-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-400 text-sm">Nenhuma obrigação cadastrada para este período.</p>
-          </div>
-        ) : (
-          current.map(o => {
-            const cfg = statusConfig[o.status];
-            const StatusIcon = cfg.icon;
+      ) : filtered.length === 0 ? (
+        <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-10 text-center">
+          <ClipboardList className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+          <p className="text-sm font-medium text-white">Nenhuma obrigação nesta categoria</p>
+          <p className="text-xs text-gray-500 mt-1">Vá em <Link href="/agenda" className="text-indigo-400 hover:underline">Agenda Fiscal</Link> e gere o calendário anual.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((o) => {
+            const cfg = STATUS_CONFIG[o.status] ?? STATUS_CONFIG.pendente;
+            const Icon = cfg.icon;
+            const venc = new Date(o.dataVencimento);
+            const dias = Math.ceil((venc.getTime() - Date.now()) / 86400000);
             return (
-              <div key={o.id} className="p-4 bg-[#0f1117] rounded-lg border border-[#1e2740]">
-                <div className="flex items-center gap-4">
-                  <div className={`flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center ${cfg.bg} border ${cfg.border}`}>
-                    <StatusIcon className={`h-5 w-5 ${cfg.color}`} />
+              <div key={o.id} className={`rounded-lg border p-3 ${cfg.classes}`}>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{o.descricao}</p>
+                    <p className="text-[11px] text-gray-400">
+                      {o.tipo} · {o.competencia} · vence {venc.toLocaleDateString('pt-BR')}
+                      {o.status !== 'paga' && dias >= 0 && ` (em ${dias} dia${dias !== 1 ? 's' : ''})`}
+                    </p>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-white font-medium text-sm">{o.nome}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.color} ${cfg.border}`}>{cfg.label}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-400">
-                      <span>Competência: {o.competencia}</span>
-                      {o.arquivo && <span className="font-mono">{o.arquivo}</span>}
-                      {o.protocolo && <span>Protocolo: {o.protocolo}</span>}
-                      {o.dataTransmissao && <span>Transmitido: {new Date(o.dataTransmissao + 'T12:00:00').toLocaleDateString('pt-BR')}</span>}
-                    </div>
-                  </div>
-
-                  {/* Timeline */}
-                  <div className="flex items-center gap-1 mr-4">
-                    {STEPS.map((step, i) => (
-                      <div key={step} className="flex items-center gap-1">
-                        <div className={`h-2 w-2 rounded-full ${statusConfig[o.status].step >= i ? 'bg-indigo-500' : 'bg-[#1e2740]'}`} title={step} />
-                        {i < STEPS.length - 1 && <div className={`h-0.5 w-4 ${statusConfig[o.status].step > i ? 'bg-indigo-500' : 'bg-[#1e2740]'}`} />}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {o.arquivo && (
-                      <button className="btn-ghost p-1.5 text-gray-400 hover:text-white" title="Download XML">
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    {o.status !== 'aceito' && o.status !== 'erro' && (
-                      <button onClick={() => avancar(o.id, tab)} className="btn-ghost text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 px-2 py-1">
-                        {o.status === 'rascunho' ? 'Validar' : o.status === 'validado' ? 'Transmitir' : 'Confirmar'}
-                        <ChevronRight className="h-3 w-3 ml-1" />
-                      </button>
-                    )}
-                    {o.status === 'rascunho' && (
-                      <button className="btn-ghost p-1.5 text-gray-400 hover:text-white" title="Regenerar">
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
+                  {o.valorEstimado != null && (
+                    <span className="text-sm font-mono text-white">R$ {o.valorEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  )}
+                  <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider">{cfg.label}</span>
+                  {o.status !== 'paga' && o.status !== 'isenta' && (
+                    <button
+                      onClick={() => {
+                        const v = parseFloat(prompt('Valor pago?', String(o.valorEstimado ?? 0)) ?? '0');
+                        if (v > 0) marcarPaga(o.id, v);
+                      }}
+                      className="px-2 py-1 text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white rounded"
+                    >Marcar paga</button>
+                  )}
                 </div>
               </div>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value, color }: any) {
+  return (
+    <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-3 text-center">
+      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">{label}</p>
     </div>
   );
 }

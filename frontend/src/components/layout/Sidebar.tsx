@@ -95,7 +95,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/portal-cliente', icon: Globe,     label: 'Portal do Cliente' },
       { href: '/banking',        icon: Landmark,  label: 'Open Finance' },
-      { href: '/assinaturas',    icon: PenLine,   label: 'Assinaturas' },
       { href: '/companies',      icon: Building2, label: 'Empresas' },
       { href: '/onboarding-cliente', icon: Building2, label: 'Onboarding Cliente', badge: 'Novo' },
       { href: '/migracao',         icon: ArrowLeftRight, label: 'Migração em Massa', badge: 'Novo' },
