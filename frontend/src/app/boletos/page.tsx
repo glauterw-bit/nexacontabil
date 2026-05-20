@@ -1,202 +1,287 @@
 'use client';
 import { useState } from 'react';
-import { Plus, Download, CheckCircle, Search, Printer } from 'lucide-react';
+import { useQuery, useMutation, gql } from '@apollo/client';
+import { Plus, Download, CheckCircle, Search, Printer, Loader2, X, Banknote, Copy } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 
-type BoletoStatus = 'pendente' | 'pago' | 'vencido' | 'cancelado';
+const LIST_BOLETOS = gql`
+  query Boletos($companyId: String!) {
+    boletos(companyId: $companyId) {
+      id payerName payerCnpjCpf amount dueDate status
+      digitableLine barcode ourNumber bankCode
+      instructions fine interest discount paidAt
+    }
+  }
+`;
+
+const CREATE_BOLETO = gql`
+  mutation CreateBoleto($input: CreateBoletoInput!) {
+    createBoleto(input: $input) { id }
+  }
+`;
+
+const MARK_PAID = gql`
+  mutation MarkPaid($id: ID!) {
+    markBoletoAsPaid(id: $id) { id status }
+  }
+`;
+
+const CANCEL_BOLETO = gql`
+  mutation CancelBoleto($id: ID!) {
+    cancelBoleto(id: $id) { id status }
+  }
+`;
 
 interface Boleto {
   id: string;
-  pagador: string;
-  cnpjCpf: string;
-  valor: number;
-  vencimento: string;
-  status: BoletoStatus;
-  codigoBarras: string;
-  linhaDigitavel: string;
-  descricao?: string;
+  payerName: string;
+  payerCnpjCpf: string;
+  amount: number;
+  dueDate: string;
+  status: string;
+  digitableLine?: string;
+  barcode?: string;
+  ourNumber: string;
+  bankCode: string;
+  instructions?: string;
+  paidAt?: string;
 }
 
-const MOCK_BOLETOS: Boleto[] = [
-  { id: '1', pagador: 'Empresa ABC Ltda', cnpjCpf: '12.345.678/0001-90', valor: 5800.00, vencimento: '2026-03-30', status: 'pendente', codigoBarras: '34191.09008 12345.678901 23456.789012 1 98760000058000', linhaDigitavel: '34191090081234567890123456789012198760000058000', descricao: 'Honorários Contábeis — Mar/2026' },
-  { id: '2', pagador: 'Comércio XYZ SA', cnpjCpf: '98.765.432/0001-10', valor: 3200.00, vencimento: '2026-03-25', status: 'pago', codigoBarras: '34191.09008 98765.432001 10234.567890 2 87650000032000', linhaDigitavel: '34191090089876543200110234567890287650000032000', descricao: 'Assessoria Fiscal — Fev/2026' },
-  { id: '3', pagador: 'Maria Santos ME', cnpjCpf: '111.222.333-44', valor: 1200.00, vencimento: '2026-03-10', status: 'vencido', codigoBarras: '34191.09008 11122.233344 12345.678901 3 76540000012000', linhaDigitavel: '34191090081112223334412345678901376540000012000', descricao: 'Declaração Anual IR' },
-  { id: '4', pagador: 'Tech Solutions Ltda', cnpjCpf: '22.333.444/0001-55', valor: 9500.00, vencimento: '2026-04-05', status: 'pendente', codigoBarras: '34191.09008 22333.444001 55123.456789 4 65430000095000', linhaDigitavel: '34191090082233344400155123456789465430000095000', descricao: 'Contabilidade Mensal — Abr/2026' },
-  { id: '5', pagador: 'João da Silva', cnpjCpf: '987.654.321-00', valor: 480.00, vencimento: '2026-03-01', status: 'cancelado', codigoBarras: '34191.09008 98765.432100 01234.567890 5 54320000004800', linhaDigitavel: '34191090089876543210001234567890554320000004800', descricao: 'Consulta Tributária' },
-];
-
-const statusConfig: Record<BoletoStatus, { label: string; color: string; bg: string; border: string }> = {
-  pendente: { label: 'Pendente', color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/30' },
-  pago: { label: 'Pago', color: 'text-green-400', bg: 'bg-green-400/10', border: 'border-green-400/30' },
-  vencido: { label: 'Vencido', color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/30' },
-  cancelado: { label: 'Cancelado', color: 'text-gray-500', bg: 'bg-gray-500/10', border: 'border-gray-500/30' },
+const STATUS_MAP: Record<string, { label: string; classes: string }> = {
+  pending: { label: 'Pendente', classes: 'text-amber-300 bg-amber-500/10 border-amber-500/30' },
+  pendente: { label: 'Pendente', classes: 'text-amber-300 bg-amber-500/10 border-amber-500/30' },
+  paid: { label: 'Pago', classes: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30' },
+  pago: { label: 'Pago', classes: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30' },
+  overdue: { label: 'Vencido', classes: 'text-red-300 bg-red-500/10 border-red-500/30' },
+  vencido: { label: 'Vencido', classes: 'text-red-300 bg-red-500/10 border-red-500/30' },
+  cancelled: { label: 'Cancelado', classes: 'text-gray-400 bg-gray-500/10 border-gray-500/30' },
+  cancelado: { label: 'Cancelado', classes: 'text-gray-400 bg-gray-500/10 border-gray-500/30' },
 };
+
+function brl(n: number) {
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
 
 export default function BoletosPage() {
   const { selectedCompany } = useCompany();
-  const [boletos, setBoletos] = useState<Boleto[]>(MOCK_BOLETOS);
-  const [statusFiltro, setStatusFiltro] = useState<string>('todos');
+  const toast = useToast();
+  const [showNew, setShowNew] = useState(false);
+  const [statusFiltro, setStatusFiltro] = useState('todos');
   const [search, setSearch] = useState('');
-  const [showBarcode, setShowBarcode] = useState<string | null>(null);
 
-  const marcarPago = (id: string) => {
-    setBoletos(prev => prev.map(b => b.id === id ? { ...b, status: 'pago' as BoletoStatus } : b));
-  };
-
-  const filtered = boletos.filter(b => {
-    const matchSearch = b.pagador.toLowerCase().includes(search.toLowerCase()) || b.cnpjCpf.includes(search);
-    const matchStatus = statusFiltro === 'todos' || b.status === statusFiltro;
-    return matchSearch && matchStatus;
+  const companyId = selectedCompany?.id ?? '';
+  const { data, loading, refetch } = useQuery(LIST_BOLETOS, {
+    variables: { companyId },
+    skip: !companyId,
   });
 
-  const selectedBoleto = boletos.find(b => b.id === showBarcode);
+  const [createBoleto, { loading: creating }] = useMutation(CREATE_BOLETO, {
+    onCompleted: () => { toast.push('Boleto criado', { variant: 'success' }); setShowNew(false); refetch(); },
+    onError: (e) => toast.push(e.message, { variant: 'error' }),
+  });
+  const [markPaid] = useMutation(MARK_PAID, {
+    onCompleted: () => { toast.push('Marcado como pago', { variant: 'success' }); refetch(); },
+  });
+  const [cancelBoleto] = useMutation(CANCEL_BOLETO, {
+    onCompleted: () => { toast.push('Cancelado', { variant: 'success' }); refetch(); },
+  });
+
+  const boletos: Boleto[] = data?.boletos ?? [];
+
+  const filtered = boletos.filter((b) => {
+    if (statusFiltro !== 'todos' && b.status !== statusFiltro) return false;
+    if (search) {
+      const s = search.toLowerCase();
+      return b.payerName.toLowerCase().includes(s) || b.payerCnpjCpf.includes(s);
+    }
+    return true;
+  });
+
+  const totals = {
+    pendentes: boletos.filter((b) => b.status === 'pending' || b.status === 'pendente').reduce((s, b) => s + b.amount, 0),
+    pagos: boletos.filter((b) => b.status === 'paid' || b.status === 'pago').reduce((s, b) => s + b.amount, 0),
+    vencidos: boletos.filter((b) => {
+      if (b.status === 'paid' || b.status === 'pago' || b.status === 'cancelled') return false;
+      return new Date(b.dueDate) < new Date();
+    }).reduce((s, b) => s + b.amount, 0),
+  };
+
+  function copyLine(line: string) {
+    navigator.clipboard.writeText(line);
+    toast.push('Linha digitável copiada', { variant: 'info' });
+  }
 
   if (!selectedCompany) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
         <Building2 className="h-12 w-12 text-gray-600" />
-        <p className="text-gray-400 text-sm">Selecione uma empresa para gerenciar boletos.</p>
-        <Link href="/companies" className="btn-primary">Gerenciar Empresas</Link>
+        <p className="text-gray-400 text-sm">Selecione uma empresa.</p>
+        <Link href="/companies" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">Gerenciar Empresas</Link>
       </div>
     );
   }
 
-  const totalPendente = boletos.filter(b => b.status === 'pendente').reduce((s, b) => s + b.valor, 0);
-  const totalVencido = boletos.filter(b => b.status === 'vencido').reduce((s, b) => s + b.valor, 0);
-
   return (
-    <div className="p-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+    <div className="p-6 md:p-8 max-w-6xl space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Boletos</h1>
-          <p className="text-gray-400 text-sm mt-1">{selectedCompany.name}</p>
-        </div>
-        <Link href="/boletos/novo" className="btn-primary">
-          <Plus className="h-4 w-4" /> Novo Boleto
-        </Link>
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="card-aura">
-          <p className="text-xs text-gray-500 mb-1">A receber (pendentes)</p>
-          <p className="text-xl font-bold text-yellow-400">{totalPendente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-          <p className="text-xs text-gray-500 mt-1">{boletos.filter(b => b.status === 'pendente').length} boletos</p>
-        </div>
-        <div className="card-aura">
-          <p className="text-xs text-gray-500 mb-1">Vencidos</p>
-          <p className="text-xl font-bold text-red-400">{totalVencido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-          <p className="text-xs text-gray-500 mt-1">{boletos.filter(b => b.status === 'vencido').length} boletos</p>
-        </div>
-        <div className="card-aura">
-          <p className="text-xs text-gray-500 mb-1">Pagos este mês</p>
-          <p className="text-xl font-bold text-green-400">{boletos.filter(b => b.status === 'pago').reduce((s, b) => s + b.valor, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-          <p className="text-xs text-gray-500 mt-1">{boletos.filter(b => b.status === 'pago').length} boletos</p>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar pagador ou CNPJ/CPF..."
-            className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg pl-10 pr-4 py-2 text-white text-sm outline-none focus:border-indigo-500 placeholder-gray-600" />
-        </div>
-        <div className="flex rounded-lg border border-[#1e2740] overflow-hidden">
-          {(['todos', 'pendente', 'pago', 'vencido', 'cancelado'] as const).map(s => (
-            <button key={s} onClick={() => setStatusFiltro(s)}
-              className={`px-3 py-1.5 text-sm transition-colors capitalize ${statusFiltro === s ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-              {s === 'todos' ? 'Todos' : statusConfig[s].label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="card-aura overflow-x-auto">
-        <table className="w-full min-w-[700px]">
-          <thead>
-            <tr className="text-left text-xs text-gray-500 border-b border-[#1e2740]">
-              <th className="pb-3 font-medium">Pagador</th>
-              <th className="pb-3 font-medium">Descrição</th>
-              <th className="pb-3 font-medium text-right">Valor</th>
-              <th className="pb-3 font-medium">Vencimento</th>
-              <th className="pb-3 font-medium text-center">Status</th>
-              <th className="pb-3 font-medium text-center">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#1e2740]">
-            {filtered.map(b => {
-              const cfg = statusConfig[b.status];
-              const isVencido = b.status === 'vencido';
-              return (
-                <tr key={b.id} className={`hover:bg-white/5 transition-colors ${b.status === 'cancelado' ? 'opacity-40' : ''}`}>
-                  <td className="py-3">
-                    <p className="text-white text-sm font-medium">{b.pagador}</p>
-                    <p className="text-gray-500 text-xs font-mono">{b.cnpjCpf}</p>
-                  </td>
-                  <td className="py-3 text-sm text-gray-400 max-w-[200px] truncate">{b.descricao}</td>
-                  <td className="py-3 text-sm text-right font-mono font-semibold text-white">{b.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                  <td className={`py-3 text-sm ${isVencido ? 'text-red-400' : 'text-gray-400'}`}>
-                    {new Date(b.vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
-                  </td>
-                  <td className="py-3 text-center">
-                    <span className={`text-xs px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.color} ${cfg.border}`}>{cfg.label}</span>
-                  </td>
-                  <td className="py-3 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <button onClick={() => setShowBarcode(b.id)} className="btn-ghost p-1.5 text-gray-400 hover:text-white" title="Código de Barras">
-                        <Printer className="h-3.5 w-3.5" />
-                      </button>
-                      <button className="btn-ghost p-1.5 text-gray-400 hover:text-white" title="Download PDF">
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
-                      {(b.status === 'pendente' || b.status === 'vencido') && (
-                        <button onClick={() => marcarPago(b.id)} className="btn-ghost p-1.5 text-green-400 hover:text-green-300" title="Marcar como pago">
-                          <CheckCircle className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Barcode Modal */}
-      {showBarcode && selectedBoleto && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0f1117] border border-[#1e2740] rounded-2xl p-6 w-full max-w-lg space-y-4">
-            <h2 className="text-lg font-semibold text-white">Código de Barras</h2>
-            <div className="bg-white rounded-lg p-4">
-              <div className="flex gap-0.5 items-end justify-center h-16 mb-3">
-                {Array.from({ length: 60 }).map((_, i) => (
-                  <div key={i} className="bg-black" style={{ width: Math.random() > 0.5 ? 2 : 1, height: Math.random() > 0.3 ? 64 : 48 }} />
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Linha Digitável</p>
-              <p className="text-sm font-mono text-white bg-[#161b2e] p-3 rounded-lg break-all">{selectedBoleto.linhaDigitavel}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><p className="text-gray-500 text-xs">Pagador</p><p className="text-white">{selectedBoleto.pagador}</p></div>
-              <div><p className="text-gray-500 text-xs">Valor</p><p className="text-green-400 font-bold">{selectedBoleto.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></div>
-              <div><p className="text-gray-500 text-xs">Vencimento</p><p className="text-white">{new Date(selectedBoleto.vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</p></div>
-              <div><p className="text-gray-500 text-xs">Status</p><p className={statusConfig[selectedBoleto.status].color}>{statusConfig[selectedBoleto.status].label}</p></div>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setShowBarcode(null)} className="btn-ghost flex-1">Fechar</button>
-              <button className="btn-primary flex-1"><Download className="h-4 w-4" />Baixar PDF</button>
-            </div>
+          <div className="flex items-center gap-2 mb-0.5">
+            <Banknote className="h-5 w-5 text-indigo-400" />
+            <h1 className="text-xl font-semibold text-white">Boletos</h1>
           </div>
+          <p className="text-sm text-gray-400">{selectedCompany.name} · {boletos.length} boleto(s)</p>
+        </div>
+        <button
+          onClick={() => setShowNew(true)}
+          className="px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded inline-flex items-center gap-1.5"
+        >
+          <Plus className="h-3.5 w-3.5" /> Novo boleto
+        </button>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-3">
+        <KPI label="Pendentes" value={brl(totals.pendentes)} color="text-amber-400" />
+        <KPI label="Vencidos" value={brl(totals.vencidos)} color="text-red-400" />
+        <KPI label="Pagos" value={brl(totals.pagos)} color="text-emerald-400" />
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex-1 min-w-[200px] relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por pagador ou CNPJ/CPF"
+            className="w-full pl-9 pr-3 py-1.5 bg-[#161b2e] border border-[#1e2740] rounded text-sm text-white outline-none"
+          />
+        </div>
+        <select
+          value={statusFiltro}
+          onChange={(e) => setStatusFiltro(e.target.value)}
+          className="px-3 py-1.5 bg-[#161b2e] border border-[#1e2740] rounded text-sm text-white outline-none"
+        >
+          <option value="todos">Todos status</option>
+          <option value="pending">Pendentes</option>
+          <option value="paid">Pagos</option>
+          <option value="overdue">Vencidos</option>
+          <option value="cancelled">Cancelados</option>
+        </select>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-10 text-sm text-gray-500 flex items-center justify-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-10 text-center">
+          <Banknote className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+          <p className="text-sm font-medium text-white">Nenhum boleto encontrado</p>
+          <p className="text-xs text-gray-500 mt-1">
+            Crie um boleto manual ou configure o Banco Inter API em /integracoes para emissão automática.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((b) => {
+            const sc = STATUS_MAP[b.status] ?? { label: b.status, classes: 'text-gray-400' };
+            const isVencido = (b.status === 'pending' || b.status === 'pendente') && new Date(b.dueDate) < new Date();
+            const venc = new Date(b.dueDate).toLocaleDateString('pt-BR');
+            return (
+              <div key={b.id} className="rounded-lg border border-[#1e2740] bg-[#161b2e] p-3 hover:border-indigo-500/40 transition-colors">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex-1 min-w-[200px]">
+                    <p className="text-sm font-medium text-white truncate">{b.payerName}</p>
+                    <p className="text-[11px] text-gray-500 font-mono">{b.payerCnpjCpf} · vence {venc}</p>
+                  </div>
+                  <span className="text-lg font-bold text-emerald-300 font-mono">{brl(b.amount)}</span>
+                  <span className={`px-2 py-0.5 text-[10px] border rounded ${sc.classes}`}>
+                    {isVencido ? 'Vencido' : sc.label}
+                  </span>
+                  <div className="flex gap-1">
+                    {b.digitableLine && (
+                      <button onClick={() => copyLine(b.digitableLine!)} className="p-1.5 text-gray-400 hover:text-white" title="Copiar linha">
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {(b.status === 'pending' || b.status === 'pendente') && (
+                      <>
+                        <button onClick={() => markPaid({ variables: { id: b.id } })} className="px-2 py-1 text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white rounded">
+                          Marcar pago
+                        </button>
+                        <button onClick={() => confirm('Cancelar boleto?') && cancelBoleto({ variables: { id: b.id } })} className="px-2 py-1 text-[10px] bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded">
+                          Cancelar
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {b.digitableLine && (
+                  <p className="text-[10px] font-mono text-gray-500 mt-1 truncate">{b.digitableLine}</p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
+
+      {showNew && <NewBoletoModal companyId={companyId} onClose={() => setShowNew(false)} onCreate={createBoleto} loading={creating} />}
+    </div>
+  );
+}
+
+function KPI({ label, value, color }: any) {
+  return (
+    <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+    </div>
+  );
+}
+
+function NewBoletoModal({ companyId, onClose, onCreate, loading }: any) {
+  const [form, setForm] = useState({
+    payerName: '', payerCnpjCpf: '', amount: 0, dueDate: new Date().toISOString().slice(0, 10),
+    beneficiaryName: '', beneficiaryCnpj: '', instructions: '',
+  });
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-[#161b2e] border border-[#2a3550] rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-[#1e2740] flex justify-between">
+          <p className="text-sm font-medium text-white">Novo boleto</p>
+          <button onClick={onClose}><X className="h-4 w-4 text-gray-500" /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          {[
+            { k: 'beneficiaryName', label: 'Beneficiário (Razão Social do escritório)', type: 'text' },
+            { k: 'beneficiaryCnpj', label: 'CNPJ do beneficiário', type: 'text' },
+            { k: 'payerName', label: 'Nome do pagador', type: 'text' },
+            { k: 'payerCnpjCpf', label: 'CNPJ/CPF do pagador', type: 'text' },
+            { k: 'amount', label: 'Valor (R$)', type: 'number' },
+            { k: 'dueDate', label: 'Vencimento', type: 'date' },
+            { k: 'instructions', label: 'Descrição (opcional)', type: 'text' },
+          ].map((f) => (
+            <div key={f.k}>
+              <label className="text-[10px] uppercase text-gray-500 tracking-wider block mb-1">{f.label}</label>
+              <input
+                type={f.type}
+                value={(form as any)[f.k]}
+                onChange={(e) => setForm({ ...form, [f.k]: f.type === 'number' ? Number(e.target.value) : e.target.value })}
+                className="w-full px-3 py-1.5 bg-[#0f1117] border border-[#1e2740] rounded text-sm text-white outline-none"
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => onCreate({ variables: { input: { companyId, ...form, dueDate: new Date(form.dueDate) } } })}
+            disabled={loading || !form.payerName || form.amount <= 0}
+            className="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs rounded"
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin inline" /> : 'Criar boleto'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
