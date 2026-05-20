@@ -55,7 +55,10 @@ export class PortalClienteService {
 
     if (!portal || !portal.active) throw new UnauthorizedException('Portal não encontrado ou inativo');
 
-    const jwtSecret = this.config.get('PORTAL_JWT_SECRET') || 'portal-secret';
+    const jwtSecret = this.config.get<string>('PORTAL_JWT_SECRET') || this.config.get<string>('JWT_SECRET');
+    if (!jwtSecret) {
+      throw new Error('PORTAL_JWT_SECRET ou JWT_SECRET obrigatório para emissão de token do portal.');
+    }
     const token = jwt.sign(
       { portalId: portal.id, companyId: portal.companyId },
       jwtSecret,

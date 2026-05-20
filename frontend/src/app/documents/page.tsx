@@ -23,31 +23,30 @@ export default function DocumentsPage() {
   const onDrop = useCallback(async (files: File[]) => {
     if (!selectedCompany) return;
     setProcessing(true);
+    const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
+    const token = typeof window !== 'undefined' ? localStorage.getItem('aura_token') : null;
+    const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
     for (const file of files) {
+      const docId = crypto.randomUUID();
+      setDocs(prev => [{ id: docId, filename: file.name, status: 'processing', result: null }, ...prev]);
       try {
         const form = new FormData();
         form.append('file', file);
-        form.append('company_id', selectedCompany.id);
 
         const res = await axios.post(
-          `${process.env.NEXT_PUBLIC_AI_URL || 'http://localhost:8000'}/api/v1/documents/upload`,
+          `${API}/api/v1/ai/ocr`,
           form,
-          { headers: { 'Content-Type': 'multipart/form-data' } }
+          { headers: { ...authHeader, 'Content-Type': 'multipart/form-data' } }
         );
 
-        setDocs(prev => [{
-          id: res.data.document_id,
-          filename: file.name,
-          status: res.data.status,
-          result: res.data,
-        }, ...prev]);
+        setDocs(prev => prev.map(d => d.id === docId
+          ? { ...d, status: 'completed', result: res.data }
+          : d));
       } catch (err: any) {
-        setDocs(prev => [{
-          id: crypto.randomUUID(),
-          filename: file.name,
-          status: 'failed',
-          result: { error: err.message },
-        }, ...prev]);
+        setDocs(prev => prev.map(d => d.id === docId
+          ? { ...d, status: 'failed', result: { error: err?.response?.data?.message ?? err.message } }
+          : d));
       }
     }
     setProcessing(false);

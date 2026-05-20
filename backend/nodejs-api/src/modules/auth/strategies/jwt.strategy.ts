@@ -10,9 +10,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     config: ConfigService,
     private readonly prisma: PrismaService,
   ) {
+    const secret = config.get<string>('JWT_SECRET');
+    if (!secret && process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET ausente em produção. Configure a variável de ambiente.');
+    }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey: config.get('JWT_SECRET', 'aura_secret_change_in_production'),
+      secretOrKey: secret ?? 'dev-only-not-secure-rotate-me',
     });
   }
 
