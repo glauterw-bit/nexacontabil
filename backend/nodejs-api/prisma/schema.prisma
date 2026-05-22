@@ -1440,3 +1440,29 @@ model AccountingPeriodClosing {
   @@index([companyId, status])
   @@map("accounting_period_closings")
 }
+
+// ─── Onvio (Thomson Reuters Domínio cloud) ────────────────────
+// Integração via OAuth 2.0 com a Plataforma Onvio. Uma conexão por
+// usuário do escritório (não por empresa-cliente) — uma conta Onvio
+// vê todas as empresas do escritório contábil.
+model OnvioConnection {
+  id                    String    @id @default(uuid())
+  userId                String    @unique // contador que conectou (1 por user)
+  onvioEmail            String?   // identifica conta Onvio
+  onvioTenantId         String?   // tenant/escritório no Onvio
+  encryptedAccessToken  String    // AES-256-GCM
+  encryptedRefreshToken String?
+  tokenExpiresAt        DateTime
+  scopes                String    // space-separated, p.ex. "connect.read cargas.read"
+  modulos               String?   // CSV dos módulos contratados detectados (connect|cargas|folha|...)
+  active                Boolean   @default(true)
+  lastSyncAt            DateTime?
+  lastSyncStatus        String?   // ok|error|partial
+  lastSyncError         String?
+  syncStats             String?   // JSON: {clientes:n, documentos:n, ...}
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId, active])
+  @@map("onvio_connections")
+}

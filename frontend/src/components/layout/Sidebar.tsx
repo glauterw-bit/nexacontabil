@@ -41,6 +41,7 @@ const NAV_MAIN: NavItem[] = [
   { href: '/buscar',       icon: Bot,              label: 'Busca IA',        badge: 'AI' },
   { href: '/agent',        icon: Bot,              label: 'Agent Desktop',   badge: 'Novo' },
   { href: '/integracoes',  icon: Settings,         label: 'Integrações',     badge: 'Setup' },
+  { href: '/onvio',        icon: Building2,        label: 'Onvio · Domínio', badge: 'TR' },
   { href: '/transactions', icon: ArrowLeftRight,   label: 'Lançamentos' },
   { href: '/copilot',      icon: Bot,              label: 'Copilot IA',  badge: 'AI' },
   { href: '/whatsapp',     icon: MessageCircle,    label: 'WhatsApp IA', badge: 'WA' },

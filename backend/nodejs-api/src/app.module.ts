@@ -72,6 +72,7 @@ import { HealthScoreModule } from './modules/health-score/health-score.module';
 import { PredictiveModule } from './modules/predictive/predictive.module';
 import { BenchmarkModule } from './modules/benchmark/benchmark.module';
 import { BalanceSheetModule } from './modules/balance-sheet/balance-sheet.module';
+import { OnvioModule } from './modules/onvio/onvio.module';
 import { ChartAccountsModule } from './modules/chart-accounts/chart-accounts.module';
 import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
 import { FiscalCalendarModule } from './modules/fiscal-calendar/fiscal-calendar.module';
@@ -182,6 +183,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     PredictiveModule,
     BenchmarkModule,
     BalanceSheetModule,
+    OnvioModule,
     EmailModule,
   ],
   providers: [
