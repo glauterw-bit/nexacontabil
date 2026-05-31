@@ -10,7 +10,7 @@ import {
   Calendar, Users, Receipt, BarChart3, TrendingUp, Target, HeartPulse,
   Banknote, PenLine, ClipboardList, Landmark, Scale, Package, FileCode,
   Briefcase, UserCheck, Award, Globe, DollarSign, Kanban, Megaphone, Store,
-  Workflow, Boxes
+  Workflow, Boxes, FileDown
 } from 'lucide-react';
 import { useCompany, Company } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -104,6 +104,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/companies',      icon: Building2, label: 'Empresas' },
       { href: '/onboarding-cliente', icon: Building2, label: 'Onboarding Cliente', badge: 'Novo' },
       { href: '/migracao',         icon: ArrowLeftRight, label: 'Migração em Massa', badge: 'Novo' },
+      { href: '/exportar-dominio', icon: FileDown,       label: 'Exportar p/ Domínio' },
       { href: '/fechamento',     icon: ShieldCheck, label: 'Fechamento Mensal', badge: 'Novo' },
       { href: '/kanban',         icon: Kanban,      label: 'Kanban Operacional', badge: 'Novo' },
       { href: '/minha-carteira', icon: Briefcase,   label: 'Minha Carteira' },
