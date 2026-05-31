@@ -59,3 +59,14 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"competencia\":\"$COMP\"}" | tee -a "$GITHUB_STEP_SUMMARY"
           echo
+
+      - name: Banco de NCM — aprender dos XMLs (nightly)
+        env:
+          SERVICE_TOKEN: ${{ secrets.CRON_SERVICE_TOKEN }}
+          API_BASE: https://backend-production-9eeec.up.railway.app
+        run: |
+          if [ -z "$SERVICE_TOKEN" ]; then exit 0; fi
+          echo "▸ Aprender NCMs dos XMLs capturados"
+          curl -fsSL -X POST "$API_BASE/api/v1/ncm-inteligente/aprender-xmls" \
+            -H "Authorization: Bearer $SERVICE_TOKEN" | tee -a "$GITHUB_STEP_SUMMARY" || echo "::warning::NCM learn falhou (segue)"
+          echo

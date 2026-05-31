@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react';
 import {
   CheckCircle2, Circle, AlertTriangle, ExternalLink, ChevronDown, ChevronRight,
   Sparkles, Receipt, Banknote, MessageCircle, Cloud, Mail, ShieldCheck, Building2,
-  Copy, Check, Loader2,
+  Copy, Check, Loader2, HardDrive, Zap,
 } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
 const ICONS: Record<string, any> = {
+  google_drive: HardDrive,
+  onvio: Building2,
   anthropic: Sparkles,
   nfeio: Receipt,
   banco_inter: Banknote,
@@ -19,11 +21,19 @@ const ICONS: Record<string, any> = {
   cert_a1: ShieldCheck,
 };
 
+const GRUPOS: Record<number, { titulo: string; desc: string }> = {
+  1: { titulo: 'Essenciais pra operação', desc: 'Ativam a Esteira Fiscal, a IA e os envios automáticos ao cliente' },
+  2: { titulo: 'Fiscal & Cobrança', desc: 'Emissão de notas, boletos reais e ponte com o Domínio' },
+  3: { titulo: 'Avançadas', desc: 'Conciliação bancária e armazenamento legal' },
+};
+
 interface Integration {
   key: string;
   name: string;
   status: 'configured' | 'missing' | 'partial';
   required: boolean;
+  prioridade?: 1 | 2 | 3;
+  usadoEm?: string;
   helps: string[];
   signupUrl?: string;
   setupSteps: string[];
@@ -101,9 +111,19 @@ export default function IntegracoesPage() {
         </div>
       </div>
 
-      {/* List */}
-      <div className="space-y-2">
-        {data.integrations.map((it) => {
+      {/* List agrupada por prioridade */}
+      {[1, 2, 3].map((grupo) => {
+        const items = data.integrations.filter((i) => (i.prioridade ?? 2) === grupo);
+        if (items.length === 0) return null;
+        const g = GRUPOS[grupo];
+        return (
+        <div key={grupo} className="space-y-2">
+          <div className="flex items-center gap-2 pt-2">
+            {grupo === 1 ? <Zap className="h-4 w-4 text-indigo-400" /> : grupo === 2 ? <Receipt className="h-4 w-4 text-gray-400" /> : <Cloud className="h-4 w-4 text-gray-500" />}
+            <h2 className="text-sm font-semibold text-white">{g.titulo}</h2>
+            <span className="text-xs text-gray-500">· {g.desc}</span>
+          </div>
+        {items.map((it) => {
           const Icon = ICONS[it.key] || Cloud;
           const isExpanded = expanded === it.key;
           return (
@@ -141,6 +161,9 @@ export default function IntegracoesPage() {
                     )}
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5 truncate">{it.helps[0]}</p>
+                  {it.usadoEm && (
+                    <p className="text-[11px] text-indigo-300/70 mt-0.5 truncate">Usado em: {it.usadoEm}</p>
+                  )}
                 </div>
                 {isExpanded ? (
                   <ChevronDown className="h-4 w-4 text-gray-500" />
@@ -231,7 +254,9 @@ export default function IntegracoesPage() {
             </div>
           );
         })}
-      </div>
+        </div>
+        );
+      })}
 
       {/* Help */}
       <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4">

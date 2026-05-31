@@ -8,6 +8,8 @@ interface IntegrationStatus {
   name: string;
   status: Status;
   required: boolean;
+  prioridade: 1 | 2 | 3; // 1=essencial pra operação · 2=fiscal/cobrança · 3=avançada
+  usadoEm?: string;      // qual recurso do NexaContábil consome
   helps: string[];
   signupUrl?: string;
   setupSteps: string[];
@@ -24,10 +26,58 @@ export class IntegrationsController {
   status(): { integrations: IntegrationStatus[]; summary: { total: number; configured: number; missing: number } } {
     const integrations: IntegrationStatus[] = [
       {
+        key: 'google_drive',
+        name: 'Google Drive (captura de documentos)',
+        status: process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? 'configured' : 'missing',
+        required: false,
+        prioridade: 1,
+        usadoEm: 'Esteira Fiscal (varre a pasta e roteia por cliente), Busca IA em drives',
+        helps: [
+          'A Esteira Fiscal lê a pasta do Drive e roteia cada documento ao cliente certo',
+          'Busca em linguagem natural dentro dos arquivos do escritório',
+          'Sem precisar baixar tudo manualmente',
+        ],
+        signupUrl: 'https://console.cloud.google.com',
+        setupSteps: [
+          'Acesse console.cloud.google.com e crie um projeto (ou use um existente).',
+          'Ative a "Google Drive API" em APIs e Serviços → Biblioteca.',
+          'Em "Tela de consentimento OAuth", configure como Externo e adicione seu e-mail como usuário de teste.',
+          'Em Credenciais → Criar credenciais → ID do cliente OAuth → Aplicativo da Web.',
+          'Em URIs de redirecionamento autorizados, adicione: BACKEND_URL/api/v1/cloud/google/callback.',
+          'Copie o Client ID e o Client Secret.',
+          'No Railway → backend → Variables: GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.',
+          'No NexaContábil, vá em /drive-conectado e clique em Conectar — autorize a conta do escritório.',
+        ],
+      },
+      {
+        key: 'onvio',
+        name: 'Onvio / Domínio (Thomson Reuters)',
+        status: process.env.ONVIO_CLIENT_ID && process.env.ONVIO_CLIENT_SECRET ? 'configured' : 'missing',
+        required: false,
+        prioridade: 2,
+        usadoEm: 'Integração Onvio (envio de NF, baixa de parcelas e rubricas pro Domínio)',
+        helps: [
+          'Envia NF, baixas de parcela e rubricas de folha direto pro Domínio',
+          'Alternativa: se não conseguir o Onvio, use /exportar-dominio (gera arquivo de importação, sem credencial)',
+        ],
+        signupUrl: 'https://onvio.com.br',
+        setupSteps: [
+          'No Portal Onvio, abra chamado pedindo "Acesso à Plataforma de Integração (Developer Portal)".',
+          'A Thomson Reuters envia client_id e client_secret (pode levar 3-7 dias úteis).',
+          'Informe as URLs de callback: BACKEND_URL/api/v1/onvio/callback.',
+          'No Railway → backend → Variables: ONVIO_CLIENT_ID e ONVIO_CLIENT_SECRET.',
+          'Se a TR informar URLs próprias, ajuste também ONVIO_AUTHORIZE_URL, ONVIO_TOKEN_URL, ONVIO_API_BASE_URL.',
+          'No NexaContábil, vá em /onvio e clique em Conectar.',
+          'ALTERNATIVA SEM ESPERAR A TR: use /exportar-dominio — gera o arquivo de importação de lançamentos que o Domínio lê nativamente.',
+        ],
+      },
+      {
         key: 'anthropic',
         name: 'Anthropic Claude (IA contábil)',
         status: process.env.ANTHROPIC_API_KEY ? 'configured' : 'missing',
         required: false,
+        prioridade: 1,
+        usadoEm: 'OCR de documentos, Banco de NCM (classificação), Copilot, Esteira Fiscal, Risco Fiscal',
         helps: [
           'Classificação automática de documentos (NF-e, NFS-e, boleto, holerite...)',
           'Extração estruturada via OCR',
@@ -51,6 +101,8 @@ export class IntegrationsController {
         status: process.env.NFEIO_API_KEY && process.env.NFEIO_COMPANY_ID ? 'configured'
               : (process.env.NFEIO_API_KEY || process.env.NFEIO_COMPANY_ID) ? 'partial' : 'missing',
         required: false,
+        prioridade: 2,
+        usadoEm: 'Módulo /fiscal (emissão real de NF-e/NFS-e)',
         helps: [
           'Emissão real de NF-e e NFS-e em nome do cliente',
           'Cancelamento e consulta de notas',
@@ -70,6 +122,8 @@ export class IntegrationsController {
         name: 'Banco Inter API (PIX + Boleto)',
         status: process.env.INTER_CLIENT_ID && process.env.INTER_CLIENT_SECRET ? 'configured' : 'missing',
         required: false,
+        prioridade: 2,
+        usadoEm: 'Módulo /boletos (cobrança real com retorno bancário)',
         helps: [
           'Emissão real de boletos com retorno bancário',
           'PIX cobrança dinâmica com QR Code',
@@ -91,6 +145,8 @@ export class IntegrationsController {
         name: 'WhatsApp Business API (Meta)',
         status: process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_ID ? 'configured' : 'missing',
         required: false,
+        prioridade: 1,
+        usadoEm: 'Esteira Fiscal (relatório por WhatsApp), atendimento IA, lembretes de cobrança',
         helps: [
           'Envio automático de lembretes de obrigações ao cliente',
           'Chat oficial com cliente (não risco de banimento como WhatsApp pessoal)',
@@ -113,6 +169,8 @@ export class IntegrationsController {
         name: 'Pluggy (Open Finance — conciliação bancária)',
         status: process.env.PLUGGY_CLIENT_ID && process.env.PLUGGY_CLIENT_SECRET ? 'configured' : 'missing',
         required: false,
+        prioridade: 3,
+        usadoEm: 'Conciliação bancária automática (/banking)',
         helps: [
           'Conecta extratos automaticamente de 50+ bancos brasileiros',
           'Conciliação inteligente entre vendas, NF-e e crédito bancário',
@@ -132,6 +190,8 @@ export class IntegrationsController {
         name: 'Cloudflare R2 / Backblaze B2 (Storage de arquivos)',
         status: process.env.STORAGE_BUCKET && process.env.STORAGE_ACCESS_KEY ? 'configured' : 'missing',
         required: false,
+        prioridade: 3,
+        usadoEm: 'Guarda legal de XMLs/PDFs (retenção 5 anos RFB)',
         helps: [
           'Guarda XMLs/PDFs originais (não pode depender só de volume Railway por lei)',
           'Backup criptografado',
@@ -151,6 +211,8 @@ export class IntegrationsController {
         name: 'Resend ou AWS SES (E-mail transacional)',
         status: process.env.RESEND_API_KEY || process.env.SES_REGION ? 'configured' : 'missing',
         required: false,
+        prioridade: 1,
+        usadoEm: 'Esteira Fiscal (relatório ao cliente), lembretes de obrigações, alertas',
         helps: [
           'Lembretes automáticos D-7/D-3/D-1 de obrigações fiscais',
           'Alertas de certificado vencendo',
@@ -170,6 +232,8 @@ export class IntegrationsController {
         name: 'Certificado Digital A1 (ICP-Brasil)',
         status: 'missing', // sempre marcado missing, é gerenciado por empresa
         required: true,
+        prioridade: 2,
+        usadoEm: 'Emissão NF-e/NFS-e, eSocial, DCTFWeb, EFD-REINF, e-CAC (por cliente)',
         helps: [
           'OBRIGATÓRIO para emitir NF-e/NFS-e em nome do cliente',
           'Necessário para transmissão eSocial, DCTFWeb, EFD-REINF',
@@ -185,6 +249,8 @@ export class IntegrationsController {
         ],
       },
     ];
+
+    integrations.sort((a, b) => a.prioridade - b.prioridade);
 
     const summary = {
       total: integrations.length,
