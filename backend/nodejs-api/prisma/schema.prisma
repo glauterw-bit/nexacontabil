@@ -67,6 +67,7 @@ model Company {
   whatsappNumber       String?
   monthlyReportEnabled Boolean  @default(false)
   reportInstanceName   String?
+  segmentoFiscal       String?  // comercio|industria|servico|transporte — usado no Banco de NCM
 
   honorarios           Honorario[]
   crmClientes          CrmCliente[]
@@ -1465,4 +1466,87 @@ model OnvioConnection {
 
   @@index([userId, active])
   @@map("onvio_connections")
+}
+
+// ─── Banco de NCM Inteligente (padronização tributária por segmento) ──
+// "Ideia de ouro": base única de NCM + tributação por segmento, alimentada
+// pelos XMLs reais de todos os clientes. Resultado: XML chega correto,
+// menos retrabalho de NCM/tributação, menos ajuste no Domínio.
+model NcmSegmentoRule {
+  id            String   @id @default(uuid())
+  ncm           String   // 8 dígitos
+  descricao     String
+  segmento      String   // comercio|industria|servico|transporte|outro
+  // ICMS
+  icmsAliquota  Float    @default(0)
+  icmsCst       String?
+  icmsSt        Boolean  @default(false)
+  mvaSt         Float    @default(0)
+  // IPI
+  ipiAliquota   Float    @default(0)
+  ipiCst        String?
+  // PIS/COFINS
+  pisAliquota   Float    @default(0)
+  pisCst        String?
+  cofinsAliquota Float   @default(0)
+  cofinsCst     String?
+  // CFOP + regras estaduais
+  cfopPadrao    String?
+  regraPorEstado String? // JSON: { "SP": { icms, st, mva }, "MG": {...} }
+  // Metadados de aprendizado
+  origem        String   @default("manual") // manual|aprendido_xml|ia|econet
+  confianca     Float    @default(1)        // 0-1
+  usosContador  Int      @default(0)        // quantas notas/clientes usam esse NCM
+  observacao    String?
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([ncm, segmento])
+  @@index([ncm])
+  @@index([segmento, ativo])
+  @@map("ncm_segmento_rules")
+}
+
+// ─── Esteira Fiscal: distribuição automática Drive → cliente → relatório ──
+model EsteiraExecucao {
+  id                 String   @id @default(uuid())
+  userId             String
+  connectionId       String?  // conexão cloud usada
+  provider           String   @default("google_drive")
+  folderId           String?
+  folderName         String?
+  status             String   @default("rodando") // rodando|concluido|erro|parcial
+  totalArquivos      Int      @default(0)
+  roteados           Int      @default(0)
+  naoRoteados        Int      @default(0)
+  comInconsistencia  Int      @default(0)
+  relatoriosEnviados Int      @default(0)
+  itensJson          String?  // JSON: por arquivo { nome, cnpj, companyId, tipo, inconsistencias[] }
+  erro               String?
+  startedAt          DateTime @default(now())
+  finishedAt         DateTime?
+  createdAt          DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("esteira_execucoes")
+}
+
+// ─── Log de envio de relatório ao cliente (email/whatsapp) ────────────
+model RelatorioEnvio {
+  id                String   @id @default(uuid())
+  companyId         String
+  esteiraExecucaoId String?
+  canal             String   // email|whatsapp
+  destino           String   // email ou número
+  assunto           String?
+  corpo             String   // texto/html do relatório
+  status            String   @default("pendente") // enviado|falha|pendente
+  erro              String?
+  providerId        String?  // id retornado pelo provider (Resend/Meta)
+  createdAt         DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([esteiraExecucaoId])
+  @@map("relatorio_envios")
 }

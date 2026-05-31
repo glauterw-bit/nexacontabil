@@ -9,7 +9,8 @@ import {
   Settings, ShieldCheck, Zap, Building2, ChevronDown, Plus, MessageCircle, Hash, LogOut,
   Calendar, Users, Receipt, BarChart3, TrendingUp, Target, HeartPulse,
   Banknote, PenLine, ClipboardList, Landmark, Scale, Package, FileCode,
-  Briefcase, UserCheck, Award, Globe, DollarSign, Kanban, Megaphone, Store
+  Briefcase, UserCheck, Award, Globe, DollarSign, Kanban, Megaphone, Store,
+  Workflow, Boxes
 } from 'lucide-react';
 import { useCompany, Company } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,6 +64,8 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Fiscal',
     items: [
       { href: '/fiscal',          icon: Receipt,       label: 'NF-e / NFS-e' },
+      { href: '/esteira-fiscal',  icon: Workflow,      label: 'Esteira Fiscal',  badge: 'Auto' },
+      { href: '/ncm-inteligente', icon: Boxes,         label: 'Banco de NCM',    badge: 'IA' },
       { href: '/sped',            icon: FileCode,      label: 'SPED / EFD' },
       { href: '/esocial',         icon: Briefcase,     label: 'eSocial' },
       { href: '/simples-nacional',icon: Award,         label: 'Simples Nacional' },

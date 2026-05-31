@@ -8,5 +8,6 @@ import { AiModule } from '../ai/ai.module';
   imports: [AiModule],
   controllers: [WhatsappController],
   providers: [WhatsappService, PrismaService],
+  exports: [WhatsappService],
 })
 export class WhatsappModule {}
