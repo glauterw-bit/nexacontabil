@@ -76,6 +76,7 @@ import { OnvioModule } from './modules/onvio/onvio.module';
 import { NcmInteligenteModule } from './modules/ncm-inteligente/ncm-inteligente.module';
 import { EsteiraFiscalModule } from './modules/esteira-fiscal/esteira-fiscal.module';
 import { DominioExportModule } from './modules/dominio-export/dominio-export.module';
+import { TorreControleModule } from './modules/torre-controle/torre-controle.module';
 import { ChartAccountsModule } from './modules/chart-accounts/chart-accounts.module';
 import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
 import { FiscalCalendarModule } from './modules/fiscal-calendar/fiscal-calendar.module';
@@ -190,6 +191,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     NcmInteligenteModule,
     EsteiraFiscalModule,
     DominioExportModule,
+    TorreControleModule,
     EmailModule,
   ],
   providers: [

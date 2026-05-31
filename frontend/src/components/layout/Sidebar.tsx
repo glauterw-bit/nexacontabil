@@ -10,7 +10,7 @@ import {
   Calendar, Users, Receipt, BarChart3, TrendingUp, Target, HeartPulse,
   Banknote, PenLine, ClipboardList, Landmark, Scale, Package, FileCode,
   Briefcase, UserCheck, Award, Globe, DollarSign, Kanban, Megaphone, Store,
-  Workflow, Boxes, FileDown
+  Workflow, Boxes, FileDown, Gauge
 } from 'lucide-react';
 import { useCompany, Company } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -88,6 +88,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Gestão do Escritório',
     items: [
+      { href: '/torre-controle',   icon: Gauge,        label: 'Torre de Controle', badge: 'Gestor' },
       { href: '/honorarios',       icon: DollarSign,   label: 'Honorários' },
       { href: '/crm',              icon: Users,        label: 'CRM / Pipeline' },
       { href: '/tarefas',          icon: Kanban,       label: 'Tarefas / Kanban' },
