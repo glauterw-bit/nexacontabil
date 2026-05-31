@@ -30,6 +30,7 @@ export default function TorreControlePage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [auto, setAuto] = useState(false);
+  const [seeding, setSeeding] = useState(false);
   const timer = useRef<any>(null);
 
   const load = useCallback(async () => {
@@ -38,6 +39,16 @@ export default function TorreControlePage() {
       if (r.ok) setData(await r.json());
     } catch { /* noop */ } finally { setLoading(false); }
   }, [comp]);
+
+  async function seedDemo(metodo: 'POST' | 'DELETE') {
+    setSeeding(true);
+    try {
+      await fetch(`${API}/api/v1/torre-controle/seed-demo`, { method: metodo, headers: authHeaders() });
+      await load();
+    } catch { /* noop */ } finally { setSeeding(false); }
+  }
+
+  const vazio = data && data.analistas.length === 0 && data.pulso.total === 0;
 
   useEffect(() => { setLoading(true); load(); }, [load]);
   useEffect(() => {
@@ -66,8 +77,27 @@ export default function TorreControlePage() {
             <Zap className="h-3.5 w-3.5" /> {auto ? 'Ao vivo' : 'Auto'}
           </button>
           <button onClick={load} className="p-2 bg-[#161b2e] border border-[#1e2740] rounded-lg text-gray-400 hover:text-white"><RefreshCw className="h-4 w-4" /></button>
+          {data && !vazio && (
+            <button onClick={() => seedDemo('DELETE')} disabled={seeding} title="Limpar dados de demonstração"
+              className="px-2.5 py-2 text-xs bg-[#161b2e] border border-[#1e2740] rounded-lg text-gray-500 hover:text-red-400">
+              {seeding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Limpar demo'}
+            </button>
+          )}
         </div>
       </div>
+
+      {vazio && (
+        <div className="rounded-xl border border-dashed border-indigo-500/30 bg-indigo-500/5 p-8 text-center">
+          <Gauge className="h-10 w-10 mx-auto text-indigo-400/60 mb-3" />
+          <p className="text-white font-medium mb-1">A torre está pronta, mas o escritório ainda não tem movimento nesta competência.</p>
+          <p className="text-sm text-gray-400 mb-4">Popule com dados de demonstração pra ver o cockpit cheio — analistas, carteiras, tarefas, pendências e envios.</p>
+          <button onClick={() => seedDemo('POST')} disabled={seeding}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm rounded-lg inline-flex items-center gap-2">
+            {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+            Popular demonstração
+          </button>
+        </div>
+      )}
 
       {loading && !data ? (
         <div className="text-center py-24 text-sm text-gray-500 flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Consolidando a operação…</div>
