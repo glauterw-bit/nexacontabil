@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Inbox, HardDrive, Mail, Search, Play, Loader2, Copy, Check, CheckCircle2,
   Circle, ExternalLink, FolderOpen, Sparkles, ArrowRight, AlertTriangle,
+  Upload, FileText, Brain,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import Link from 'next/link';
@@ -49,6 +50,39 @@ export default function CapturaXmlPage() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [analisando, setAnalisando] = useState(false);
+  const [analises, setAnalises] = useState<any[]>([]);
+
+  async function analisarArquivos(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    if (!ready['anthropic']) { toast.push('A IA (Anthropic) precisa estar ligada — já está ✅', { variant: 'info' }); }
+    setAnalisando(true);
+    for (const file of Array.from(files)) {
+      const nome = file.name;
+      setAnalises((prev) => [{ nome, status: 'analisando', dados: null }, ...prev]);
+      try {
+        const isXml = nome.toLowerCase().endsWith('.xml') || file.type.includes('xml');
+        let dados: any;
+        if (isXml) {
+          const xml = await file.text();
+          const r = await fetch(`${API}/api/v1/ai/xml`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ xml }) });
+          if (!r.ok) throw new Error((await r.json())?.message ?? 'Falha na análise');
+          dados = await r.json();
+        } else {
+          const fd = new FormData();
+          fd.append('file', file);
+          const t = typeof window !== 'undefined' ? localStorage.getItem('aura_token') : null;
+          const r = await fetch(`${API}/api/v1/ai/ocr`, { method: 'POST', headers: t ? { Authorization: `Bearer ${t}` } : {}, body: fd });
+          if (!r.ok) throw new Error((await r.json())?.message ?? 'Falha na análise');
+          dados = await r.json();
+        }
+        setAnalises((prev) => prev.map((a) => a.nome === nome && a.status === 'analisando' ? { nome, status: 'ok', dados } : a));
+      } catch (e: any) {
+        setAnalises((prev) => prev.map((a) => a.nome === nome && a.status === 'analisando' ? { nome, status: 'erro', erro: e.message } : a));
+      }
+    }
+    setAnalisando(false);
+  }
 
   const load = useCallback(async () => {
     try {
@@ -115,6 +149,68 @@ export default function CapturaXmlPage() {
         <Chip ok={driveOk} label="Google Drive" />
         <Chip ok={ready['email']} label="E-mail (Resend)" />
       </div>
+
+      {/* TESTAR AGORA — sem Drive */}
+      <div className="rounded-xl border border-indigo-500/40 bg-indigo-500/5 p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Brain className="h-5 w-5 text-indigo-400" />
+          <h2 className="text-sm font-semibold text-white">Testar a análise da IA agora</h2>
+          <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded">Sem Drive</span>
+        </div>
+        <p className="text-xs text-gray-400">
+          Não precisa esperar o Drive: suba alguns XMLs (ou PDFs de NF) e a IA analisa na hora —
+          tipo, emitente, valores, impostos e NCM. É o jeito de testar hoje mesmo.
+        </p>
+        <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-indigo-500/30 rounded-xl py-7 cursor-pointer hover:bg-indigo-500/5 transition-colors">
+          <Upload className="h-6 w-6 text-indigo-400" />
+          <span className="text-sm text-gray-300">Clique pra escolher arquivos (.xml, .pdf, imagem)</span>
+          <span className="text-[11px] text-gray-600">pode selecionar vários de uma vez</span>
+          <input type="file" multiple accept=".xml,.pdf,image/*,text/xml,application/xml" className="hidden"
+            onChange={(e) => analisarArquivos(e.target.files)} disabled={analisando} />
+        </label>
+
+        {analises.length > 0 && (
+          <div className="space-y-2 max-h-[420px] overflow-y-auto">
+            {analises.map((a, i) => (
+              <div key={i} className="rounded-lg border border-[#1e2740] bg-[#0f1117] p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <FileText className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
+                  <span className="text-sm text-white truncate flex-1">{a.nome}</span>
+                  {a.status === 'analisando' && <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />}
+                  {a.status === 'ok' && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
+                  {a.status === 'erro' && <AlertTriangle className="h-3.5 w-3.5 text-red-400" />}
+                </div>
+                {a.status === 'erro' && <p className="text-[11px] text-red-400 pl-5">{a.erro}</p>}
+                {a.status === 'ok' && a.dados && (
+                  <div className="pl-5 space-y-1.5">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+                      {a.dados.tipo && <span className="text-gray-400">Tipo: <b className="text-white uppercase">{a.dados.tipo}</b></span>}
+                      {a.dados.emitenteNome && <span className="text-gray-400">Emitente: <b className="text-white">{a.dados.emitenteNome}</b></span>}
+                      {a.dados.valorTotal != null && <span className="text-gray-400">Valor: <b className="text-emerald-400">{Number(a.dados.valorTotal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</b></span>}
+                      {a.dados.dataEmissao && <span className="text-gray-400">Emissão: <b className="text-white">{a.dados.dataEmissao}</b></span>}
+                    </div>
+                    {a.dados.impostos && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
+                        {a.dados.impostos.icms != null && <span>ICMS: {a.dados.impostos.icms}</span>}
+                        {a.dados.impostos.ipi != null && <span>IPI: {a.dados.impostos.ipi}</span>}
+                        {a.dados.impostos.pis != null && <span>PIS: {a.dados.impostos.pis}</span>}
+                        {a.dados.impostos.cofins != null && <span>COFINS: {a.dados.impostos.cofins}</span>}
+                      </div>
+                    )}
+                    {Array.isArray(a.dados.sugestoesContabeis) && a.dados.sugestoesContabeis.length > 0 && (
+                      <div className="text-[11px] text-indigo-300/80">
+                        <span className="text-gray-500">Sugestão contábil: </span>{a.dados.sugestoesContabeis[0]}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <p className="text-xs text-gray-500 -mb-2">Ou configure a captura automática (Drive + e-mail + buscador):</p>
 
       {/* PASSO 1 — Drive */}
       <Step n={1} done={driveOk} icon={HardDrive} title="Conectar a pasta do Drive">
