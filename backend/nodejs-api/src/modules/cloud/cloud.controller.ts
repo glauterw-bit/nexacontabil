@@ -38,6 +38,26 @@ export class CloudController {
     return { revoked: true };
   }
 
+  // ─── Conta de Serviço Google (sem login/senha) ──────────────
+
+  /** Retorna o e-mail da conta de serviço — compartilhe a pasta com ele. */
+  @Get('google/service-account')
+  serviceAccountInfo() {
+    const email = this.google.getServiceAccountEmail();
+    return { configured: !!email, email };
+  }
+
+  /** Registra uma pasta compartilhada com a conta de serviço. */
+  @Post('google/service-account/connect')
+  async serviceAccountConnect(@Req() req: any, @Body() body: { label?: string; folderId?: string }) {
+    const conn = await this.google.createServiceAccountConnection(
+      req.user.id,
+      body.label || 'Drive (conta de serviço)',
+      body.folderId || undefined,
+    );
+    return { id: conn.id, label: conn.label, accountEmail: conn.accountEmail };
+  }
+
   // ─── OAuth Google ───────────────────────────────────────────
 
   @Get('google/authorize')

@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { google, drive_v3 } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client, JWT } from 'google-auth-library';
 import { PrismaService } from '../../database/prisma.service';
 import { encryptToken, decryptToken } from './crypto.util';
 
@@ -59,9 +59,72 @@ export class GoogleDriveService {
     });
   }
 
-  private async getAuthedClient(connectionId: string): Promise<OAuth2Client> {
+  // ─── Conta de Serviço (Service Account) ──────────────────────
+  // Permite o app ler uma pasta SEM senha e SEM tela de login:
+  // basta compartilhar a pasta do Drive com o e-mail da conta de serviço.
+
+  private getServiceAccountKey(): { client_email: string; private_key: string } | null {
+    const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+    if (!raw) return null;
+    try {
+      // aceita JSON cru ou base64 do JSON
+      const json = raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
+      const j = JSON.parse(json);
+      if (j.client_email && j.private_key) {
+        return { client_email: j.client_email, private_key: String(j.private_key).replace(/\\n/g, '\n') };
+      }
+    } catch { /* ignore */ }
+    return null;
+  }
+
+  /** E-mail da conta de serviço — é com ELE que o usuário compartilha a pasta. */
+  getServiceAccountEmail(): string | null {
+    return this.getServiceAccountKey()?.client_email ?? null;
+  }
+
+  private serviceAccountAuth(): JWT {
+    const key = this.getServiceAccountKey();
+    if (!key) throw new BadRequestException('Conta de serviço Google não configurada (GOOGLE_SERVICE_ACCOUNT_JSON no Railway).');
+    return new google.auth.JWT({
+      email: key.client_email,
+      key: key.private_key,
+      scopes: ['https://www.googleapis.com/auth/drive'],
+    });
+  }
+
+  /** Registra uma conexão que usa a conta de serviço pra ler uma pasta compartilhada. */
+  async createServiceAccountConnection(userId: string, label: string, rootFolderId?: string) {
+    const key = this.getServiceAccountKey();
+    if (!key) throw new BadRequestException('Configure GOOGLE_SERVICE_ACCOUNT_JSON no Railway primeiro.');
+    // valida acesso real à pasta antes de salvar
+    if (rootFolderId) {
+      try {
+        const drive = google.drive({ version: 'v3', auth: this.serviceAccountAuth() });
+        await drive.files.get({ fileId: rootFolderId, fields: 'id, name', supportsAllDrives: true });
+      } catch {
+        throw new BadRequestException('Não consegui acessar essa pasta. Compartilhe a pasta do Drive com ' + key.client_email + ' (permissão Leitor) e tente de novo.');
+      }
+    }
+    return this.prisma.cloudConnection.create({
+      data: {
+        provider: 'google_service_account',
+        label,
+        accountEmail: key.client_email,
+        scope: 'full',
+        encryptedAccessToken: encryptToken('service-account'),
+        encryptedRefreshToken: null,
+        tokenExpiresAt: new Date('2099-01-01'),
+        rootFolderId,
+        createdById: userId,
+      },
+    });
+  }
+
+  private async getAuthedClient(connectionId: string): Promise<OAuth2Client | JWT> {
     const conn = await this.prisma.cloudConnection.findUnique({ where: { id: connectionId } });
-    if (!conn || conn.provider !== 'google_drive') throw new BadRequestException('Conexao Google nao encontrada');
+    if (!conn) throw new BadRequestException('Conexao Google nao encontrada');
+    if (conn.provider === 'google_service_account') return this.serviceAccountAuth();
+    if (conn.provider !== 'google_drive') throw new BadRequestException('Conexao Google nao encontrada');
     const client = this.getOAuthClient();
     client.setCredentials({
       access_token: decryptToken(conn.encryptedAccessToken),
@@ -97,6 +160,8 @@ export class GoogleDriveService {
       pageSize: opts.pageSize ?? 50,
       fields: 'files(id, name, mimeType, modifiedTime, size, webViewLink, parents)',
       orderBy: 'modifiedTime desc',
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
     });
     await this.prisma.cloudConnection.update({
       where: { id: connectionId },
@@ -108,8 +173,8 @@ export class GoogleDriveService {
   async downloadFile(connectionId: string, fileId: string): Promise<{ buffer: Buffer; mimeType: string; name: string }> {
     const auth = await this.getAuthedClient(connectionId);
     const drive = google.drive({ version: 'v3', auth });
-    const meta = await drive.files.get({ fileId, fields: 'id, name, mimeType' });
-    const res = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' });
+    const meta = await drive.files.get({ fileId, fields: 'id, name, mimeType', supportsAllDrives: true });
+    const res = await drive.files.get({ fileId, alt: 'media', supportsAllDrives: true }, { responseType: 'arraybuffer' });
     const buffer = Buffer.from(res.data as ArrayBuffer);
     return { buffer, mimeType: meta.data.mimeType ?? 'application/octet-stream', name: meta.data.name ?? 'file' };
   }
