@@ -100,6 +100,24 @@ export class BalanceSheetService {
       groups[g].total += c.saldo;
     }
 
+    // Resultado do exercício (receita − despesa) compõe o PL, conforme
+    // NBC TG 26 — o lucro/prejuízo apurado entra no Patrimônio Líquido.
+    let receita = 0, despesa = 0;
+    for (const a of accounts) {
+      if (a.tipo !== 'receita' && a.tipo !== 'despesa') continue;
+      const b = balanceByCode.get(a.codigo) ?? { debit: 0, credit: 0 };
+      if (a.tipo === 'receita') receita += b.credit - b.debit;
+      else despesa += b.debit - b.credit;
+    }
+    const resultadoExercicio = round(receita - despesa);
+    if (Math.abs(resultadoExercicio) > 0.005) {
+      groups.patrimonioLiquido.contas.push({
+        codigo: '2.3.09.001', nome: 'Resultado do Exercício', tipo: 'patrimonio',
+        natureza: 'credora', saldo: resultadoExercicio,
+      });
+      groups.patrimonioLiquido.total += resultadoExercicio;
+    }
+
     const totalAtivo = groups.ativoCirculante.total + groups.ativoNaoCirculante.total;
     const totalPassivo = groups.passivoCirculante.total + groups.passivoNaoCirculante.total;
     const totalPatrimonio = groups.patrimonioLiquido.total;
