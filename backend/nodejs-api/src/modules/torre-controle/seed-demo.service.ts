@@ -209,10 +209,137 @@ export class SeedDemoService {
       });
     }
 
+    // ── folha: colaboradores + holerites ─────────────────
+    const CARGOS = ['Vendedor', 'Auxiliar Adm.', 'Gerente', 'Caixa', 'Estoquista', 'Analista'];
+    const NOMES_F = ['Bruno Lima', 'Camila Rocha', 'Diego Souza', 'Elaine Martins', 'Felipe Nunes', 'Gabriela Dias', 'Hugo Pereira', 'Isabela Castro'];
+    let funcionarios = 0, holerites = 0;
+    for (let ci2 = 0; ci2 < assignedCompanies.length; ci2++) {
+      const comp = assignedCompanies[ci2];
+      const nfunc = 2 + Math.floor(rnd() * 2);
+      for (let f = 0; f < nfunc; f++) {
+        const salario = 1800 + Math.floor(rnd() * 4000);
+        const emp = await this.prisma.employee.create({
+          data: {
+            companyId: comp.id, name: NOMES_F[(ci2 + f) % NOMES_F.length],
+            cpf: String(10000000000 + ci2 * 137 + f * 31).slice(0, 11),
+            role: CARGOS[(ci2 + f) % CARGOS.length], department: 'Operacional',
+            admissionDate: new Date(now.getFullYear() - 1 - Math.floor(rnd() * 3), Math.floor(rnd() * 12), 1),
+            baseSalary: salario, dependents: Math.floor(rnd() * 3), active: true,
+          },
+        });
+        funcionarios++;
+        const inss = round2(salario * 0.09);
+        const irrf = salario > 2800 ? round2((salario - inss) * 0.075) : 0;
+        await this.prisma.payslip.create({
+          data: {
+            companyId: comp.id, employeeId: emp.id, referenceMonth: competencia,
+            baseSalary: salario, overtimeHours: rnd() > 0.7 ? 8 : 0, overtimeValue: 0,
+            inssEmployee: inss, inssEmployer: round2(salario * 0.2), irrf, fgts: round2(salario * 0.08),
+            grossSalary: salario, netSalary: round2(salario - inss - irrf), breakdown: '{}',
+            status: rnd() > 0.4 ? 'approved' : 'draft',
+          },
+        });
+        holerites++;
+      }
+    }
+
+    // ── plano de contas + lançamentos (DRE / balanço / fluxo) ──
+    const PLANO = [
+      { codigo: '1.1.01.001', nome: 'Caixa e Bancos', tipo: 'ativo', natureza: 'devedora' },
+      { codigo: '1.1.02.001', nome: 'Clientes', tipo: 'ativo', natureza: 'devedora' },
+      { codigo: '2.1.01.001', nome: 'Fornecedores', tipo: 'passivo', natureza: 'credora' },
+      { codigo: '2.3.01.001', nome: 'Capital Social', tipo: 'patrimonio', natureza: 'credora' },
+      { codigo: '3.1.01.001', nome: 'Receita de Vendas', tipo: 'receita', natureza: 'credora' },
+      { codigo: '4.1.01.001', nome: 'Despesas Operacionais', tipo: 'despesa', natureza: 'devedora' },
+    ];
+    let lancamentos = 0;
+    const mkTx = async (comp: any, date: Date, entries: any[], desc: string) => {
+      const td = entries.filter((e) => e.nature === 'debit').reduce((s, e) => s + e.value, 0);
+      const tc = entries.filter((e) => e.nature === 'credit').reduce((s, e) => s + e.value, 0);
+      await this.prisma.transaction.create({
+        data: { companyId: comp.id, description: desc, date, status: 'approved', entries: JSON.stringify(entries), totalDebit: round2(td), totalCredit: round2(tc), isBalanced: true },
+      });
+      lancamentos++;
+    };
+    for (const comp of assignedCompanies) {
+      for (const p of PLANO) {
+        await this.prisma.chartAccount.create({
+          data: { companyId: comp.id, codigo: p.codigo, nome: p.nome, tipo: p.tipo, natureza: p.natureza, grau: 3, active: true, permiteLancamento: true },
+        });
+      }
+      // capital inicial
+      await mkTx(comp, new Date(now.getFullYear(), 0, 2), [
+        { accountCode: '1.1.01.001', nature: 'debit', value: 50000 },
+        { accountCode: '2.3.01.001', nature: 'credit', value: 50000 },
+      ], 'Integralização de capital');
+      // vendas e despesas nos últimos 3 meses
+      for (let mAgo = 2; mAgo >= 0; mAgo--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - mAgo, 10);
+        const venda = 8000 + Math.floor(rnd() * 25000);
+        await mkTx(comp, d, [
+          { accountCode: '1.1.01.001', nature: 'debit', value: venda },
+          { accountCode: '3.1.01.001', nature: 'credit', value: venda },
+        ], 'Receita de vendas');
+        const desp = 3000 + Math.floor(rnd() * 12000);
+        await mkTx(comp, new Date(now.getFullYear(), now.getMonth() - mAgo, 18), [
+          { accountCode: '4.1.01.001', nature: 'debit', value: desp },
+          { accountCode: '1.1.01.001', nature: 'credit', value: desp },
+        ], 'Despesas operacionais');
+      }
+    }
+
+    // ── Banco de NCM (regras demo) ───────────────────────
+    const NCMS = [
+      { ncm: '22021000', descricao: 'Refrigerantes', seg: 'comercio', icms: 18, st: true, mva: 40, ipi: 0, pis: 1.65, cofins: 7.6, cfop: '5405' },
+      { ncm: '19059090', descricao: 'Produtos de padaria', seg: 'comercio', icms: 18, st: false, mva: 0, ipi: 0, pis: 1.65, cofins: 7.6, cfop: '5102' },
+      { ncm: '84713012', descricao: 'Notebooks', seg: 'comercio', icms: 18, st: false, mva: 0, ipi: 0, pis: 1.65, cofins: 7.6, cfop: '5102' },
+      { ncm: '30049099', descricao: 'Medicamentos', seg: 'comercio', icms: 18, st: true, mva: 33, ipi: 0, pis: 0, cofins: 0, cfop: '5405' },
+      { ncm: '27101259', descricao: 'Combustíveis', seg: 'comercio', icms: 25, st: true, mva: 0, ipi: 0, pis: 0, cofins: 0, cfop: '5656' },
+      { ncm: '10063021', descricao: 'Arroz', seg: 'comercio', icms: 7, st: false, mva: 0, ipi: 0, pis: 0, cofins: 0, cfop: '5102' },
+      { ncm: '87089990', descricao: 'Autopeças', seg: 'industria', icms: 18, st: true, mva: 71.78, ipi: 5, pis: 1.65, cofins: 7.6, cfop: '5405' },
+      { ncm: '94036000', descricao: 'Móveis de madeira', seg: 'industria', icms: 18, st: false, mva: 0, ipi: 5, pis: 1.65, cofins: 7.6, cfop: '5101' },
+      { ncm: '62034200', descricao: 'Calças de algodão', seg: 'comercio', icms: 18, st: false, mva: 0, ipi: 0, pis: 1.65, cofins: 7.6, cfop: '5102' },
+      { ncm: '49019900', descricao: 'Livros', seg: 'comercio', icms: 0, st: false, mva: 0, ipi: 0, pis: 0, cofins: 0, cfop: '5102' },
+    ];
+    let ncmRegras = 0;
+    for (const n of NCMS) {
+      await this.prisma.ncmSegmentoRule.create({
+        data: {
+          ncm: n.ncm, descricao: n.descricao, segmento: n.seg, icmsAliquota: n.icms, icmsSt: n.st, mvaSt: n.mva,
+          ipiAliquota: n.ipi, pisAliquota: n.pis, cofinsAliquota: n.cofins, cfopPadrao: n.cfop,
+          origem: 'demo', confianca: 0.9, usosContador: 1 + Math.floor(rnd() * 40),
+        },
+      });
+      ncmRegras++;
+    }
+
+    // ── notas fiscais ────────────────────────────────────
+    let notas = 0;
+    for (let ci3 = 0; ci3 < assignedCompanies.length; ci3++) {
+      const comp = assignedCompanies[ci3];
+      for (let k = 0; k < 2; k++) {
+        const val = 1500 + Math.floor(rnd() * 9000);
+        await this.prisma.fiscalNote.create({
+          data: {
+            companyId: comp.id, type: 'nfe', status: 'authorized',
+            number: 1000 + ci3 * 10 + k, series: '1',
+            issueDate: new Date(now.getFullYear(), now.getMonth(), 1 + Math.floor(rnd() * 25)),
+            recipientName: ['Cliente Varejo Ltda', 'Atacado Central SA', 'Comércio União ME'][(ci3 + k) % 3],
+            recipientCnpjCpf: String(20000000000000 + ci3 * 100 + k),
+            cfop: '5102', totalValue: val, totalIcms: round2(val * 0.18),
+            totalPis: round2(val * 0.0165), totalCofins: round2(val * 0.076),
+            items: JSON.stringify([{ descricao: 'Produto', ncm: '19059090', quantidade: 1, valorUnitario: val, valorTotal: val }]),
+          },
+        });
+        notas++;
+      }
+    }
+
     return {
       ok: true,
       criados: { analistas: users.length, empresas: companies.length, semResponsavel: companies.length - assignedCompanies.length,
-        tarefas: tasks, concluidas: concl, obrigacoesVencidas: obrig, honorariosAtraso: honor, boletos, envios },
+        tarefas: tasks, concluidas: concl, obrigacoesVencidas: obrig, honorariosAtraso: honor, boletos, envios,
+        funcionarios, holerites, lancamentos, ncmRegras, notas },
       competencia,
     };
   }
@@ -231,12 +358,20 @@ export class SeedDemoService {
       await this.prisma.boleto.deleteMany({ where: w });
       await this.prisma.relatorioEnvio.deleteMany({ where: w });
       await this.prisma.notification.deleteMany({ where: w });
+      await this.prisma.payslip.deleteMany({ where: w });
+      await this.prisma.employee.deleteMany({ where: w });
+      await this.prisma.transaction.deleteMany({ where: w });
+      await this.prisma.chartAccount.deleteMany({ where: w });
+      await this.prisma.fiscalNote.deleteMany({ where: w });
       await this.prisma.company.deleteMany({ where: { id: { in: ids } } });
     }
+    await this.prisma.ncmSegmentoRule.deleteMany({ where: { origem: 'demo' } });
     const del = await this.prisma.user.deleteMany({ where: { email: { endsWith: DEMO_EMAIL } } });
     return { empresasRemovidas: ids.length, analistasRemovidos: del.count };
   }
 }
+
+function round2(n: number): number { return Math.round(n * 100) / 100; }
 
 /** PRNG determinístico (seed fixo = mesmo resultado, sem Math.random no boot). */
 function mulberry32(seed: number) {
