@@ -18,13 +18,26 @@ export class CloudController {
   // ─── Listagem de arquivos/pastas (qualquer provider) ─────────
 
   @Get('list')
-  async listFiles(@Query('connectionId') connectionId: string, @Query('folderId') folderId?: string) {
+  async listFiles(
+    @Query('connectionId') connectionId: string,
+    @Query('folderId') folderId?: string,
+    @Query('driveId') driveId?: string,
+  ) {
     const conn = await this.prisma.cloudConnection.findUnique({ where: { id: connectionId } });
     if (!conn) throw new NotFoundException('Conexão não encontrada');
     if (conn.provider.startsWith('google')) {
       return this.google.search(connectionId, { folderId, pageSize: 200 });
     }
-    return this.onedrive.search(connectionId, { folderId, pageSize: 200 });
+    return this.onedrive.search(connectionId, { folderId, driveId, pageSize: 200 });
+  }
+
+  /** Lista pastas/arquivos compartilhados com a conta (OneDrive). */
+  @Get('shared')
+  async sharedItems(@Query('connectionId') connectionId: string) {
+    const conn = await this.prisma.cloudConnection.findUnique({ where: { id: connectionId } });
+    if (!conn) throw new NotFoundException('Conexão não encontrada');
+    if (!conn.provider.startsWith('microsoft')) throw new NotFoundException('Só OneDrive tem "compartilhados comigo"');
+    return this.onedrive.listShared(connectionId);
   }
 
   // ─── Conexoes ────────────────────────────────────────────────

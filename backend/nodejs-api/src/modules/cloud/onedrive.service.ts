@@ -89,14 +89,35 @@ export class OneDriveService {
     return result.accessToken;
   }
 
-  async search(connectionId: string, opts: { q?: string; pageSize?: number; folderId?: string } = {}) {
+  /** Lista itens compartilhados COM a conta (Compartilhados comigo). */
+  async listShared(connectionId: string) {
+    const token = await this.getValidToken(connectionId);
+    const res = await fetch(`${GRAPH_BASE}/me/drive/sharedWithMe`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new BadRequestException(`Graph API (sharedWithMe): ${res.status}`);
+    const json = await res.json();
+    return (json.value ?? []).map((item: any) => {
+      const r = item.remoteItem ?? item;
+      return {
+        id: r.id,
+        driveId: r.parentReference?.driveId,
+        name: item.name ?? r.name,
+        isFolder: !!r.folder,
+        childCount: r.folder?.childCount ?? undefined,
+        mimeType: r.file?.mimeType,
+        webViewLink: r.webUrl ?? item.webUrl,
+      };
+    });
+  }
+
+  async search(connectionId: string, opts: { q?: string; pageSize?: number; folderId?: string; driveId?: string } = {}) {
     const token = await this.getValidToken(connectionId);
     const top = opts.pageSize ?? 50;
+    const base = opts.driveId ? `${GRAPH_BASE}/drives/${opts.driveId}` : `${GRAPH_BASE}/me/drive`;
     const url = opts.q
-      ? `${GRAPH_BASE}/me/drive/root/search(q='${encodeURIComponent(opts.q)}')?$top=${top}`
+      ? `${base}/root/search(q='${encodeURIComponent(opts.q)}')?$top=${top}`
       : opts.folderId
-      ? `${GRAPH_BASE}/me/drive/items/${opts.folderId}/children?$top=${top}`
-      : `${GRAPH_BASE}/me/drive/root/children?$top=${top}`;
+      ? `${base}/items/${opts.folderId}/children?$top=${top}`
+      : `${base}/root/children?$top=${top}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new BadRequestException(`Graph API: ${res.status}`);
     const json = await res.json();
@@ -110,19 +131,21 @@ export class OneDriveService {
       mimeType: item.file?.mimeType,
       isFolder: !!item.folder,
       childCount: item.folder?.childCount ?? undefined,
+      driveId: item.parentReference?.driveId ?? opts.driveId,
       modifiedTime: item.lastModifiedDateTime,
       size: item.size,
       webViewLink: item.webUrl,
     }));
   }
 
-  async downloadFile(connectionId: string, fileId: string) {
+  async downloadFile(connectionId: string, fileId: string, driveId?: string) {
     const token = await this.getValidToken(connectionId);
-    const meta = await fetch(`${GRAPH_BASE}/me/drive/items/${fileId}`, {
+    const base = driveId ? `${GRAPH_BASE}/drives/${driveId}` : `${GRAPH_BASE}/me/drive`;
+    const meta = await fetch(`${base}/items/${fileId}`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then((r) => r.json());
 
-    const dl = await fetch(`${GRAPH_BASE}/me/drive/items/${fileId}/content`, {
+    const dl = await fetch(`${base}/items/${fileId}/content`, {
       headers: { Authorization: `Bearer ${token}` },
       redirect: 'follow',
     });
