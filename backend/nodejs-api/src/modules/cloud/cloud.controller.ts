@@ -40,6 +40,15 @@ export class CloudController {
     return this.onedrive.listShared(connectionId);
   }
 
+  /** Varre sites do SharePoint (Acesso rápido) e suas bibliotecas. */
+  @Get('sharepoint')
+  async sharepoint(@Query('connectionId') connectionId: string) {
+    const conn = await this.prisma.cloudConnection.findUnique({ where: { id: connectionId } });
+    if (!conn) throw new NotFoundException('Conexão não encontrada');
+    if (!conn.provider.startsWith('microsoft')) throw new NotFoundException('Só OneDrive/SharePoint');
+    return this.onedrive.scanSharePoint(connectionId);
+  }
+
   // ─── Conexoes ────────────────────────────────────────────────
 
   @Get('connections')

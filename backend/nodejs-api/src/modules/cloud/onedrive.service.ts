@@ -89,6 +89,36 @@ export class OneDriveService {
     return result.accessToken;
   }
 
+  /** Varre os sites do SharePoint (Acesso rápido) e suas bibliotecas de documentos. */
+  async scanSharePoint(connectionId: string) {
+    const token = await this.getValidToken(connectionId);
+    const tryGet = async (url: string) => {
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      return { ok: r.ok, status: r.status, json: r.ok ? await r.json() : null, text: r.ok ? '' : (await r.text()).slice(0, 200) };
+    };
+
+    let sites: any[] = [];
+    let erro: string | null = null;
+    // 1. sites seguidos (Acesso rápido)
+    const f = await tryGet(`${GRAPH_BASE}/me/followedSites`);
+    if (f.ok) sites = f.json.value ?? [];
+    else erro = `followedSites: ${f.status} ${f.text}`;
+    // 2. fallback: busca todos os sites
+    if (!sites.length) {
+      const s = await tryGet(`${GRAPH_BASE}/sites?search=*`);
+      if (s.ok) sites = s.json.value ?? [];
+      else if (!erro) erro = `sites?search: ${s.status} ${s.text}`;
+    }
+
+    const out: any[] = [];
+    for (const s of sites.slice(0, 25)) {
+      const dr = await tryGet(`${GRAPH_BASE}/sites/${s.id}/drives`);
+      const drives = dr.ok ? (dr.json.value ?? []).map((d: any) => ({ driveId: d.id, name: d.name, webUrl: d.webUrl })) : [];
+      out.push({ siteId: s.id, name: s.displayName ?? s.name, webUrl: s.webUrl, drives });
+    }
+    return { sites: out, total: out.length, erro: out.length ? null : erro };
+  }
+
   /** Lista itens compartilhados COM a conta (Compartilhados comigo). */
   async listShared(connectionId: string) {
     const token = await this.getValidToken(connectionId);
