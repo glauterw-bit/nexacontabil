@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, Req, Res, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, Req, Res, HttpCode, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 import { PrismaService } from '../../database/prisma.service';
 import { GoogleDriveService } from './google-drive.service';
@@ -14,6 +14,18 @@ export class CloudController {
     private readonly onedrive: OneDriveService,
     private readonly search: CloudSearchService,
   ) {}
+
+  // ─── Listagem de arquivos/pastas (qualquer provider) ─────────
+
+  @Get('list')
+  async listFiles(@Query('connectionId') connectionId: string, @Query('folderId') folderId?: string) {
+    const conn = await this.prisma.cloudConnection.findUnique({ where: { id: connectionId } });
+    if (!conn) throw new NotFoundException('Conexão não encontrada');
+    if (conn.provider.startsWith('google')) {
+      return this.google.search(connectionId, { folderId, pageSize: 200 });
+    }
+    return this.onedrive.search(connectionId, { folderId, pageSize: 200 });
+  }
 
   // ─── Conexoes ────────────────────────────────────────────────
 

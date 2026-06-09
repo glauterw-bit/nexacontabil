@@ -89,11 +89,14 @@ export class OneDriveService {
     return result.accessToken;
   }
 
-  async search(connectionId: string, opts: { q?: string; pageSize?: number } = {}) {
+  async search(connectionId: string, opts: { q?: string; pageSize?: number; folderId?: string } = {}) {
     const token = await this.getValidToken(connectionId);
+    const top = opts.pageSize ?? 50;
     const url = opts.q
-      ? `${GRAPH_BASE}/me/drive/root/search(q='${encodeURIComponent(opts.q)}')?$top=${opts.pageSize ?? 50}`
-      : `${GRAPH_BASE}/me/drive/root/children?$top=${opts.pageSize ?? 50}`;
+      ? `${GRAPH_BASE}/me/drive/root/search(q='${encodeURIComponent(opts.q)}')?$top=${top}`
+      : opts.folderId
+      ? `${GRAPH_BASE}/me/drive/items/${opts.folderId}/children?$top=${top}`
+      : `${GRAPH_BASE}/me/drive/root/children?$top=${top}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new BadRequestException(`Graph API: ${res.status}`);
     const json = await res.json();
@@ -105,6 +108,8 @@ export class OneDriveService {
       id: item.id,
       name: item.name,
       mimeType: item.file?.mimeType,
+      isFolder: !!item.folder,
+      childCount: item.folder?.childCount ?? undefined,
       modifiedTime: item.lastModifiedDateTime,
       size: item.size,
       webViewLink: item.webUrl,
