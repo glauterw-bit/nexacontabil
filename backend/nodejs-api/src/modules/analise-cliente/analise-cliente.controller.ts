@@ -13,8 +13,8 @@ export class AnaliseClienteController {
 
   /** Analisa um lote de clientes ainda não analisados (chamar em loop até zerar). */
   @Post('lote')
-  lote(@Body() body: { limit?: number; maxFiles?: number }) {
-    return this.svc.analisarLote(body?.limit ?? 8, body?.maxFiles ?? 80);
+  lote(@Body() body: { limit?: number; maxFiles?: number; incluirInativos?: boolean }) {
+    return this.svc.analisarLote(body?.limit ?? 8, body?.maxFiles ?? 80, body?.incluirInativos ?? false);
   }
 
   /** Limpa análises e zera flags (pra re-análise com parser novo). */

@@ -104,15 +104,11 @@ export class AnaliseClienteService {
    * Cada cliente é tentado uma vez só — pasta vazia é marcada e não re-tentada.
    * Chamável repetidamente até zerar.
    */
-  async analisarLote(limit = 8, maxFilesPorCliente = 80) {
-    const pendentesTotal = await this.prisma.company.count({
-      where: { sharepointItemId: { not: null }, active: true, sharepointAnalisadoEm: null },
-    });
-    const lote = await this.prisma.company.findMany({
-      where: { sharepointItemId: { not: null }, active: true, sharepointAnalisadoEm: null },
-      select: { id: true, name: true },
-      take: limit,
-    });
+  async analisarLote(limit = 8, maxFilesPorCliente = 80, incluirInativos = false) {
+    const where: any = { sharepointItemId: { not: null }, sharepointAnalisadoEm: null };
+    if (!incluirInativos) where.active = true;
+    const pendentesTotal = await this.prisma.company.count({ where });
+    const lote = await this.prisma.company.findMany({ where, select: { id: true, name: true }, take: limit });
 
     const detalhes: any[] = [];
     for (const c of lote) {
