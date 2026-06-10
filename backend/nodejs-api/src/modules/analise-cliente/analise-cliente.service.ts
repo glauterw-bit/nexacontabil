@@ -196,10 +196,8 @@ export class AnaliseClienteService {
           // entradas (1/2/3) e exportação (7): não valida ICMS de saída
         }
 
-        // ── CFOP por natureza (últimos 3 dígitos — ignora intra/inter) ──
-        if (cfop && rule.cfopPadrao && cfop.slice(-3) !== String(rule.cfopPadrao).slice(-3)) {
-          incs.push(`NCM ${it.ncm}: CFOP ${cfop} — natureza difere do padrão ${rule.cfopPadrao}`);
-        }
+        // CFOP NÃO entra como erro: varia legitimamente por tipo de venda
+        // (ST, contribuinte/consumidor, intra/inter). Só ICMS é sinal confiável.
       }
       await this.prisma.document.update({ where: { id: d.id }, data: { fiscalValidation: JSON.stringify({ ok: incs.length === 0, inconsistencias: incs }) } });
       revalidados++; totalInconsist += incs.length; if (incs.length) comInconsistencia++;
