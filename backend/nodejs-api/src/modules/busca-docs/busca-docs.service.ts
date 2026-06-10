@@ -17,6 +17,9 @@ export class BuscaDocsService {
   async buscar(query: string) {
     const f = await this.ai.parseDocumentSearch(query);
 
+    // intenção "só os que têm problema" — não vem nos filtros estruturados
+    const soComInconsist = /(inconsist|diverg|erro|irregular|problema|errad)/i.test(query);
+
     // resolve cliente pelo nome (issuerKeyword ou keywords)
     let companyIds: string[] | undefined;
     const termoCliente = f.issuerKeyword || (f.keywords ?? []).find((k) => k.length > 3);
@@ -46,8 +49,10 @@ export class BuscaDocsService {
     }
     if (f.cnpj) where.OR = [{ issuerCnpj: f.cnpj }, { recipientCnpj: f.cnpj }];
 
+    // se filtrar por inconsistência, buscamos mais (fiscalValidation é JSON,
+    // não dá pra filtrar no SQL) e cortamos depois
     const docs = await this.prisma.document.findMany({
-      where, orderBy: { issueDate: 'desc' }, take: 60,
+      where, orderBy: { issueDate: 'desc' }, take: soComInconsist ? 500 : 60,
     });
 
     // nome dos clientes
@@ -55,13 +60,10 @@ export class BuscaDocsService {
     const cos = await this.prisma.company.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
     const nomeCo = new Map(cos.map((c) => [c.id, c.name]));
 
-    let valorTotal = 0, comInconsist = 0;
-    const resultados = docs.map((d) => {
+    let todos = docs.map((d) => {
       const nf = safe(d.extractedData);
       const fv = safe(d.fiscalValidation);
       const inc = fv?.inconsistencias ?? [];
-      valorTotal += d.totalValue ?? 0;
-      if (inc.length) comInconsist++;
       return {
         id: d.id,
         cliente: nomeCo.get(d.companyId),
@@ -77,10 +79,21 @@ export class BuscaDocsService {
       };
     });
 
+    if (soComInconsist) todos = todos.filter((r) => r.inconsistencias.length > 0);
+    const resultados = todos.slice(0, 60);
+
+    let valorTotal = 0, comInconsist = 0;
+    for (const r of resultados) {
+      valorTotal += r.valor ?? 0;
+      if (r.inconsistencias.length) comInconsist++;
+    }
+
     return {
       consulta: query,
       filtrosInterpretados: f,
+      filtroInconsistencia: soComInconsist,
       encontrados: resultados.length,
+      totalDisponivel: todos.length,
       valorTotal: Math.round(valorTotal * 100) / 100,
       comInconsistencia: comInconsist,
       resultados,

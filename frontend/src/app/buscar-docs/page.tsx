@@ -75,7 +75,7 @@ export default function BuscarDocsPage() {
       {data && (
         <div style={{ marginTop: 24 }}>
           <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-            <Card label="Encontrados" value={`${data.encontrados}`} />
+            <Card label="Encontrados" value={`${data.encontrados}`} sub={data.totalDisponivel > data.encontrados ? `de ${data.totalDisponivel}+` : undefined} />
             <Card label="Valor total" value={BRL(data.valorTotal)} />
             <Card label="Com inconsistência" value={`${data.comInconsistencia}`} cor={data.comInconsistencia ? '#f59e0b' : '#10b981'} />
           </div>
@@ -122,11 +122,13 @@ export default function BuscarDocsPage() {
   );
 }
 
-function Card({ label, value, cor }: { label: string; value: string; cor?: string }) {
+function Card({ label, value, cor, sub }: { label: string; value: string; cor?: string; sub?: string }) {
   return (
     <div style={{ flex: 1, background: '#161b27', border: '1px solid #2a3142', borderRadius: 12, padding: 16 }}>
       <div style={{ fontSize: 12, color: '#64748b' }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: cor || '#e2e8f0', marginTop: 4 }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: cor || '#e2e8f0', marginTop: 4 }}>
+        {value} {sub && <span style={{ fontSize: 12, fontWeight: 400, color: '#64748b' }}>{sub}</span>}
+      </div>
     </div>
   );
 }
