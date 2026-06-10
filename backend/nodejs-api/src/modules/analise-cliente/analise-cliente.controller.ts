@@ -10,4 +10,10 @@ export class AnaliseClienteController {
   analisar(@Body() body: { companyId: string; maxFiles?: number }) {
     return this.svc.analisarCliente(body.companyId, body.maxFiles);
   }
+
+  /** Analisa um lote de clientes ainda não analisados (chamar em loop até zerar). */
+  @Post('lote')
+  lote(@Body() body: { limit?: number; maxFiles?: number }) {
+    return this.svc.analisarLote(body?.limit ?? 8, body?.maxFiles ?? 80);
+  }
 }

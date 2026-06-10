@@ -40,6 +40,16 @@ export class NcmInteligenteController {
     return this.svc.aprenderDeXmls();
   }
 
+  @Post('aprender-documentos')
+  aprenderDocs() {
+    return this.svc.aprenderDeDocumentos();
+  }
+
+  @Post('enriquecer-ia')
+  enriquecer(@Body() body: { limit?: number }) {
+    return this.svc.enriquecerComIA(body?.limit ?? 15);
+  }
+
   @Post('classificar-ia')
   classificar(@Body() body: { ncm: string; descricao: string; segmento: string; uf?: string }) {
     return this.svc.classificarComIA(body.ncm, body.descricao, body.segmento, body.uf);

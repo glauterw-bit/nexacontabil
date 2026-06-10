@@ -247,6 +247,99 @@ export class NcmInteligenteService {
     return { ncmsDescobertos: agg.size, regrasCriadas, regrasAtualizadas };
   }
 
+  /**
+   * Aprende dos Documentos JÁ analisados (extractedData = NF parseada).
+   * Popula o Banco de NCM com os NCMs REAIS de vocês + a tributação que
+   * apareceu nas notas + contagem de uso.
+   */
+  async aprenderDeDocumentos(): Promise<{ ncmsDescobertos: number; regrasCriadas: number; regrasAtualizadas: number; documentos: number }> {
+    const docs = await this.prisma.document.findMany({
+      where: { extractedData: { not: null } },
+      select: { companyId: true, extractedData: true },
+      take: 20000,
+    });
+    const companies = await this.prisma.company.findMany({ select: { id: true, segmentoFiscal: true, cnaeCode: true } });
+    const segByCompany = new Map<string, string>();
+    for (const c of companies) segByCompany.set(c.id, c.segmentoFiscal ?? segmentoFromCnae(c.cnaeCode));
+
+    const agg = new Map<string, Map<string, any>>();
+    for (const doc of docs) {
+      let nf: any;
+      try { nf = JSON.parse(doc.extractedData as string); } catch { continue; }
+      const itens: any[] = Array.isArray(nf?.itens) ? nf.itens : [];
+      const seg = segByCompany.get(doc.companyId) ?? 'comercio';
+      for (const it of itens) {
+        const ncm = String(it.ncm ?? '').replace(/\D/g, '');
+        if (ncm.length !== 8) continue;
+        if (!agg.has(ncm)) agg.set(ncm, new Map());
+        const bySeg = agg.get(ncm)!;
+        const cur = bySeg.get(seg) ?? { icms: [], ipi: [], pis: [], cofins: [], cfops: {}, descricao: it.descricao, count: 0 };
+        if (it.icms != null) cur.icms.push(Number(it.icms));
+        if (it.ipi != null) cur.ipi.push(Number(it.ipi));
+        if (it.pis != null) cur.pis.push(Number(it.pis));
+        if (it.cofins != null) cur.cofins.push(Number(it.cofins));
+        if (it.cfop) cur.cfops[it.cfop] = (cur.cfops[it.cfop] ?? 0) + 1;
+        cur.count++;
+        if (!cur.descricao && it.descricao) cur.descricao = it.descricao;
+        bySeg.set(seg, cur);
+      }
+    }
+
+    let regrasCriadas = 0, regrasAtualizadas = 0;
+    for (const [ncm, bySeg] of agg) {
+      for (const [seg, data] of bySeg) {
+        const cfopPadrao = Object.entries(data.cfops).sort((a: any, b: any) => b[1] - a[1])[0]?.[0];
+        const existing = await this.prisma.ncmSegmentoRule.findUnique({ where: { ncm_segmento: { ncm, segmento: seg } } });
+        const payload = {
+          icmsAliquota: moda(data.icms), ipiAliquota: moda(data.ipi),
+          pisAliquota: moda(data.pis), cofinsAliquota: moda(data.cofins),
+          cfopPadrao: cfopPadrao ?? undefined, descricao: data.descricao || `NCM ${ncm}`,
+        };
+        if (existing) {
+          await this.prisma.ncmSegmentoRule.update({
+            where: { id: existing.id },
+            data: { usosContador: { increment: data.count }, ...(existing.origem === 'aprendido_xml' ? payload : {}) },
+          });
+          regrasAtualizadas++;
+        } else {
+          await this.prisma.ncmSegmentoRule.create({
+            data: { ncm, segmento: seg, ...payload, origem: 'aprendido_xml', confianca: Math.min(0.95, 0.5 + data.count * 0.05), usosContador: data.count },
+          });
+          regrasCriadas++;
+        }
+      }
+    }
+    return { ncmsDescobertos: agg.size, regrasCriadas, regrasAtualizadas, documentos: docs.length };
+  }
+
+  /**
+   * Enriquece com IA: pros NCMs mais usados, o Claude preenche a tributação
+   * correta (CST, ST, MVA, CFOP, observações) — mantém as alíquotas reais
+   * observadas e completa o que falta.
+   */
+  async enriquecerComIA(limit = 15): Promise<{ enriquecidos: number; total: number }> {
+    const rules = await this.prisma.ncmSegmentoRule.findMany({
+      where: { ativo: true, icmsCst: null }, orderBy: { usosContador: 'desc' }, take: limit,
+    });
+    let enriquecidos = 0;
+    for (const r of rules) {
+      try {
+        const s = await this.classificarComIA(r.ncm, r.descricao, r.segmento, 'SP');
+        await this.prisma.ncmSegmentoRule.update({
+          where: { id: r.id },
+          data: {
+            icmsCst: s.icmsCst ?? undefined, icmsSt: typeof s.icmsSt === 'boolean' ? s.icmsSt : r.icmsSt,
+            mvaSt: s.mvaSt ?? r.mvaSt, ipiCst: s.ipiCst ?? undefined,
+            cfopPadrao: r.cfopPadrao ?? s.cfopPadrao, observacao: s.observacao ?? undefined,
+            confianca: 0.85,
+          },
+        });
+        enriquecidos++;
+      } catch { /* segue */ }
+    }
+    return { enriquecidos, total: rules.length };
+  }
+
   // ─── Classificação assistida por IA ─────────────────────────────────
 
   async classificarComIA(ncm: string, descricao: string, segmento: string, uf?: string): Promise<any> {

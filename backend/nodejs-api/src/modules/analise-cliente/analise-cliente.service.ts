@@ -79,6 +79,37 @@ export class AnaliseClienteService {
       valorTotal: Math.round(valorTotal * 100) / 100,
     };
   }
+
+  /**
+   * Analisa um LOTE de clientes ainda não analisados (sem documentos).
+   * Chamável repetidamente até zerar (evita timeout de processar todos de uma vez).
+   */
+  async analisarLote(limit = 8, maxFilesPorCliente = 80) {
+    const comDocs = await this.prisma.document.findMany({ distinct: ['companyId'], select: { companyId: true } });
+    const jaFeitos = new Set(comDocs.map((d) => d.companyId));
+    const candidatos = await this.prisma.company.findMany({
+      where: { sharepointItemId: { not: null }, active: true },
+      select: { id: true, name: true },
+    });
+    const pendentes = candidatos.filter((c) => !jaFeitos.has(c.id));
+    const lote = pendentes.slice(0, limit);
+
+    const detalhes: any[] = [];
+    for (const c of lote) {
+      try {
+        const r = await this.analisarCliente(c.id, maxFilesPorCliente);
+        detalhes.push({ cliente: c.name, analisados: r.analisados, inconsistencias: r.inconsistencias });
+      } catch (e: any) {
+        detalhes.push({ cliente: c.name, erro: e?.message ?? 'erro' });
+      }
+    }
+    return {
+      processados: lote.length,
+      restantes: Math.max(0, pendentes.length - lote.length),
+      totalComPasta: candidatos.length,
+      detalhes,
+    };
+  }
 }
 
 // ─── Parser de NF-e (regex, sem dependência) ──────────────────
