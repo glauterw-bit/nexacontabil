@@ -68,6 +68,9 @@ model Company {
   monthlyReportEnabled Boolean  @default(false)
   reportInstanceName   String?
   segmentoFiscal       String?  // comercio|industria|servico|transporte — usado no Banco de NCM
+  clienteCodigo        String?  // código do cliente (pasta SharePoint / Domínio)
+  sharepointItemId     String?  @unique // pasta do cliente no SharePoint (dedup import)
+  sharepointDriveId    String?  // drive da pasta (pra ler os documentos depois)
 
   honorarios           Honorario[]
   crmClientes          CrmCliente[]

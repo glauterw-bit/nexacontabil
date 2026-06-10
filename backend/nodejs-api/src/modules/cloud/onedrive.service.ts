@@ -213,6 +213,43 @@ export class OneDriveService {
     };
   }
 
+  /** Importa os clientes da carteira (SharePoint) como empresas no sistema. */
+  async importarCarteira(connectionId: string) {
+    const cart: any = await this.getCarteira(connectionId);
+    if (cart.erro) return { erro: cart.erro };
+    const regimeMap: Record<string, string> = {
+      'Simples Nacional': 'SIMPLES_NACIONAL', 'Lucro Presumido': 'LUCRO_PRESUMIDO',
+      'Lucro Real': 'LUCRO_REAL', 'MEI': 'MEI', 'Não identificado': 'SIMPLES_NACIONAL',
+    };
+    let criados = 0, atualizados = 0, erros = 0;
+    for (const c of cart.clientes) {
+      const regime = regimeMap[c.regime] ?? 'SIMPLES_NACIONAL';
+      try {
+        const existing = c.itemId
+          ? await this.prisma.company.findUnique({ where: { sharepointItemId: c.itemId } })
+          : null;
+        if (existing) {
+          await this.prisma.company.update({
+            where: { id: existing.id },
+            data: { name: c.nome, taxRegime: regime, clienteCodigo: c.codigo ?? undefined, sharepointDriveId: c.driveId, active: c.ativo },
+          });
+          atualizados++;
+        } else {
+          await this.prisma.company.create({
+            data: {
+              name: c.nome, cnpj: cnpjFromItem(c.itemId ?? `${criados}-${c.nome}`),
+              taxRegime: regime, active: c.ativo,
+              clienteCodigo: c.codigo ?? undefined,
+              sharepointItemId: c.itemId, sharepointDriveId: c.driveId,
+            },
+          });
+          criados++;
+        }
+      } catch { erros++; }
+    }
+    return { total: cart.clientes.length, criados, atualizados, erros };
+  }
+
   /** Lista itens compartilhados COM a conta (Compartilhados comigo). */
   async listShared(connectionId: string) {
     const token = await this.getValidToken(connectionId);
@@ -295,6 +332,13 @@ export class OneDriveService {
     if (!res.ok) throw new BadRequestException(`Upload falhou: ${res.status}`);
     return res.json();
   }
+}
+
+/** CNPJ placeholder determinístico a partir do itemId (único por pasta). */
+function cnpjFromItem(seed: string): string {
+  let h = 0n;
+  for (const ch of seed) h = (h * 131n + BigInt(ch.charCodeAt(0))) % 10000000000000n;
+  return '7' + h.toString().padStart(13, '0');
 }
 
 /** Interpreta "113 - CLINICA OWEN (SN)" → {codigo, nome, regime, sigla}. */

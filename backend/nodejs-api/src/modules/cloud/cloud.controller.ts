@@ -61,6 +61,18 @@ export class CloudController {
     return this.onedrive.getCarteira(id);
   }
 
+  /** Importa os clientes da carteira (SharePoint) como empresas no sistema. */
+  @Post('importar-carteira')
+  async importarCarteira(@Body() body: { connectionId?: string }) {
+    let id = body?.connectionId;
+    if (!id) {
+      const c = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+      if (!c) throw new NotFoundException('Nenhuma conexão OneDrive ativa');
+      id = c.id;
+    }
+    return this.onedrive.importarCarteira(id);
+  }
+
   // ─── Conexoes ────────────────────────────────────────────────
 
   @Get('connections')
