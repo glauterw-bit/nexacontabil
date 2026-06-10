@@ -177,7 +177,7 @@ export class OneDriveService {
 
     const clientes: any[] = [];
     for (const site of sites) {
-      const ativo = /ativas/i.test(site.name) || !/inativas/i.test(site.name);
+      const ativo = !/inativ/i.test(site.name); // "Empresas Inativas" → inativo
       for (const drive of (site.drives ?? [])) {
         const items = await this.listAllChildren(connectionId, drive.driveId);
         for (const it of items) {
