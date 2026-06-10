@@ -49,6 +49,18 @@ export class CloudController {
     return this.onedrive.scanSharePoint(connectionId);
   }
 
+  /** Análise da carteira: lê Empresas Ativas/Inativas do SharePoint e agrega por cliente/regime. */
+  @Get('carteira')
+  async carteira(@Query('connectionId') connectionId?: string) {
+    let id = connectionId;
+    if (!id) {
+      const c = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+      if (!c) throw new NotFoundException('Nenhuma conexão OneDrive ativa');
+      id = c.id;
+    }
+    return this.onedrive.getCarteira(id);
+  }
+
   // ─── Conexoes ────────────────────────────────────────────────
 
   @Get('connections')

@@ -101,6 +101,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Outros',
     items: [
+      { href: '/carteira',       icon: Briefcase, label: 'Carteira (SharePoint)', badge: 'Live' },
       { href: '/portal-cliente', icon: Globe,     label: 'Portal do Cliente' },
       { href: '/banking',        icon: Landmark,  label: 'Open Finance' },
       { href: '/companies',      icon: Building2, label: 'Empresas' },

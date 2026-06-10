@@ -144,6 +144,75 @@ export class OneDriveService {
     return { sites: out, total: out.length, erro: out.length ? null : erro };
   }
 
+  /** Lista TODOS os filhos de um drive/pasta paginando via @odata.nextLink. */
+  async listAllChildren(connectionId: string, driveId?: string, folderId?: string) {
+    const token = await this.getValidToken(connectionId);
+    const base = driveId ? `${GRAPH_BASE}/drives/${driveId}` : `${GRAPH_BASE}/me/drive`;
+    let url: string | null = folderId ? `${base}/items/${folderId}/children?$top=200` : `${base}/root/children?$top=200`;
+    const out: any[] = [];
+    let guard = 0;
+    while (url && guard++ < 60) {
+      const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) break;
+      const json: any = await res.json();
+      for (const item of (json.value ?? [])) {
+        out.push({ id: item.id, name: item.name, isFolder: !!item.folder, childCount: item.folder?.childCount ?? 0, mimeType: item.file?.mimeType, size: item.size, driveId });
+      }
+      url = json['@odata.nextLink'] ?? null;
+    }
+    return out;
+  }
+
+  /**
+   * Análise da carteira: lê os sites "Empresas Ativas/Inativas" do SharePoint,
+   * interpreta cada pasta como um cliente (nome + regime + nº de documentos)
+   * e devolve a visão agregada pronta pra dashboard.
+   */
+  async getCarteira(connectionId: string) {
+    const scan = await this.scanSharePoint(connectionId);
+    if (!scan.sites.length) return { erro: scan.erro ?? 'Nenhum site SharePoint acessível', clientes: [], porRegime: [], totalClientes: 0, totalDocs: 0 };
+
+    const alvo = scan.sites.filter((s: any) => /empresas\s+(ativas|inativas)/i.test(s.name || ''));
+    const sites = alvo.length ? alvo : scan.sites;
+
+    const clientes: any[] = [];
+    for (const site of sites) {
+      const ativo = /ativas/i.test(site.name) || !/inativas/i.test(site.name);
+      for (const drive of (site.drives ?? [])) {
+        const items = await this.listAllChildren(connectionId, drive.driveId);
+        for (const it of items) {
+          if (!it.isFolder) continue;
+          const p = parseClienteFolder(it.name);
+          clientes.push({
+            codigo: p.codigo, nome: p.nome, regime: p.regime, regimeSigla: p.sigla,
+            docs: it.childCount ?? 0, ativo, driveId: drive.driveId, itemId: it.id, site: site.name,
+          });
+        }
+      }
+    }
+
+    const porRegimeMap: Record<string, { clientes: number; docs: number }> = {};
+    let totalDocs = 0;
+    for (const c of clientes) {
+      totalDocs += c.docs;
+      (porRegimeMap[c.regime] ??= { clientes: 0, docs: 0 });
+      porRegimeMap[c.regime].clientes++; porRegimeMap[c.regime].docs += c.docs;
+    }
+    const porRegime = Object.entries(porRegimeMap).map(([regime, v]) => ({ regime, ...v })).sort((a, b) => b.clientes - a.clientes);
+
+    return {
+      totalClientes: clientes.length,
+      totalDocs,
+      ativos: clientes.filter((c) => c.ativo).length,
+      inativos: clientes.filter((c) => !c.ativo).length,
+      semRegime: clientes.filter((c) => c.regime === 'Não identificado').length,
+      semDocs: clientes.filter((c) => c.docs === 0).length,
+      porRegime,
+      clientes: clientes.sort((a, b) => b.docs - a.docs),
+      atualizadoEm: new Date().toISOString(),
+    };
+  }
+
   /** Lista itens compartilhados COM a conta (Compartilhados comigo). */
   async listShared(connectionId: string) {
     const token = await this.getValidToken(connectionId);
@@ -226,4 +295,27 @@ export class OneDriveService {
     if (!res.ok) throw new BadRequestException(`Upload falhou: ${res.status}`);
     return res.json();
   }
+}
+
+/** Interpreta "113 - CLINICA OWEN (SN)" → {codigo, nome, regime, sigla}. */
+function parseClienteFolder(raw: string): { codigo: string | null; nome: string; regime: string; sigla: string | null } {
+  const nome0 = (raw || '').trim();
+  // código no início: "113 - "
+  const mCod = nome0.match(/^(\d+)\s*[-–]\s*(.+)$/);
+  const codigo = mCod ? mCod[1] : null;
+  let resto = mCod ? mCod[2].trim() : nome0;
+  // regime entre parênteses no final
+  const mReg = resto.match(/\(([^)]*)\)\s*$/);
+  let sigla: string | null = null;
+  let regime = 'Não identificado';
+  if (mReg) {
+    const s = mReg[1].trim().toUpperCase();
+    if (/\bSN\b/.test(s)) { sigla = 'SN'; regime = 'Simples Nacional'; }
+    else if (/\bLP\b/.test(s)) { sigla = 'LP'; regime = 'Lucro Presumido'; }
+    else if (/\bLR\b/.test(s)) { sigla = 'LR'; regime = 'Lucro Real'; }
+    else if (/\bMEI\b/.test(s)) { sigla = 'MEI'; regime = 'MEI'; }
+    if (sigla) resto = resto.replace(/\([^)]*\)\s*$/, '').trim();
+  }
+  if (/\bMEI\b/i.test(nome0) && regime === 'Não identificado') { regime = 'MEI'; sigla = 'MEI'; }
+  return { codigo, nome: resto || nome0, regime, sigla };
 }
