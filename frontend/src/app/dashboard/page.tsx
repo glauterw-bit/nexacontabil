@@ -1,283 +1,220 @@
 'use client';
-import { useState } from 'react';
-import { useQuery } from '@apollo/client';
-import { gql } from '@apollo/client';
+import { useEffect, useState, useCallback } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
-import { MetricCard } from '@/components/charts/MetricCard';
-import { CashFlowChart } from '@/components/charts/CashFlowChart';
-import { DocumentsQueue } from '@/components/layout/DocumentsQueue';
-import { AgentActivity } from '@/components/layout/AgentActivity';
-import { FileText, TrendingUp, AlertTriangle, CheckCircle, Brain, Building2, Flag, DollarSign, HeartPulse, Clock, Bell } from 'lucide-react';
+import {
+  Building2, Loader2, RefreshCw, CheckCircle2, Clock, AlertTriangle, Circle,
+  FileText, Brain, ShieldAlert, HeartPulse, Users, CalendarClock,
+} from 'lucide-react';
 import Link from 'next/link';
 
-const GET_EXTRAS = gql`
-  query GetDashboardExtras($companyId: String!) {
-    tarefasResumo(companyId: $companyId) { total emAndamento atrasadas }
-    honorariosResumo(companyId: $companyId) { totalAtrasado totalPendente vencendoHoje }
-    notifications(companyId: $companyId) { id titulo corpo tipo lida link createdAt }
-    notificacoesNaoLidas(companyId: $companyId)
-  }
-`;
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
+function authHeaders(): Record<string, string> {
+  const t = typeof window !== 'undefined' ? localStorage.getItem('aura_token') : null;
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+const BRL = (n: number) => (n ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const dataBR = (d: any) => d ? new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—';
 
-const GET_STATS = gql`
-  query GetDocumentStats($companyId: String!) {
-    documentStats(companyId: $companyId) {
-      total
-      pending
-      completed
-      failed
-      totalValue
-    }
-  }
-`;
+const ST: Record<string, { c: string; label: string }> = {
+  concluida:    { c: '#10b981', label: 'Concluída' },
+  em_andamento: { c: '#6366f1', label: 'Em andamento' },
+  bloqueada:    { c: '#ef4444', label: 'Bloqueada' },
+  pendente:     { c: '#64748b', label: 'Pendente' },
+  sem_tarefa:   { c: '#3a4256', label: '—' },
+};
+const nivelCor = (level: string) => ({ baixo: '#10b981', medio: '#f59e0b', alto: '#f97316', critico: '#ef4444' } as any)[level] ?? '#64748b';
 
 export default function DashboardPage() {
-  const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d');
   const { selectedCompany } = useCompany();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  const { data, loading } = useQuery(GET_STATS, {
-    variables: { companyId: selectedCompany?.id ?? '' },
-    skip: !selectedCompany,
-  });
+  const load = useCallback(async () => {
+    if (!selectedCompany) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/v1/dashboard-empresa?companyId=${selectedCompany.id}`, { headers: authHeaders() });
+      if (r.ok) setData(await r.json());
+    } catch { /* noop */ } finally { setLoading(false); }
+  }, [selectedCompany]);
 
-  const { data: extras } = useQuery(GET_EXTRAS, {
-    variables: { companyId: selectedCompany?.id ?? '' },
-    skip: !selectedCompany,
-    pollInterval: 60000,
-  });
-
-  const stats = data?.documentStats;
-  const tarefasRes = extras?.tarefasResumo;
-  const honorariosRes = extras?.honorariosResumo;
-  const notificacoes: any[] = extras?.notifications ?? [];
-  const naoLidas: number = extras?.notificacoesNaoLidas ?? 0;
-
-  // Score de Saúde: heurística baseada em pendências
-  const calcHealthScore = () => {
-    let score = 100;
-    if (tarefasRes?.atrasadas) score -= tarefasRes.atrasadas * 5;
-    if (honorariosRes?.totalAtrasado > 0) score -= 15;
-    if (stats?.failed) score -= stats.failed * 3;
-    if (stats?.pending > 5) score -= 10;
-    return Math.max(0, Math.min(100, score));
-  };
-  const healthScore = selectedCompany ? calcHealthScore() : 0;
-  const healthColor = healthScore >= 80 ? 'text-green-400' : healthScore >= 60 ? 'text-yellow-400' : 'text-red-400';
-  const healthBg = healthScore >= 80 ? 'bg-green-500' : healthScore >= 60 ? 'bg-yellow-500' : 'bg-red-500';
-
-  const accuracy = stats?.completed && stats?.total
-    ? ((stats.completed / stats.total) * 100).toFixed(1) + '%'
-    : '—';
-
-  const metrics = [
-    {
-      label: 'Documentos Processados',
-      value: loading ? '...' : (stats?.total ?? 0).toLocaleString('pt-BR'),
-      delta: stats?.completed ? `${stats.completed} concluídos` : '0 concluídos',
-      icon: FileText,
-      color: 'blue' as const,
-    },
-    {
-      label: 'Precisão do IDP',
-      value: loading ? '...' : accuracy,
-      delta: stats?.failed ? `${stats.failed} falhas` : 'sem falhas',
-      icon: CheckCircle,
-      color: 'green' as const,
-    },
-    {
-      label: 'Pendentes de Revisão',
-      value: loading ? '...' : (stats?.pending ?? 0).toString(),
-      delta: stats?.pending ? 'aguardando aprovação' : 'tudo em dia',
-      icon: AlertTriangle,
-      color: 'yellow' as const,
-    },
-    {
-      label: 'Volume Processado',
-      value: loading ? '...' : `R$ ${Number(stats?.totalValue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`,
-      delta: 'total acumulado',
-      icon: TrendingUp,
-      color: 'purple' as const,
-    },
-  ];
+  useEffect(() => { setData(null); load(); }, [load]);
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-6 p-8">
-        <div className="h-16 w-16 rounded-2xl bg-indigo-600/20 flex items-center justify-center">
-          <Building2 className="h-8 w-8 text-indigo-400" />
-        </div>
-        <div className="text-center">
-          <h2 className="text-xl font-bold text-white mb-2">Nenhuma empresa selecionada</h2>
-          <p className="text-gray-400 text-sm mb-6">Cadastre um cliente para começar a usar o sistema</p>
-          <Link href="/companies" className="btn-primary">
-            <Building2 className="h-4 w-4" />
-            Cadastrar empresa
-          </Link>
-        </div>
+      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
+        <Building2 className="h-12 w-12 text-gray-600" />
+        <p className="text-gray-400 text-sm">Selecione um cliente na barra lateral para ver o painel.</p>
+        <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">Ver carteira</Link>
       </div>
     );
   }
 
+  const cr = data?.cronograma;
+  const ia = data?.analiseIA;
+
   return (
-    <div className="p-8 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="p-5 md:p-8 max-w-6xl space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">{selectedCompany.name}</h1>
-          <p className="text-gray-400 text-sm mt-1">
-            {selectedCompany.taxRegime.replace(/_/g, ' ')} · CNPJ {selectedCompany.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}
-          </p>
+          <h1 className="text-xl font-semibold text-white">{selectedCompany.name}</h1>
+          <p className="text-sm text-gray-400">{selectedCompany.taxRegime?.replace(/_/g, ' ')} · competência {data?.competencia ?? '—'}</p>
         </div>
-        <div className="flex gap-2">
-          {(['7d', '30d', '90d'] as const).map(p => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                period === p
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              {p === '7d' ? '7 dias' : p === '30d' ? '30 dias' : '90 dias'}
-            </button>
-          ))}
-        </div>
+        <button onClick={load} disabled={loading} className="p-2 bg-[#161b2e] border border-[#1e2740] rounded-lg text-gray-400 hover:text-white">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+        </button>
       </div>
 
-      {/* AI Status Banner */}
-      <div className="flex items-center gap-3 bg-indigo-600/10 border border-indigo-500/30 rounded-xl p-4">
-        <Brain className="h-5 w-5 text-indigo-400 flex-shrink-0" />
-        <div>
-          <p className="text-sm font-medium text-white">5 Agentes de IA Ativos</p>
-          <p className="text-xs text-gray-400">
-            Supervisor · Tax Agent · Accounting Agent · Compliance Agent · Audit Agent
-          </p>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-xs text-green-400 font-medium">Online</span>
-        </div>
-      </div>
-
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {metrics.map(m => (
-          <MetricCard key={m.label} {...m} />
-        ))}
-      </div>
-
-      {/* Charts + Queue */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2">
-          <CashFlowChart period={period} />
-        </div>
-        <DocumentsQueue companyId={selectedCompany.id} />
-      </div>
-
-      {/* Agent Activity */}
-      <AgentActivity />
-
-      {/* Inovação: Score de Saúde + Alertas + Notificações */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-
-        {/* Score de Saúde do Cliente */}
-        <div className="bg-[#161b2e] border border-[#1e2740] rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <HeartPulse className="h-4 w-4 text-pink-400" />
-            <h3 className="text-sm font-semibold text-white">Score de Saúde</h3>
+      {loading && !data ? (
+        <div className="text-center py-24 text-sm text-gray-500 flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Carregando o painel…</div>
+      ) : data && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Kpi label="Cronograma do mês" value={`${cr?.pct ?? 0}%`} sub={`${cr?.concluidas ?? 0}/${cr?.total ?? 0} etapas`} icon={CalendarClock} color={cr?.pct >= 80 ? '#10b981' : cr?.pct >= 40 ? '#f59e0b' : '#ef4444'} />
+            <Kpi label="Pendências" value={data.totalPendencias} sub={data.totalPendencias ? 'precisam ação' : 'tudo em dia'} icon={AlertTriangle} color={data.totalPendencias ? '#ef4444' : '#10b981'} />
+            <Kpi label="Documentos analisados" value={`${data.documentos.analisados}/${data.documentos.total}`} sub={BRL(data.documentos.valorTotal)} icon={FileText} color="#6366f1" />
+            <Kpi label="Risco de malha fina" value={ia?.malhaFina ? `${ia.malhaFina.score}` : '—'} sub={ia?.malhaFina ? `nível ${ia.malhaFina.level}` : 'sem dados'} icon={ShieldAlert} color={ia?.malhaFina ? nivelCor(ia.malhaFina.level) : '#64748b'} />
           </div>
-          <div className="flex items-center gap-4">
-            <div className="relative h-20 w-20 flex-shrink-0">
-              <svg className="h-20 w-20 -rotate-90" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#1e2740" strokeWidth="3" />
-                <circle cx="18" cy="18" r="15.9" fill="none"
-                  stroke={healthScore >= 80 ? '#22c55e' : healthScore >= 60 ? '#eab308' : '#ef4444'}
-                  strokeWidth="3" strokeDasharray={`${healthScore} 100`} strokeLinecap="round" />
-              </svg>
-              <span className={`absolute inset-0 flex items-center justify-center text-lg font-bold ${healthColor}`}>
-                {healthScore}
-              </span>
+
+          <Card title="Cronograma fiscal e contábil" icon={CalendarClock} action={<Link href="/kanban" className="text-xs text-indigo-400 hover:underline">Kanban →</Link>}>
+            <div className="flex items-stretch gap-1.5 overflow-x-auto pb-1">
+              {(cr?.etapas ?? []).map((e: any, i: number) => {
+                const s = ST[e.status] ?? ST.pendente;
+                return (
+                  <div key={e.stage} className="flex-1 min-w-[120px]">
+                    <div className="rounded-lg border p-2.5" style={{ borderColor: e.vencida ? '#ef4444' : '#1e2740', background: e.vencida ? '#ef444410' : '#0f1117' }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] text-gray-500">Etapa {i + 1}</span>
+                        {e.status === 'concluida' ? <CheckCircle2 className="h-3.5 w-3.5" style={{ color: s.c }} />
+                          : e.status === 'em_andamento' ? <Clock className="h-3.5 w-3.5" style={{ color: s.c }} />
+                          : e.vencida ? <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+                          : <Circle className="h-3.5 w-3.5 text-gray-600" />}
+                      </div>
+                      <p className="text-xs text-white leading-tight font-medium">{e.label}</p>
+                      <p className="text-[10px] mt-1" style={{ color: e.vencida ? '#f87171' : s.c }}>
+                        {e.status === 'concluida' ? 'OK' : e.vencida ? `venceu ${dataBR(e.slaDate)}` : `prazo ${dataBR(e.slaDate)}`}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="space-y-1.5 flex-1">
-              {tarefasRes?.atrasadas > 0 && (
-                <p className="text-xs text-red-400 flex items-center gap-1.5">
-                  <Flag className="h-3 w-3" />{tarefasRes.atrasadas} tarefa(s) atrasada(s)
-                </p>
-              )}
-              {honorariosRes?.totalAtrasado > 0 && (
-                <p className="text-xs text-red-400 flex items-center gap-1.5">
-                  <DollarSign className="h-3 w-3" />Honorário em atraso
-                </p>
-              )}
-              {tarefasRes?.atrasadas === 0 && honorariosRes?.totalAtrasado === 0 && (
-                <p className="text-xs text-green-400">Tudo em dia!</p>
-              )}
-              <p className="text-xs text-gray-600 mt-2">
-                {healthScore >= 80 ? 'Excelente' : healthScore >= 60 ? 'Atenção necessária' : 'Crítico'}
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 h-1.5 bg-[#0f1117] rounded-full overflow-hidden">
-            <div className={`h-full rounded-full transition-all ${healthBg}`} style={{ width: `${healthScore}%` }} />
-          </div>
-        </div>
+          </Card>
 
-        {/* Tarefas e Honorários */}
-        <div className="bg-[#161b2e] border border-[#1e2740] rounded-xl p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Clock className="h-4 w-4 text-yellow-400" /> Pendências do Dia
-          </h3>
-          <div className="space-y-3">
-            <Link href="/tarefas" className="flex items-center justify-between p-3 bg-[#0f1117] rounded-lg hover:bg-white/3 transition-colors group">
-              <div className="flex items-center gap-2">
-                <Flag className="h-4 w-4 text-indigo-400" />
-                <div>
-                  <p className="text-xs font-medium text-white">Tarefas em andamento</p>
-                  <p className="text-xs text-gray-500">{tarefasRes?.atrasadas ?? 0} atrasadas</p>
+          <div className="grid lg:grid-cols-2 gap-5">
+            <Card title={`Pendências (${data.totalPendencias})`} icon={AlertTriangle}>
+              {data.pendencias.length === 0 ? <Empty msg="Nenhuma pendência. Cliente em dia. 🎉" /> : (
+                <div className="space-y-2">
+                  {data.pendencias.map((p: any, i: number) => {
+                    const cor = p.diasAtraso > 15 ? '#ef4444' : p.diasAtraso > 5 ? '#f59e0b' : '#64748b';
+                    return (
+                      <div key={i} className="flex items-center gap-2.5 text-sm">
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cor }} />
+                        <span className="flex-1 text-gray-200 truncate">{p.titulo}</span>
+                        <span className="text-[11px] px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: cor + '22', color: cor }}>{p.tipo} · {p.diasAtraso}d</span>
+                      </div>
+                    );
+                  })}
                 </div>
+              )}
+            </Card>
+
+            <Card title="Próximas obrigações" icon={CalendarClock} action={<Link href="/obrigacoes" className="text-xs text-indigo-400 hover:underline">Ver todas →</Link>}>
+              {(!data.obrigacoes.proximas || data.obrigacoes.proximas.length === 0) ? (
+                <Empty msg={data.obrigacoes.vencidas > 0 ? `${data.obrigacoes.vencidas} obrigação(ões) vencida(s)` : 'Sem obrigações cadastradas neste cliente.'} />
+              ) : (
+                <div className="space-y-2">
+                  {data.obrigacoes.proximas.map((o: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2.5 text-sm">
+                      <CalendarClock className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
+                      <span className="flex-1 text-gray-200 truncate">{o.nome}</span>
+                      <span className="text-[11px] text-amber-300">{dataBR(o.venc)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          <Card title="Análises da IA — fiscal e contábil" icon={Brain} action={<Link href="/risco-fiscal" className="text-xs text-indigo-400 hover:underline">Risco fiscal →</Link>}>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="rounded-lg border border-[#1e2740] bg-[#0f1117] p-4">
+                <div className="flex items-center gap-2 mb-2"><ShieldAlert className="h-4 w-4 text-indigo-400" /><span className="text-xs text-gray-400">Risco de malha fina</span></div>
+                {ia?.malhaFina ? (
+                  <>
+                    <p className="text-3xl font-bold" style={{ color: nivelCor(ia.malhaFina.level) }}>{ia.malhaFina.score}<span className="text-sm text-gray-600">/100</span></p>
+                    <p className="text-xs mt-0.5 capitalize" style={{ color: nivelCor(ia.malhaFina.level) }}>{ia.malhaFina.level}</p>
+                    {ia.malhaFina.fatores?.length > 0 && <p className="text-[11px] text-gray-500 mt-2 leading-snug">{ia.malhaFina.fatores[0].fator}</p>}
+                  </>
+                ) : <p className="text-xs text-gray-600">Sem dados suficientes.</p>}
               </div>
-              <span className="text-xl font-bold text-indigo-400">{tarefasRes?.emAndamento ?? 0}</span>
-            </Link>
-            <Link href="/honorarios" className="flex items-center justify-between p-3 bg-[#0f1117] rounded-lg hover:bg-white/3 transition-colors group">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-yellow-400" />
-                <div>
-                  <p className="text-xs font-medium text-white">Honorários pendentes</p>
-                  <p className="text-xs text-gray-500">{honorariosRes?.vencendoHoje ?? 0} vencendo hoje</p>
-                </div>
+              <div className="rounded-lg border border-[#1e2740] bg-[#0f1117] p-4">
+                <div className="flex items-center gap-2 mb-2"><HeartPulse className="h-4 w-4 text-emerald-400" /><span className="text-xs text-gray-400">Saúde fiscal-contábil</span></div>
+                {ia?.saudeFiscal ? (
+                  <>
+                    <p className="text-3xl font-bold text-white">{ia.saudeFiscal.score}<span className="text-sm text-gray-600">/100</span></p>
+                    <div className="space-y-1 mt-2">
+                      {(ia.saudeFiscal.dimensoes ?? []).slice(0, 3).map((d: any, i: number) => (
+                        <div key={i}>
+                          <div className="flex justify-between text-[10px] text-gray-500"><span className="truncate">{d.nome}</span><span>{d.score}</span></div>
+                          <div className="h-1 bg-[#1e2740] rounded-full"><div className="h-full rounded-full" style={{ width: `${d.score}%`, background: d.score >= 75 ? '#10b981' : d.score >= 50 ? '#f59e0b' : '#ef4444' }} /></div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : <p className="text-xs text-gray-600">Sem dados suficientes.</p>}
               </div>
-              <span className="text-sm font-bold text-yellow-400">
-                R$ {(honorariosRes?.totalPendente ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
-              </span>
-            </Link>
-          </div>
-        </div>
-
-        {/* Notificações recentes */}
-        <div className="bg-[#161b2e] border border-[#1e2740] rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white">Notificações</h3>
-            {naoLidas > 0 && (
-              <span className="flex items-center gap-1 text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full font-medium">
-                <Bell className="h-3 w-3" />{naoLidas}
-              </span>
-            )}
-          </div>
-          {notificacoes.length === 0 ? (
-            <p className="text-xs text-gray-600 text-center py-6">Sem notificações</p>
-          ) : (
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {notificacoes.slice(0, 6).map((n: any) => (
-                <div key={n.id} className={`p-2.5 rounded-lg border text-xs transition-colors ${n.lida ? 'border-[#1e2740] bg-transparent' : 'border-indigo-500/20 bg-indigo-600/5'}`}>
-                  <p className={`font-medium ${n.lida ? 'text-gray-400' : 'text-white'}`}>{n.titulo}</p>
-                  <p className="text-gray-600 mt-0.5">{n.corpo}</p>
-                </div>
-              ))}
+              <div className="rounded-lg border border-[#1e2740] bg-[#0f1117] p-4">
+                <div className="flex items-center gap-2 mb-2"><Users className="h-4 w-4 text-amber-400" /><span className="text-xs text-gray-400">Anomalias na folha</span></div>
+                <p className="text-3xl font-bold" style={{ color: ia?.folhaAnomalias ? '#f59e0b' : '#10b981' }}>{ia?.folhaAnomalias ?? 0}</p>
+                <p className="text-[11px] text-gray-500 mt-2">{ia?.folhaAnomalias ? 'detectadas — revisar holerites' : 'nenhuma anomalia detectada'}</p>
+              </div>
             </div>
+          </Card>
+
+          {data.documentos.recentes?.length > 0 && (
+            <Card title="Documentos analisados recentemente" icon={FileText} action={<Link href="/captura-xml" className="text-xs text-indigo-400 hover:underline">Analisar mais →</Link>}>
+              <div className="space-y-1.5">
+                {data.documentos.recentes.map((d: any, i: number) => (
+                  <div key={i} className="flex items-center gap-3 text-sm">
+                    <FileText className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
+                    <span className="flex-1 text-gray-200 truncate">{d.nome}</span>
+                    {d.emitente && <span className="text-[11px] text-gray-500 truncate max-w-[140px]">{d.emitente}</span>}
+                    {d.valor != null && <span className="text-[11px] font-mono text-emerald-400">{BRL(d.valor)}</span>}
+                    <span className={`text-[10px] ${d.status === 'completed' ? 'text-emerald-400' : 'text-gray-500'}`}>{d.status === 'completed' ? '✓' : d.status}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
           )}
-        </div>
-      </div>
+
+          <p className="text-[11px] text-gray-600 text-center">Atualizado em {data.atualizadoEm ? new Date(data.atualizadoEm).toLocaleString('pt-BR') : '—'}</p>
+        </>
+      )}
     </div>
   );
+}
+
+function Kpi({ label, value, sub, icon: Icon, color }: any) {
+  return (
+    <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4">
+      <div className="flex items-center justify-between mb-1"><span className="text-[11px] text-gray-500">{label}</span><Icon className="h-3.5 w-3.5" style={{ color }} /></div>
+      <p className="text-2xl font-bold" style={{ color }}>{value}</p>
+      {sub && <p className="text-[11px] text-gray-600 mt-0.5 truncate">{sub}</p>}
+    </div>
+  );
+}
+function Card({ title, icon: Icon, action, children }: any) {
+  return (
+    <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-medium text-white flex items-center gap-2"><Icon className="h-4 w-4 text-gray-400" /> {title}</h2>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+function Empty({ msg }: { msg: string }) {
+  return <p className="text-xs text-gray-600 text-center py-6">{msg}</p>;
 }

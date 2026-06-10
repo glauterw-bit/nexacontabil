@@ -22,5 +22,6 @@ class PredictiveController {
   imports: [AiModule],
   controllers: [PredictiveController],
   providers: [PredictiveService, PrismaService],
+  exports: [PredictiveService],
 })
 export class PredictiveModule {}

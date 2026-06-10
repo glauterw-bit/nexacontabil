@@ -37,6 +37,7 @@ interface NavGroup {
 
 // ── Fluxo fiscal — o dia a dia do departamento (topo, fixo) ──
 const NAV_MAIN: NavItem[] = [
+  { href: '/dashboard',       icon: LayoutDashboard, label: 'Painel do Cliente' },
   { href: '/captura-xml',     icon: Inbox,         label: 'Captura de XMLs', badge: 'Fiscal' },
   { href: '/esteira-fiscal',  icon: Workflow,      label: 'Esteira Fiscal',  badge: 'Auto' },
   { href: '/carteira',        icon: Briefcase,     label: 'Carteira',        badge: 'Live' },

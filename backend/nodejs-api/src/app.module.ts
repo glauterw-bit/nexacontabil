@@ -70,6 +70,7 @@ import { CbsIbsModule } from './modules/tax-reform/cbs-ibs.module';
 import { MigrationModule } from './modules/migration/migration.module';
 import { HealthScoreModule } from './modules/health-score/health-score.module';
 import { PredictiveModule } from './modules/predictive/predictive.module';
+import { DashboardEmpresaModule } from './modules/dashboard-empresa/dashboard-empresa.module';
 import { BenchmarkModule } from './modules/benchmark/benchmark.module';
 import { BalanceSheetModule } from './modules/balance-sheet/balance-sheet.module';
 import { OnvioModule } from './modules/onvio/onvio.module';
@@ -185,6 +186,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     MigrationModule,
     HealthScoreModule,
     PredictiveModule,
+    DashboardEmpresaModule,
     BenchmarkModule,
     BalanceSheetModule,
     OnvioModule,
