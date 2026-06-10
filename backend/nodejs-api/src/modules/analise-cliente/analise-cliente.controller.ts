@@ -1,9 +1,15 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Get, Body } from '@nestjs/common';
 import { AnaliseClienteService } from './analise-cliente.service';
 
 @Controller('analise-cliente')
 export class AnaliseClienteController {
   constructor(private readonly svc: AnaliseClienteService) {}
+
+  /** Progresso da análise da carteira (pra barra de progresso ao vivo). */
+  @Get('progresso')
+  progresso() {
+    return this.svc.progresso();
+  }
 
   /** Lê os XMLs da pasta SharePoint do cliente, analisa e salva. */
   @Post()

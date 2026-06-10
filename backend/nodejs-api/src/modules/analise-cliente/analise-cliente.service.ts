@@ -128,6 +128,24 @@ export class AnaliseClienteService {
     };
   }
 
+  /** Progresso da análise da carteira (pra barra de progresso ao vivo). */
+  async progresso() {
+    const [total, analisados, ativos, ativosFeitos, documentos] = await Promise.all([
+      this.prisma.company.count({ where: { sharepointItemId: { not: null } } }),
+      this.prisma.company.count({ where: { sharepointItemId: { not: null }, sharepointAnalisadoEm: { not: null } } }),
+      this.prisma.company.count({ where: { sharepointItemId: { not: null }, active: true } }),
+      this.prisma.company.count({ where: { sharepointItemId: { not: null }, active: true, sharepointAnalisadoEm: { not: null } } }),
+      this.prisma.document.count(),
+    ]);
+    return {
+      total, analisados, restantes: total - analisados,
+      pct: total ? Math.round((analisados / total) * 100) : 0,
+      ativos, ativosAnalisados: ativosFeitos,
+      documentos,
+      rodando: analisados < total,
+    };
+  }
+
   /** Limpa as análises (documentos) e zera as flags pra re-análise limpa. */
   async resetAnalises() {
     const clientes = await this.prisma.company.findMany({ where: { sharepointItemId: { not: null } }, select: { id: true } });

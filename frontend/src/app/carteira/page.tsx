@@ -20,6 +20,7 @@ export default function CarteiraPage() {
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState('');
   const [regimeFiltro, setRegimeFiltro] = useState('');
+  const [prog, setProg] = useState<any>(null);
 
   async function load() {
     setLoading(true);
@@ -28,7 +29,17 @@ export default function CarteiraPage() {
       setData(await r.json());
     } catch { /* noop */ } finally { setLoading(false); }
   }
-  useEffect(() => { load(); }, []);
+  async function loadProg() {
+    try {
+      const r = await fetch(`${API}/api/v1/analise-cliente/progresso`, { headers: authHeaders() });
+      if (r.ok) setProg(await r.json());
+    } catch { /* noop */ }
+  }
+  useEffect(() => { load(); loadProg(); }, []);
+  useEffect(() => {
+    const t = setInterval(loadProg, 10000); // atualiza a cada 10s
+    return () => clearInterval(t);
+  }, []);
 
   const clientes = useMemo(() => {
     let cs = data?.clientes ?? [];
@@ -50,6 +61,23 @@ export default function CarteiraPage() {
         </div>
         <button onClick={load} className="p-2 bg-[#161b2e] border border-[#1e2740] rounded-lg text-gray-400 hover:text-white"><RefreshCw className="h-4 w-4" /></button>
       </div>
+
+      {/* Barra de progresso da análise */}
+      {prog && (
+        <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <span className="text-sm text-white flex items-center gap-2">
+              {prog.rodando ? <Loader2 className="h-4 w-4 animate-spin text-indigo-400" /> : <span className="text-emerald-400">✓</span>}
+              Análise dos documentos · <b>{prog.analisados}/{prog.total}</b> clientes ({prog.pct}%)
+            </span>
+            <span className="text-xs text-gray-500">{prog.documentos.toLocaleString('pt-BR')} documentos analisados · {prog.restantes} restantes</span>
+          </div>
+          <div className="h-2.5 bg-[#0f1117] rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${prog.pct}%`, background: prog.rodando ? 'linear-gradient(90deg,#6366f1,#10b981)' : '#10b981' }} />
+          </div>
+          {prog.rodando && <p className="text-[11px] text-gray-600 mt-1.5">Processando em segundo plano · atualiza sozinho a cada 10s</p>}
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-24 text-sm text-gray-500 flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Lendo o SharePoint…</div>
