@@ -2,7 +2,7 @@ import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BuscaDocsService } from './busca-docs.service';
 
-@Controller('api/v1/busca-docs')
+@Controller('busca-docs')
 @UseGuards(JwtAuthGuard)
 export class BuscaDocsController {
   constructor(private readonly service: BuscaDocsService) {}
