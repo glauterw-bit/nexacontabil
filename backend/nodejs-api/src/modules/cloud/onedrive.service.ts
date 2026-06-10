@@ -163,6 +163,29 @@ export class OneDriveService {
     return out;
   }
 
+  /** Coleta recursivamente arquivos (por extensão) dentro de uma pasta. */
+  async coletarArquivos(connectionId: string, driveId: string, folderId: string, opts: { ext?: string[]; maxFiles?: number } = {}) {
+    const ext = opts.ext ?? ['.xml'];
+    const maxFiles = opts.maxFiles ?? 150;
+    const out: Array<{ id: string; name: string; driveId: string }> = [];
+    const queue: string[] = [folderId];
+    let guard = 0;
+    while (queue.length && out.length < maxFiles && guard++ < 800) {
+      const fid = queue.shift()!;
+      let items: any[] = [];
+      try { items = await this.listAllChildren(connectionId, driveId, fid); } catch { continue; }
+      for (const it of items) {
+        if (it.isFolder) { queue.push(it.id); continue; }
+        const n = (it.name ?? '').toLowerCase();
+        if (ext.some((e) => n.endsWith(e))) {
+          out.push({ id: it.id, name: it.name, driveId });
+          if (out.length >= maxFiles) break;
+        }
+      }
+    }
+    return out;
+  }
+
   /**
    * Análise da carteira: lê os sites "Empresas Ativas/Inativas" do SharePoint,
    * interpreta cada pasta como um cliente (nome + regime + nº de documentos)

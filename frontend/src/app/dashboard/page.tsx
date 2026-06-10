@@ -28,6 +28,8 @@ export default function DashboardPage() {
   const { selectedCompany } = useCompany();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [analisando, setAnalisando] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!selectedCompany) return;
@@ -37,6 +39,22 @@ export default function DashboardPage() {
       if (r.ok) setData(await r.json());
     } catch { /* noop */ } finally { setLoading(false); }
   }, [selectedCompany]);
+
+  async function analisarSharepoint() {
+    if (!selectedCompany) return;
+    setAnalisando(true); setMsg(null);
+    try {
+      const r = await fetch(`${API}/api/v1/analise-cliente`, {
+        method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId: selectedCompany.id }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d?.message ?? 'Falha');
+      setMsg(`${d.analisados} documentos analisados · ${d.inconsistencias} inconsistências · ${d.jaExistiam} já existiam`);
+      load();
+    } catch (e: any) { setMsg(`Erro: ${e.message}`); }
+    finally { setAnalisando(false); }
+  }
 
   useEffect(() => { setData(null); load(); }, [load]);
 
@@ -60,10 +78,18 @@ export default function DashboardPage() {
           <h1 className="text-xl font-semibold text-white">{selectedCompany.name}</h1>
           <p className="text-sm text-gray-400">{selectedCompany.taxRegime?.replace(/_/g, ' ')} · competência {data?.competencia ?? '—'}</p>
         </div>
-        <button onClick={load} disabled={loading} className="p-2 bg-[#161b2e] border border-[#1e2740] rounded-lg text-gray-400 hover:text-white">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={analisarSharepoint} disabled={analisando}
+            className="px-3 py-2 text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg inline-flex items-center gap-1.5">
+            {analisando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
+            Analisar XMLs do SharePoint
+          </button>
+          <button onClick={load} disabled={loading} className="p-2 bg-[#161b2e] border border-[#1e2740] rounded-lg text-gray-400 hover:text-white">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
+      {msg && <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/5 px-3 py-2 text-xs text-indigo-200">{msg}</div>}
 
       {loading && !data ? (
         <div className="text-center py-24 text-sm text-gray-500 flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Carregando o painel…</div>

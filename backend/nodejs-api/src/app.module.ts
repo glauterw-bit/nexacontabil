@@ -71,6 +71,7 @@ import { MigrationModule } from './modules/migration/migration.module';
 import { HealthScoreModule } from './modules/health-score/health-score.module';
 import { PredictiveModule } from './modules/predictive/predictive.module';
 import { DashboardEmpresaModule } from './modules/dashboard-empresa/dashboard-empresa.module';
+import { AnaliseClienteModule } from './modules/analise-cliente/analise-cliente.module';
 import { BenchmarkModule } from './modules/benchmark/benchmark.module';
 import { BalanceSheetModule } from './modules/balance-sheet/balance-sheet.module';
 import { OnvioModule } from './modules/onvio/onvio.module';
@@ -187,6 +188,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     HealthScoreModule,
     PredictiveModule,
     DashboardEmpresaModule,
+    AnaliseClienteModule,
     BenchmarkModule,
     BalanceSheetModule,
     OnvioModule,
