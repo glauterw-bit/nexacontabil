@@ -24,7 +24,7 @@ export class DashboardEmpresaService {
       this.prisma.workflowTask.findMany({ where: { companyId, competencia: comp } }),
       this.prisma.fiscalObligation.findMany({ where: { companyId }, orderBy: { dueDate: 'asc' }, take: 60 }),
       this.prisma.honorario.findMany({ where: { companyId, status: { in: ['pendente', 'atrasado'] } } }),
-      this.prisma.document.findMany({ where: { companyId }, orderBy: { createdAt: 'desc' }, take: 200 }),
+      this.prisma.document.findMany({ where: { companyId }, orderBy: { createdAt: 'desc' }, take: 5000 }),
     ]);
 
     // ── Cronograma fiscal e contábil (7 etapas) ──
@@ -57,18 +57,63 @@ export class DashboardEmpresaService {
       ...honorarios.filter((h) => h.vencimento < now).map((h) => ({ tipo: 'honorario', titulo: h.descricao, diasAtraso: dias(h.vencimento) })),
     ].sort((a, b) => b.diasAtraso - a.diasAtraso);
 
-    // ── Documentos analisados ──
+    // ── Documentos analisados + ANÁLISE FISCAL PROFUNDA ──
     const analisados = documents.filter((d) => d.status === 'completed' || !!d.extractedData);
+    let faturamento = 0, tIcms = 0, tIpi = 0, tPis = 0, tCofins = 0, tIcmsSt = 0;
+    const porNcm = new Map<string, { ncm: string; descricao: string; qtd: number; valor: number }>();
+    const porCfop = new Map<string, { cfop: string; qtd: number; valor: number }>();
+    const inconsistenciasDetalhe: Array<{ doc: string; problemas: string[] }> = [];
+    let totalInconsist = 0;
+
+    for (const d of documents) {
+      faturamento += d.totalValue ?? 0;
+      let nf: any = null, fv: any = null;
+      try { nf = d.extractedData ? JSON.parse(d.extractedData) : null; } catch { /* */ }
+      try { fv = d.fiscalValidation ? JSON.parse(d.fiscalValidation) : null; } catch { /* */ }
+      if (nf?.totais) {
+        tIcms += nf.totais.icms ?? 0; tIpi += nf.totais.ipi ?? 0;
+        tPis += nf.totais.pis ?? 0; tCofins += nf.totais.cofins ?? 0; tIcmsSt += nf.totais.icmsSt ?? 0;
+      }
+      for (const it of (nf?.itens ?? [])) {
+        const v = it.valor ?? 0;
+        if (it.ncm) {
+          const k = String(it.ncm);
+          const cur = porNcm.get(k) ?? { ncm: k, descricao: it.descricao ?? '', qtd: 0, valor: 0 };
+          cur.qtd++; cur.valor += v; if (!cur.descricao && it.descricao) cur.descricao = it.descricao;
+          porNcm.set(k, cur);
+        }
+        if (it.cfop) {
+          const cur = porCfop.get(it.cfop) ?? { cfop: it.cfop, qtd: 0, valor: 0 };
+          cur.qtd++; cur.valor += v; porCfop.set(it.cfop, cur);
+        }
+      }
+      if (fv?.inconsistencias?.length) {
+        totalInconsist += fv.inconsistencias.length;
+        if (inconsistenciasDetalhe.length < 15) inconsistenciasDetalhe.push({ doc: d.number ? `NF ${d.number}` : (d.originalFilename ?? d.type), problemas: fv.inconsistencias.slice(0, 3) });
+      }
+    }
+    const totalImpostos = tIcms + tIpi + tPis + tCofins + tIcmsSt;
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+
     const documentos = {
       total: documents.length,
       analisados: analisados.length,
       pendentes: documents.filter((d) => d.status === 'pending').length,
-      valorTotal: Math.round(documents.reduce((s, d) => s + (d.totalValue ?? 0), 0) * 100) / 100,
+      valorTotal: r2(faturamento),
       recentes: documents.slice(0, 6).map((d) => ({
         nome: d.originalFilename ?? d.type, tipo: d.type,
         valor: d.totalValue, emitente: d.issuerName, status: d.status,
         confianca: d.confidenceScore, em: d.createdAt,
       })),
+      resumoFiscal: {
+        faturamento: r2(faturamento),
+        impostos: { icms: r2(tIcms), ipi: r2(tIpi), pis: r2(tPis), cofins: r2(tCofins), icmsSt: r2(tIcmsSt), total: r2(totalImpostos) },
+        cargaTributaria: faturamento > 0 ? Math.round((totalImpostos / faturamento) * 1000) / 10 : 0,
+        topNcm: [...porNcm.values()].sort((a, b) => b.valor - a.valor).slice(0, 8).map((x) => ({ ...x, valor: r2(x.valor) })),
+        topCfop: [...porCfop.values()].sort((a, b) => b.valor - a.valor).slice(0, 6).map((x) => ({ ...x, valor: r2(x.valor) })),
+        totalInconsistencias: totalInconsist,
+        inconsistencias: inconsistenciasDetalhe,
+      },
     };
 
     // ── Análises da IA (fiscais e contábeis) ──

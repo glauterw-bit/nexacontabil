@@ -16,4 +16,10 @@ export class AnaliseClienteController {
   lote(@Body() body: { limit?: number; maxFiles?: number }) {
     return this.svc.analisarLote(body?.limit ?? 8, body?.maxFiles ?? 80);
   }
+
+  /** Limpa análises e zera flags (pra re-análise com parser novo). */
+  @Post('reset')
+  reset() {
+    return this.svc.resetAnalises();
+  }
 }

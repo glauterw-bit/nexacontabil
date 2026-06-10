@@ -162,6 +162,50 @@ export default function DashboardPage() {
             </Card>
           </div>
 
+          {/* ── Resumo fiscal profundo (das notas analisadas) ── */}
+          {data.documentos.resumoFiscal && data.documentos.analisados > 0 && (
+            <Card title="Análise fiscal — apurado das notas" icon={FileText}>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <Mini label="Faturamento" value={BRL(data.documentos.resumoFiscal.faturamento)} color="#10b981" />
+                <Mini label="Total impostos" value={BRL(data.documentos.resumoFiscal.impostos.total)} color="#f59e0b" />
+                <Mini label="Carga tributária" value={`${data.documentos.resumoFiscal.cargaTributaria}%`} color="#6366f1" />
+                <Mini label="Inconsistências" value={data.documentos.resumoFiscal.totalInconsistencias} color={data.documentos.resumoFiscal.totalInconsistencias ? '#ef4444' : '#10b981'} />
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[11px] text-gray-500 mb-1.5">Impostos apurados</p>
+                  <div className="space-y-1">
+                    {[['ICMS', data.documentos.resumoFiscal.impostos.icms], ['ICMS-ST', data.documentos.resumoFiscal.impostos.icmsSt], ['IPI', data.documentos.resumoFiscal.impostos.ipi], ['PIS', data.documentos.resumoFiscal.impostos.pis], ['COFINS', data.documentos.resumoFiscal.impostos.cofins]].map(([k, v]: any) => (
+                      <div key={k} className="flex items-center justify-between text-xs"><span className="text-gray-400">{k}</span><span className="font-mono text-gray-200">{BRL(v)}</span></div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-500 mb-1.5">Top NCMs (por valor)</p>
+                  <div className="space-y-1">
+                    {data.documentos.resumoFiscal.topNcm.slice(0, 5).map((n: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        <span className="font-mono text-indigo-300">{n.ncm}</span>
+                        <span className="text-gray-400 truncate flex-1">{n.descricao}</span>
+                        <span className="font-mono text-gray-300">{BRL(n.valor)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {data.documentos.resumoFiscal.inconsistencias.length > 0 && (
+                <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                  <p className="text-xs font-medium text-amber-300 mb-1.5 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5" /> Inconsistências fiscais detectadas</p>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {data.documentos.resumoFiscal.inconsistencias.map((inc: any, i: number) => (
+                      <div key={i} className="text-[11px]"><span className="text-gray-400">{inc.doc}:</span> <span className="text-amber-200/80">{inc.problemas.join(' · ')}</span></div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
+
           <Card title="Análises da IA — fiscal e contábil" icon={Brain} action={<Link href="/risco-fiscal" className="text-xs text-indigo-400 hover:underline">Risco fiscal →</Link>}>
             <div className="grid md:grid-cols-3 gap-4">
               <div className="rounded-lg border border-[#1e2740] bg-[#0f1117] p-4">
@@ -238,6 +282,14 @@ function Card({ title, icon: Icon, action, children }: any) {
         {action}
       </div>
       {children}
+    </div>
+  );
+}
+function Mini({ label, value, color = '#fff' }: { label: string; value: any; color?: string }) {
+  return (
+    <div className="rounded-lg border border-[#1e2740] bg-[#0f1117] p-3 text-center">
+      <p className="text-[10px] text-gray-500 mb-0.5">{label}</p>
+      <p className="text-base font-bold truncate" style={{ color }}>{value}</p>
     </div>
   );
 }

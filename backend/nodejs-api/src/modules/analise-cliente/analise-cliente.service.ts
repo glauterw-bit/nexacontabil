@@ -131,16 +131,25 @@ export class AnaliseClienteService {
       detalhes,
     };
   }
+
+  /** Limpa as análises (documentos) e zera as flags pra re-análise limpa. */
+  async resetAnalises() {
+    const clientes = await this.prisma.company.findMany({ where: { sharepointItemId: { not: null } }, select: { id: true } });
+    const ids = clientes.map((c) => c.id);
+    const del = await this.prisma.document.deleteMany({ where: { companyId: { in: ids } } });
+    await this.prisma.company.updateMany({ where: { sharepointItemId: { not: null } }, data: { sharepointAnalisadoEm: null, sharepointDocsCount: null } });
+    return { documentosRemovidos: del.count, clientesResetados: ids.length };
+  }
 }
 
 // ─── Parser de NF-e (regex, sem dependência) ──────────────────
 function parseNfe(xml: string): null | {
   tipo: string; numero?: string; chave?: string; dataEmissao?: string; valorTotal?: number;
-  emitenteNome?: string; emitenteCnpj?: string; destNome?: string; destCnpj?: string;
-  itens: Array<{ ncm: string; descricao?: string; cfop?: string; icms?: number; ipi?: number; pis?: number; cofins?: number }>;
+  emitenteNome?: string; emitenteCnpj?: string; destNome?: string; destCnpj?: string; natOp?: string;
+  totais?: { produtos?: number; icms?: number; ipi?: number; pis?: number; cofins?: number; icmsSt?: number; frete?: number };
+  itens: Array<{ ncm: string; descricao?: string; cfop?: string; valor?: number; cst?: string; icms?: number; ipi?: number; pis?: number; cofins?: number; vIcms?: number }>;
 } {
   if (!/<NFe|<nfeProc|<infNFe|<CTe|<NFS|<nfse/i.test(xml)) {
-    // não parece XML fiscal conhecido
     if (!/<\?xml/.test(xml)) return null;
   }
   const tipo = /<NFe|infNFe/i.test(xml) ? 'nfe' : /<CTe/i.test(xml) ? 'cte' : /nfse/i.test(xml) ? 'nfse' : 'xml';
@@ -154,7 +163,10 @@ function parseNfe(xml: string): null | {
     if (!ncm) continue;
     itens.push({
       ncm, descricao: pick(b, 'xProd'), cfop: pick(b, 'CFOP'),
+      valor: num(pick(b, 'vProd')),
+      cst: pick(b, 'CST') ?? pick(b, 'CSOSN'),
       icms: num(pick(b, 'pICMS')), ipi: num(pick(b, 'pIPI')), pis: num(pick(b, 'pPIS')), cofins: num(pick(b, 'pCOFINS')),
+      vIcms: num(pick(b, 'vICMS')),
     });
   }
 
@@ -164,6 +176,16 @@ function parseNfe(xml: string): null | {
     chave: (xml.match(/Id="NFe(\d{44})"/) ?? [])[1],
     dataEmissao: pick(xml, 'dhEmi')?.slice(0, 10) ?? pick(xml, 'dEmi'),
     valorTotal: num(pick(totalBloco, 'vNF')),
+    natOp: pick(xml, 'natOp'),
+    totais: {
+      produtos: num(pick(totalBloco, 'vProd')),
+      icms: num(pick(totalBloco, 'vICMS')),
+      icmsSt: num(pick(totalBloco, 'vST')),
+      ipi: num(pick(totalBloco, 'vIPI')),
+      pis: num(pick(totalBloco, 'vPIS')),
+      cofins: num(pick(totalBloco, 'vCOFINS')),
+      frete: num(pick(totalBloco, 'vFrete')),
+    },
     emitenteNome: pick(emitBloco, 'xNome'),
     emitenteCnpj: pick(emitBloco, 'CNPJ'),
     destNome: pick(destBloco, 'xNome'),
