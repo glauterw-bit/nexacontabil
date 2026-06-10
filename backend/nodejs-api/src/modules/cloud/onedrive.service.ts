@@ -3,7 +3,7 @@ import { ConfidentialClientApplication } from '@azure/msal-node';
 import { PrismaService } from '../../database/prisma.service';
 import { encryptToken, decryptToken } from './crypto.util';
 
-const SCOPES = ['Files.ReadWrite.All', 'User.Read', 'offline_access'];
+const SCOPES = ['Files.ReadWrite.All', 'Sites.Read.All', 'User.Read', 'offline_access'];
 const REDIRECT_PATH = '/api/v1/cloud/microsoft/callback';
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 
@@ -37,27 +37,46 @@ export class OneDriveService {
     });
   }
 
-  async exchangeCode(code: string, userId: string, label: string, rootFolderId?: string, redirectBase?: string) {
-    const msal = this.getMsal();
-    const result = await msal.acquireTokenByCode({
-      code,
-      scopes: SCOPES,
-      redirectUri: this.redirectUri(redirectBase),
-    });
-    if (!result?.accessToken) throw new BadRequestException('Sem accessToken da Microsoft');
+  private tokenEndpoint() {
+    const tenant = process.env.MICROSOFT_TENANT_ID || 'common';
+    return `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`;
+  }
 
-    const email = result.account?.username ?? 'unknown';
-    // refresh token nao vem na response do MSAL high level; precisamos da raw response
-    // MSAL cache mantem refresh internamente. Aqui salvamos o access + expiresOn.
+  /**
+   * Troca o code por tokens via OAuth raw (NÃO MSAL high-level), pra capturar
+   * o refresh_token e PERSISTIR no banco. Assim a conexão sobrevive a restarts.
+   */
+  async exchangeCode(code: string, userId: string, label: string, rootFolderId?: string, redirectBase?: string) {
+    const id = process.env.MICROSOFT_CLIENT_ID;
+    const secret = process.env.MICROSOFT_CLIENT_SECRET;
+    if (!id || !secret) throw new BadRequestException('Microsoft OAuth nao configurado (MICROSOFT_CLIENT_ID/SECRET)');
+
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code', code, redirect_uri: this.redirectUri(redirectBase),
+      client_id: id, client_secret: secret, scope: SCOPES.join(' '),
+    });
+    const r = await fetch(this.tokenEndpoint(), {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString(),
+    });
+    if (!r.ok) throw new BadRequestException(`Microsoft token: ${r.status} ${(await r.text()).slice(0, 250)}`);
+    const t: any = await r.json();
+    if (!t.access_token) throw new BadRequestException('Sem access_token da Microsoft');
+
+    let email = 'unknown';
+    try {
+      const me: any = await fetch(`${GRAPH_BASE}/me`, { headers: { Authorization: `Bearer ${t.access_token}` } }).then((x) => x.json());
+      email = me.userPrincipalName ?? me.mail ?? 'unknown';
+    } catch { /* ignore */ }
+
     return this.prisma.cloudConnection.create({
       data: {
         provider: 'microsoft_onedrive',
         label,
         accountEmail: email,
         scope: 'full',
-        encryptedAccessToken: encryptToken(result.accessToken),
-        encryptedRefreshToken: null, // MSAL renova internamente via tokenCache
-        tokenExpiresAt: result.expiresOn ?? new Date(Date.now() + 3600 * 1000),
+        encryptedAccessToken: encryptToken(t.access_token),
+        encryptedRefreshToken: t.refresh_token ? encryptToken(t.refresh_token) : null,
+        tokenExpiresAt: new Date(Date.now() + (t.expires_in ?? 3600) * 1000),
         rootFolderId,
         createdById: userId,
       },
@@ -70,23 +89,29 @@ export class OneDriveService {
     if (conn.tokenExpiresAt > new Date(Date.now() + 60 * 1000)) {
       return decryptToken(conn.encryptedAccessToken);
     }
-    // tentar renovar via msal silent
-    const msal = this.getMsal();
-    const accounts = await msal.getTokenCache().getAllAccounts();
-    const account = accounts.find((a) => a.username === conn.accountEmail);
-    if (!account) {
-      throw new BadRequestException('Token expirado e conta nao encontrada no cache MSAL. Reconecte.');
+    if (!conn.encryptedRefreshToken) {
+      throw new BadRequestException('Conexão OneDrive sem refresh token — reconecte uma vez (agora persiste).');
     }
-    const result = await msal.acquireTokenSilent({ account, scopes: SCOPES });
-    if (!result?.accessToken) throw new BadRequestException('Falha ao renovar token');
+    const id = process.env.MICROSOFT_CLIENT_ID;
+    const secret = process.env.MICROSOFT_CLIENT_SECRET;
+    const body = new URLSearchParams({
+      grant_type: 'refresh_token', refresh_token: decryptToken(conn.encryptedRefreshToken),
+      client_id: id!, client_secret: secret!, scope: SCOPES.join(' '),
+    });
+    const r = await fetch(this.tokenEndpoint(), {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString(),
+    });
+    if (!r.ok) throw new BadRequestException(`Renovação OneDrive falhou: ${r.status} ${(await r.text()).slice(0, 200)} — reconecte.`);
+    const t: any = await r.json();
     await this.prisma.cloudConnection.update({
       where: { id: connectionId },
       data: {
-        encryptedAccessToken: encryptToken(result.accessToken),
-        tokenExpiresAt: result.expiresOn ?? new Date(Date.now() + 3600 * 1000),
+        encryptedAccessToken: encryptToken(t.access_token),
+        encryptedRefreshToken: t.refresh_token ? encryptToken(t.refresh_token) : conn.encryptedRefreshToken,
+        tokenExpiresAt: new Date(Date.now() + (t.expires_in ?? 3600) * 1000),
       },
     });
-    return result.accessToken;
+    return t.access_token;
   }
 
   /** Varre os sites do SharePoint (Acesso rápido) e suas bibliotecas de documentos. */
