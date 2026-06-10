@@ -33,14 +33,26 @@ export class AnaliseClienteService {
     const segmento = company.segmentoFiscal ?? undefined;
     const uf = company.uf ?? undefined;
 
-    for (const f of arquivos) {
-      const existing = await this.prisma.document.findFirst({ where: { companyId, originalFilename: f.name } });
-      if (existing) { jaExistiam++; continue; }
-      try {
-        const { buffer } = await this.onedrive.downloadFile(conn.id, f.id, f.driveId);
-        const nf = parseNfe(buffer.toString('utf8'));
-        if (!nf) { ignorados++; continue; }
+    // já analisados antes (dedup por nome) — 1 query só
+    const existentes = new Set(
+      (await this.prisma.document.findMany({ where: { companyId }, select: { originalFilename: true } }))
+        .map((d) => d.originalFilename),
+    );
+    const novos = arquivos.filter((f) => !existentes.has(f.name));
+    jaExistiam = arquivos.length - novos.length;
 
+    // baixa + parseia em PARALELO (lotes de 6) — sem perder precisão
+    const CONC = 6;
+    for (let i = 0; i < novos.length; i += CONC) {
+      const fatia = novos.slice(i, i + CONC);
+      const parsed = await Promise.all(fatia.map(async (f) => {
+        try {
+          const { buffer } = await this.onedrive.downloadFile(conn.id, f.id, f.driveId);
+          return { f, nf: parseNfe(buffer.toString('utf8')) };
+        } catch { return { f, nf: null }; }
+      }));
+      for (const { f, nf } of parsed) {
+        if (!nf) { ignorados++; continue; }
         const incs: string[] = [];
         for (const it of nf.itens) {
           if (!it.ncm) continue;
@@ -55,22 +67,29 @@ export class AnaliseClienteService {
         }
         inconsistencias += incs.length;
         valorTotal += nf.valorTotal ?? 0;
-
-        await this.prisma.document.create({
-          data: {
-            companyId, type: nf.tipo, status: 'completed', originalFilename: f.name,
-            number: nf.numero ? String(nf.numero) : undefined,
-            totalValue: nf.valorTotal, issuerName: nf.emitenteNome, issuerCnpj: nf.emitenteCnpj,
-            recipientName: nf.destNome, recipientCnpj: nf.destCnpj,
-            confidenceScore: 1,
-            extractedData: JSON.stringify(nf),
-            fiscalValidation: JSON.stringify({ ok: incs.length === 0, inconsistencias: incs }),
-            issueDate: nf.dataEmissao ? new Date(nf.dataEmissao) : undefined,
-          },
-        });
-        analisados++;
-      } catch { ignorados++; }
+        try {
+          await this.prisma.document.create({
+            data: {
+              companyId, type: nf.tipo, status: 'completed', originalFilename: f.name,
+              number: nf.numero ? String(nf.numero) : undefined,
+              totalValue: nf.valorTotal, issuerName: nf.emitenteNome, issuerCnpj: nf.emitenteCnpj,
+              recipientName: nf.destNome, recipientCnpj: nf.destCnpj,
+              confidenceScore: 1,
+              extractedData: JSON.stringify(nf),
+              fiscalValidation: JSON.stringify({ ok: incs.length === 0, inconsistencias: incs }),
+              issueDate: nf.dataEmissao ? new Date(nf.dataEmissao) : undefined,
+            },
+          });
+          analisados++;
+        } catch { ignorados++; }
+      }
     }
+
+    // marca a pasta como varrida (mesmo com 0 docs) → não re-tenta
+    await this.prisma.company.update({
+      where: { id: companyId },
+      data: { sharepointAnalisadoEm: new Date(), sharepointDocsCount: analisados + jaExistiam },
+    });
 
     return {
       cliente: company.name,
@@ -81,18 +100,19 @@ export class AnaliseClienteService {
   }
 
   /**
-   * Analisa um LOTE de clientes ainda não analisados (sem documentos).
-   * Chamável repetidamente até zerar (evita timeout de processar todos de uma vez).
+   * Analisa um LOTE de clientes ainda NÃO varridos (sharepointAnalisadoEm null).
+   * Cada cliente é tentado uma vez só — pasta vazia é marcada e não re-tentada.
+   * Chamável repetidamente até zerar.
    */
   async analisarLote(limit = 8, maxFilesPorCliente = 80) {
-    const comDocs = await this.prisma.document.findMany({ distinct: ['companyId'], select: { companyId: true } });
-    const jaFeitos = new Set(comDocs.map((d) => d.companyId));
-    const candidatos = await this.prisma.company.findMany({
-      where: { sharepointItemId: { not: null }, active: true },
-      select: { id: true, name: true },
+    const pendentesTotal = await this.prisma.company.count({
+      where: { sharepointItemId: { not: null }, active: true, sharepointAnalisadoEm: null },
     });
-    const pendentes = candidatos.filter((c) => !jaFeitos.has(c.id));
-    const lote = pendentes.slice(0, limit);
+    const lote = await this.prisma.company.findMany({
+      where: { sharepointItemId: { not: null }, active: true, sharepointAnalisadoEm: null },
+      select: { id: true, name: true },
+      take: limit,
+    });
 
     const detalhes: any[] = [];
     for (const c of lote) {
@@ -100,13 +120,14 @@ export class AnaliseClienteService {
         const r = await this.analisarCliente(c.id, maxFilesPorCliente);
         detalhes.push({ cliente: c.name, analisados: r.analisados, inconsistencias: r.inconsistencias });
       } catch (e: any) {
+        // marca como tentado mesmo em erro, pra não travar a fila
+        await this.prisma.company.update({ where: { id: c.id }, data: { sharepointAnalisadoEm: new Date(), sharepointDocsCount: 0 } }).catch(() => undefined);
         detalhes.push({ cliente: c.name, erro: e?.message ?? 'erro' });
       }
     }
     return {
       processados: lote.length,
-      restantes: Math.max(0, pendentes.length - lote.length),
-      totalComPasta: candidatos.length,
+      restantes: Math.max(0, pendentesTotal - lote.length),
       detalhes,
     };
   }

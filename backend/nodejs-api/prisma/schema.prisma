@@ -71,6 +71,8 @@ model Company {
   clienteCodigo        String?  // código do cliente (pasta SharePoint / Domínio)
   sharepointItemId     String?  @unique // pasta do cliente no SharePoint (dedup import)
   sharepointDriveId    String?  // drive da pasta (pra ler os documentos depois)
+  sharepointAnalisadoEm DateTime? // quando a pasta foi varrida (evita re-tentar)
+  sharepointDocsCount  Int?     // nº de XMLs analisados na última varredura
 
   honorarios           Honorario[]
   crmClientes          CrmCliente[]
