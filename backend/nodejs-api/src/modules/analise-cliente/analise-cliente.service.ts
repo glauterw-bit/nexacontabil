@@ -146,6 +146,50 @@ export class AnaliseClienteService {
     };
   }
 
+  /**
+   * Re-valida TODOS os documentos contra o Banco de NCM atual (cheio).
+   * Em memória (carrega as regras uma vez) — detecta divergência REAL de
+   * tributação, não só "sem regra".
+   */
+  async revalidarDocumentos() {
+    const rules = await this.prisma.ncmSegmentoRule.findMany({
+      where: { ativo: true },
+      select: { ncm: true, segmento: true, icmsAliquota: true, ipiAliquota: true, pisAliquota: true, cofinsAliquota: true, cfopPadrao: true, icmsSt: true },
+    });
+    const ruleMap = new Map<string, any[]>();
+    for (const r of rules) { const a = ruleMap.get(r.ncm) ?? []; a.push(r); ruleMap.set(r.ncm, a); }
+
+    const companies = await this.prisma.company.findMany({ select: { id: true, segmentoFiscal: true } });
+    const segBy = new Map(companies.map((c) => [c.id, c.segmentoFiscal]));
+
+    const docs = await this.prisma.document.findMany({
+      where: { extractedData: { not: null } },
+      select: { id: true, companyId: true, extractedData: true },
+    });
+
+    let revalidados = 0, comInconsistencia = 0, totalInconsist = 0, semRegra = 0, divergencias = 0;
+    for (const d of docs) {
+      let nf: any; try { nf = JSON.parse(d.extractedData as string); } catch { continue; }
+      const seg = segBy.get(d.companyId);
+      const incs: string[] = [];
+      for (const it of (nf?.itens ?? [])) {
+        if (!it.ncm) continue;
+        const cands = ruleMap.get(String(it.ncm)) ?? [];
+        const rule = cands.find((r) => r.segmento === seg) ?? cands[0];
+        if (!rule) { incs.push(`NCM ${it.ncm} sem regra no Banco de NCM`); semRegra++; continue; }
+        if (it.icms != null && Math.abs((rule.icmsAliquota ?? 0) - it.icms) > 0.01) {
+          incs.push(`NCM ${it.ncm}: ICMS veio ${it.icms}% (padrão ${rule.icmsAliquota}%)`); divergencias++;
+        }
+        if (it.cfop && rule.cfopPadrao && it.cfop !== rule.cfopPadrao) {
+          incs.push(`NCM ${it.ncm}: CFOP ${it.cfop} (padrão ${rule.cfopPadrao})`);
+        }
+      }
+      await this.prisma.document.update({ where: { id: d.id }, data: { fiscalValidation: JSON.stringify({ ok: incs.length === 0, inconsistencias: incs }) } });
+      revalidados++; totalInconsist += incs.length; if (incs.length) comInconsistencia++;
+    }
+    return { revalidados, comInconsistencia, totalInconsistencias: totalInconsist, semRegra, divergencias };
+  }
+
   /** Limpa as análises (documentos) e zera as flags pra re-análise limpa. */
   async resetAnalises() {
     const clientes = await this.prisma.company.findMany({ where: { sharepointItemId: { not: null } }, select: { id: true } });

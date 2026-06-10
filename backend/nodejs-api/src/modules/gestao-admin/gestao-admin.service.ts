@@ -57,6 +57,39 @@ export class GestaoAdminService {
     return { total: clientes.length, atualizados, distribuicao: dist };
   }
 
+  // ─── Extrair CNPJ real dos XMLs ─────────────────────────────
+  async extrairCnpjReal() {
+    const clientes = await this.prisma.company.findMany({
+      where: { sharepointItemId: { not: null } }, select: { id: true, name: true, cnpj: true },
+    });
+    let atualizados = 0, semDados = 0, conflitos = 0, jaReal = 0;
+    for (const c of clientes) {
+      if (!c.cnpj?.startsWith('7')) { jaReal++; continue; } // já tem CNPJ real
+      const docs = await this.prisma.document.findMany({ where: { companyId: c.id }, select: { extractedData: true }, take: 300 });
+      // conta em quantos DOCUMENTOS cada CNPJ aparece (o do cliente aparece em ~todos)
+      const freq = new Map<string, { docs: number; nome?: string }>();
+      for (const d of docs) {
+        let nf: any; try { nf = JSON.parse(d.extractedData as string); } catch { continue; }
+        const noDoc = new Map<string, string | undefined>();
+        if (nf.emitenteCnpj && String(nf.emitenteCnpj).length === 14) noDoc.set(nf.emitenteCnpj, nf.emitenteNome);
+        if (nf.destCnpj && String(nf.destCnpj).length === 14) noDoc.set(nf.destCnpj, nf.destNome);
+        for (const [cnpj, nome] of noDoc) {
+          const cur = freq.get(cnpj) ?? { docs: 0, nome };
+          cur.docs++; if (!cur.nome && nome) cur.nome = nome;
+          freq.set(cnpj, cur);
+        }
+      }
+      const top = [...freq.entries()].sort((a, b) => b[1].docs - a[1].docs)[0];
+      if (!top) { semDados++; continue; }
+      const [cnpjReal, info] = top;
+      try {
+        await this.prisma.company.update({ where: { id: c.id }, data: { cnpj: cnpjReal, ...(info.nome ? { name: info.nome } : {}) } });
+        atualizados++;
+      } catch { conflitos++; }
+    }
+    return { total: clientes.length, atualizados, jaReal, semDados, conflitos };
+  }
+
   // ─── 3. Visão administrador: todos os clientes ──────────────
   async clientesOverview() {
     const now = new Date();

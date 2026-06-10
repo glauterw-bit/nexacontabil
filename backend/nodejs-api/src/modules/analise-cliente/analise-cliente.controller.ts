@@ -28,4 +28,10 @@ export class AnaliseClienteController {
   reset() {
     return this.svc.resetAnalises();
   }
+
+  /** Re-valida todos os documentos contra o Banco de NCM atual (cheio). */
+  @Post('revalidar')
+  revalidar() {
+    return this.svc.revalidarDocumentos();
+  }
 }

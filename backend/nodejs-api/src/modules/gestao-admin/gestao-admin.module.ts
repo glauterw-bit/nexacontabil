@@ -17,6 +17,10 @@ class GestaoAdminController {
   /** Deriva o segmento fiscal pelo nome do cliente. */
   @Post('derivar-segmentos')
   derivarSegmentos() { return this.svc.derivarSegmentos(); }
+
+  /** Extrai o CNPJ real dos XMLs e corrige o cadastro. */
+  @Post('extrair-cnpj')
+  extrairCnpj() { return this.svc.extrairCnpjReal(); }
 }
 
 @Module({
