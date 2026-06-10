@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Search, Loader2, FileText, AlertTriangle, Sparkles } from 'lucide-react';
+import { Search, Loader2, FileText, AlertTriangle, Sparkles, Download } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -21,6 +21,21 @@ export default function BuscarDocsPage() {
   const [query, setQuery] = useState('');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+
+  const [baixando, setBaixando] = useState<string | null>(null);
+  async function baixar(id: string, nome: string) {
+    setBaixando(id);
+    try {
+      const r = await fetch(`${API}/api/v1/busca-docs/download/${id}`, { headers: authHeaders() });
+      if (!r.ok) { alert('Não foi possível baixar o arquivo.'); return; }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = nome || 'documento.xml';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch { alert('Erro ao baixar.'); } finally { setBaixando(null); }
+  }
 
   async function buscar(q?: string) {
     const consulta = q ?? query;
@@ -100,9 +115,13 @@ export default function BuscarDocsPage() {
                     {r.ncms?.length ? ` · NCM ${r.ncms.join(', ')}` : ''}
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
+                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
                   <div style={{ fontWeight: 700, fontSize: 16 }}>{BRL(r.valor)}</div>
                   {r.impostos && <div style={{ fontSize: 11, color: '#64748b' }}>ICMS {BRL(r.impostos.icms)}</div>}
+                  <button onClick={() => baixar(r.id, r.arquivo)} disabled={baixando === r.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, border: '1px solid #2a3142', background: '#10141d', color: '#94a3b8', fontSize: 12, cursor: 'pointer' }}>
+                    {baixando === r.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} XML
+                  </button>
                 </div>
               </div>
               {r.inconsistencias?.length > 0 && (

@@ -71,6 +71,7 @@ export class AnaliseClienteService {
           await this.prisma.document.create({
             data: {
               companyId, type: nf.tipo, status: 'completed', originalFilename: f.name,
+              fileUrl: `${f.driveId}|${f.id}`, // ref do SharePoint p/ download posterior
               number: nf.numero ? String(nf.numero) : undefined,
               totalValue: nf.valorTotal, issuerName: nf.emitenteNome, issuerCnpj: nf.emitenteCnpj,
               recipientName: nf.destNome, recipientCnpj: nf.destCnpj,

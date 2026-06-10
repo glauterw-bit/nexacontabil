@@ -1,13 +1,54 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { AiService } from '../ai/ai.service';
+import { OneDriveService } from '../cloud/onedrive.service';
 
 @Injectable()
 export class BuscaDocsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: AiService,
+    private readonly onedrive: OneDriveService,
   ) {}
+
+  /**
+   * Baixa o XML original do SharePoint. Usa a referência salva (driveId|itemId)
+   * quando existe; senão, busca o arquivo pelo nome na pasta do cliente.
+   */
+  async baixar(documentId: string) {
+    const doc = await this.prisma.document.findUnique({ where: { id: documentId } });
+    if (!doc) throw new NotFoundException('Documento não encontrado');
+    const conn = await this.prisma.cloudConnection.findFirst({
+      where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' },
+    });
+    if (!conn) throw new BadRequestException('Nenhuma conexão OneDrive ativa.');
+
+    let driveId: string | undefined;
+    let itemId: string | undefined;
+
+    // caminho rápido: referência salva
+    if (doc.fileUrl && doc.fileUrl.includes('|')) {
+      [driveId, itemId] = doc.fileUrl.split('|');
+    }
+
+    // fallback: busca pelo nome na pasta do cliente (docs antigos sem ref)
+    if (!itemId) {
+      const company = await this.prisma.company.findUnique({ where: { id: doc.companyId } });
+      if (!company?.sharepointDriveId) throw new BadRequestException('Cliente sem pasta do SharePoint.');
+      driveId = company.sharepointDriveId;
+      const nome = doc.originalFilename ?? '';
+      const achados = await this.onedrive.search(conn.id, { q: nome, driveId, pageSize: 25 });
+      const match = achados.find((a: any) => a.name === nome) ?? achados.find((a: any) => !a.isFolder);
+      if (!match) throw new NotFoundException(`Arquivo "${nome}" não encontrado no SharePoint.`);
+      itemId = match.id;
+      driveId = match.driveId ?? driveId;
+      // salva a ref pra próxima vez ser instantânea
+      await this.prisma.document.update({ where: { id: doc.id }, data: { fileUrl: `${driveId}|${itemId}` } }).catch(() => undefined);
+    }
+
+    const file = await this.onedrive.downloadFile(conn.id, itemId!, driveId);
+    return { buffer: file.buffer, mimeType: file.mimeType || 'application/xml', name: file.name || doc.originalFilename || 'documento.xml' };
+  }
 
   /**
    * Busca documentos em linguagem natural: "NF da Padaria de maio acima de
