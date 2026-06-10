@@ -10,7 +10,7 @@ import {
   Calendar, Users, Receipt, BarChart3, TrendingUp, Target, HeartPulse,
   Banknote, PenLine, ClipboardList, Landmark, Scale, Package, FileCode,
   Briefcase, UserCheck, Award, Globe, DollarSign, Kanban, Megaphone, Store,
-  Workflow, Boxes, FileDown, Gauge, Inbox
+  Workflow, Boxes, FileDown, Gauge, Inbox, Search
 } from 'lucide-react';
 import { useCompany, Company } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +40,7 @@ const NAV_MAIN: NavItem[] = [
   { href: '/visao-geral',     icon: LayoutDashboard, label: 'Visão Geral',      badge: 'Admin' },
   { href: '/dashboard',       icon: Building2,        label: 'Painel do Cliente' },
   { href: '/captura-xml',     icon: Inbox,         label: 'Captura de XMLs', badge: 'Fiscal' },
+  { href: '/buscar-docs',     icon: Search,        label: 'Buscar Documentos', badge: 'IA' },
   { href: '/esteira-fiscal',  icon: Workflow,      label: 'Esteira Fiscal',  badge: 'Auto' },
   { href: '/carteira',        icon: Briefcase,     label: 'Carteira',        badge: 'Live' },
   { href: '/ncm-inteligente', icon: Boxes,         label: 'Banco de NCM',    badge: 'IA' },
