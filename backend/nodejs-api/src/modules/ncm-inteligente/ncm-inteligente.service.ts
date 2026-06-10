@@ -273,12 +273,15 @@ export class NcmInteligenteService {
         if (ncm.length !== 8) continue;
         if (!agg.has(ncm)) agg.set(ncm, new Map());
         const bySeg = agg.get(ncm)!;
-        const cur = bySeg.get(seg) ?? { icms: [], ipi: [], pis: [], cofins: [], cfops: {}, descricao: it.descricao, count: 0 };
-        if (it.icms != null) cur.icms.push(Number(it.icms));
+        const cur = bySeg.get(seg) ?? { icms: [], cfops: {}, cfops3: {}, ipi: [], pis: [], cofins: [], descricao: it.descricao, count: 0 };
+        const cfop = String(it.cfop ?? '');
+        const intra = cfop.startsWith('5'); // saída dentro do estado = ICMS interno padrão
+        // ICMS interno aprende SÓ das operações internas (5xxx); interestadual tem alíquota legal própria
+        if (it.icms != null && intra) cur.icms.push(Number(it.icms));
         if (it.ipi != null) cur.ipi.push(Number(it.ipi));
         if (it.pis != null) cur.pis.push(Number(it.pis));
         if (it.cofins != null) cur.cofins.push(Number(it.cofins));
-        if (it.cfop) cur.cfops[it.cfop] = (cur.cfops[it.cfop] ?? 0) + 1;
+        if (cfop) { cur.cfops[cfop] = (cur.cfops[cfop] ?? 0) + 1; const c3 = cfop.slice(-3); cur.cfops3[c3] = (cur.cfops3[c3] ?? 0) + 1; }
         cur.count++;
         if (!cur.descricao && it.descricao) cur.descricao = it.descricao;
         bySeg.set(seg, cur);

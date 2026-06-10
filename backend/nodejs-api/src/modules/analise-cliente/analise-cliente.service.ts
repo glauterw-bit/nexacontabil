@@ -177,11 +177,28 @@ export class AnaliseClienteService {
         const cands = ruleMap.get(String(it.ncm)) ?? [];
         const rule = cands.find((r) => r.segmento === seg) ?? cands[0];
         if (!rule) { incs.push(`NCM ${it.ncm} sem regra no Banco de NCM`); semRegra++; continue; }
-        if (it.icms != null && Math.abs((rule.icmsAliquota ?? 0) - it.icms) > 0.01) {
-          incs.push(`NCM ${it.ncm}: ICMS veio ${it.icms}% (padrão ${rule.icmsAliquota}%)`); divergencias++;
+
+        const cfop = String(it.cfop ?? '');
+        const d1 = cfop[0]; // 5=saída intra, 6=saída interestadual, 1/2=entradas, 7=exterior
+
+        // ── ICMS consciente de UF (só saídas) ──
+        if (it.icms != null) {
+          if (d1 === '5') { // operação interna → compara com a alíquota interna padrão
+            if (rule.icmsAliquota != null && Math.abs(rule.icmsAliquota - it.icms) > 0.5) {
+              incs.push(`NCM ${it.ncm}: ICMS interno ${it.icms}% (padrão ${rule.icmsAliquota}%)`); divergencias++;
+            }
+          } else if (d1 === '6') { // interestadual → alíquotas legais 4/7/12
+            const a = Math.round(it.icms);
+            if (![0, 4, 7, 12].includes(a)) {
+              incs.push(`NCM ${it.ncm}: ICMS interestadual ${it.icms}% fora do legal (4/7/12%)`); divergencias++;
+            }
+          }
+          // entradas (1/2/3) e exportação (7): não valida ICMS de saída
         }
-        if (it.cfop && rule.cfopPadrao && it.cfop !== rule.cfopPadrao) {
-          incs.push(`NCM ${it.ncm}: CFOP ${it.cfop} (padrão ${rule.cfopPadrao})`);
+
+        // ── CFOP por natureza (últimos 3 dígitos — ignora intra/inter) ──
+        if (cfop && rule.cfopPadrao && cfop.slice(-3) !== String(rule.cfopPadrao).slice(-3)) {
+          incs.push(`NCM ${it.ncm}: CFOP ${cfop} — natureza difere do padrão ${rule.cfopPadrao}`);
         }
       }
       await this.prisma.document.update({ where: { id: d.id }, data: { fiscalValidation: JSON.stringify({ ok: incs.length === 0, inconsistencias: incs }) } });
