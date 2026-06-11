@@ -3,6 +3,55 @@ import { PrismaService } from '../../database/prisma.service';
 
 function safe(s: any) { try { return s ? JSON.parse(s) : null; } catch { return null; } }
 
+/** Traduz uma inconsistência fiscal em causa + passo a passo de correção. */
+function comoCorrigir(erro: string) {
+  const ncm = (erro.match(/NCM (\d+)/) || [])[1] ?? '';
+  if (/ICMS interno .*padr[aã]o/i.test(erro)) {
+    const m = erro.match(/interno ([\d.]+)%\s*\(padr[aã]o ([\d.]+)%/i);
+    const aplicada = m?.[1] ?? '?', correta = m?.[2] ?? '?';
+    const isento = correta === '0' || correta === '0.0';
+    return {
+      categoria: 'Alíquota de ICMS interna divergente',
+      severidade: 'alta',
+      causa: `A nota aplicou ICMS de ${aplicada}% numa operação interna, mas o padrão do NCM ${ncm} (Banco de NCM) é ${correta}%.`,
+      passos: [
+        `Abra o cadastro do produto (NCM ${ncm}) no Domínio e confira a tributação de ICMS.`,
+        isento
+          ? `O padrão é 0% — se for isento/cesta básica/Simples, ajuste o CST/CSOSN para isenção e zere o ICMS.`
+          : `Ajuste a alíquota interna para ${correta}% (ou confirme se há redução de base/benefício que justifique ${aplicada}%).`,
+        `Se a nota estiver correta e o padrão errado, corrija a regra no Banco de NCM (o cliente pode ter particularidade).`,
+      ],
+    };
+  }
+  if (/interestadual .*fora do legal/i.test(erro)) {
+    const m = erro.match(/interestadual ([\d.]+)%/i);
+    return {
+      categoria: 'ICMS interestadual fora da alíquota legal',
+      severidade: 'alta',
+      causa: `Operação interestadual com ICMS de ${m?.[1] ?? '?'}%. A legislação só admite 4% (importados), 7% ou 12% conforme origem/destino.`,
+      passos: [
+        `Verifique a UF de origem e destino e aplique a alíquota legal (4% / 7% / 12%).`,
+        `Cheque o CST/CSOSN e se a operação tem ST ou DIFAL.`,
+        `Corrija o lançamento no Domínio para a alíquota correta.`,
+      ],
+    };
+  }
+  if (/sem regra/i.test(erro)) {
+    return {
+      categoria: 'NCM sem classificação',
+      severidade: 'media',
+      causa: `O NCM ${ncm} ainda não tem regra de tributação no Banco de NCM.`,
+      passos: [`Classifique o NCM ${ncm} no Banco de NCM (alíquotas e CST por segmento) para que a validação passe a cobrir esse produto.`],
+    };
+  }
+  return {
+    categoria: 'Inconsistência fiscal',
+    severidade: 'media',
+    causa: erro,
+    passos: ['Revise o lançamento e a tributação correspondente no Domínio.'],
+  };
+}
+
 @Injectable()
 export class PaineisService {
   constructor(private readonly prisma: PrismaService) {}
@@ -26,7 +75,7 @@ export class PaineisService {
     });
 
     const itens: any[] = [];
-    const porCliente = new Map<string, { cliente: string; responsavel: string | null; erros: number; valor: number }>();
+    const porCliente = new Map<string, { companyId: string; cliente: string; responsavel: string | null; erros: number; valor: number }>();
     let valorEnvolvido = 0;
 
     for (const d of docs) {
@@ -36,11 +85,11 @@ export class PaineisService {
       const co = coById.get(d.companyId);
       valorEnvolvido += d.totalValue ?? 0;
       itens.push({
-        docId: d.id, cliente: co?.name, responsavel: co?.responsavel ?? null,
+        docId: d.id, companyId: d.companyId, cliente: co?.name, responsavel: co?.responsavel ?? null,
         nota: d.number, arquivo: d.originalFilename, valor: d.totalValue,
         data: d.issueDate, problemas: inc,
       });
-      const cur = porCliente.get(d.companyId) ?? { cliente: co?.name ?? '?', responsavel: co?.responsavel ?? null, erros: 0, valor: 0 };
+      const cur = porCliente.get(d.companyId) ?? { companyId: d.companyId, cliente: co?.name ?? '?', responsavel: co?.responsavel ?? null, erros: 0, valor: 0 };
       cur.erros += inc.length; cur.valor += d.totalValue ?? 0;
       porCliente.set(d.companyId, cur);
     }
@@ -56,6 +105,39 @@ export class PaineisService {
       clientesAfetados: ranking.length,
       ranking: ranking.slice(0, 30),
       itens: itens.slice(0, 200),
+    };
+  }
+
+  // Detalhe dos erros de UM cliente, com causa + como corrigir.
+  async clienteErros(companyId: string) {
+    const empresa = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true, name: true, responsavel: true, taxRegime: true, segmentoFiscal: true },
+    });
+    const docs = await this.prisma.document.findMany({
+      where: { companyId, fiscalValidation: { not: null } },
+      select: { id: true, number: true, originalFilename: true, totalValue: true, issueDate: true, fiscalValidation: true },
+    });
+    const notas: any[] = [];
+    const porTipo = new Map<string, number>();
+    let valorEnvolvido = 0, totalErros = 0;
+    for (const d of docs) {
+      const inc: string[] = safe(d.fiscalValidation)?.inconsistencias ?? [];
+      if (!inc.length) continue;
+      const problemas = inc.map(comoCorrigir);
+      for (const p of problemas) porTipo.set(p.categoria, (porTipo.get(p.categoria) ?? 0) + 1);
+      totalErros += problemas.length;
+      valorEnvolvido += d.totalValue ?? 0;
+      notas.push({ docId: d.id, nota: d.number, arquivo: d.originalFilename, valor: d.totalValue, data: d.issueDate, problemas });
+    }
+    notas.sort((a, b) => (b.valor ?? 0) - (a.valor ?? 0));
+    return {
+      empresa,
+      totalNotas: notas.length,
+      totalErros,
+      valorEnvolvido: Math.round(valorEnvolvido * 100) / 100,
+      resumoPorTipo: [...porTipo.entries()].map(([categoria, qtd]) => ({ categoria, qtd })).sort((a, b) => b.qtd - a.qtd),
+      notas: notas.slice(0, 100),
     };
   }
 
@@ -145,12 +227,37 @@ export class PaineisService {
       porResp.set(key, cur);
     }
 
-    const equipe = [...porResp.values()].sort((a, b) => b.docs - a.docs);
+    const equipe = [...porResp.values()].sort((a, b) => b.docs - a.docs).map((e) => ({
+      ...e,
+      docsPorCliente: e.clientesAtivos ? Math.round(e.docs / e.clientesAtivos) : 0,
+      taxaErro: e.docs ? Math.round((e.erros / e.docs) * 10000) / 100 : 0, // % de erro
+    }));
+    const real = equipe.filter((e) => !e.responsavel.includes('Sem responsável'));
     const semResponsavel = equipe.find((e) => e.responsavel.includes('Sem responsável'))?.clientes ?? 0;
+
+    // insights de gestão
+    const insights: { tipo: string; texto: string }[] = [];
+    if (real.length >= 2) {
+      const cargas = real.map((e) => e.clientesAtivos);
+      const maxC = Math.max(...cargas), minC = Math.min(...cargas);
+      if (maxC - minC >= 15) {
+        const sobre = real.find((e) => e.clientesAtivos === maxC)!;
+        const sub = real.find((e) => e.clientesAtivos === minC)!;
+        insights.push({ tipo: 'carga', texto: `Carga desbalanceada: ${sobre.responsavel} tem ${maxC} clientes ativos e ${sub.responsavel} tem ${minC}. Considere rebalancear.` });
+      }
+      const piorErro = [...real].sort((a, b) => b.taxaErro - a.taxaErro)[0];
+      if (piorErro && piorErro.taxaErro > 0) {
+        insights.push({ tipo: 'qualidade', texto: `Maior taxa de erro: ${piorErro.responsavel} (${piorErro.taxaErro}%). Pode indicar carteira mais complexa ou necessidade de apoio.` });
+      }
+    }
+
     return {
-      analistas: equipe.filter((e) => !e.responsavel.includes('Sem responsável')).length,
+      analistas: real.length,
       semResponsavel,
       precisaAtribuir: semResponsavel > 0,
+      totalDocs: equipe.reduce((s, e) => s + e.docs, 0),
+      totalErros: equipe.reduce((s, e) => s + e.erros, 0),
+      insights,
       equipe,
     };
   }
@@ -260,8 +367,8 @@ export class PaineisService {
 
     const aFazer = [
       ...vencidas.map((o) => ({ prioridade: 'alta', tipo: 'obrigacao', titulo: `${o.name} VENCIDA`, cliente: coById.get(o.companyId)?.name, data: o.dueDate })),
-      ...[...errosPorCliente.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([cid, n]) => ({ prioridade: 'alta', tipo: 'inconsistencia', titulo: `${n} nota(s) com erro fiscal`, cliente: coById.get(cid)?.name, data: null })),
-      ...proximas.map((o) => ({ prioridade: 'media', tipo: 'obrigacao', titulo: o.name, cliente: coById.get(o.companyId)?.name, data: o.dueDate })),
+      ...[...errosPorCliente.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([cid, n]) => ({ prioridade: 'alta', tipo: 'inconsistencia', titulo: `${n} nota(s) com erro fiscal`, cliente: coById.get(cid)?.name, companyId: cid, data: null })),
+      ...proximas.map((o) => ({ prioridade: 'media', tipo: 'obrigacao', titulo: o.name, cliente: coById.get(o.companyId)?.name, companyId: o.companyId, data: o.dueDate })),
     ];
 
     return {

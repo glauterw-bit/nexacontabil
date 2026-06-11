@@ -43,16 +43,24 @@ function authHeaders(): Record<string, string> {
 export default function KanbanPage() {
   const toast = useToast();
   const [competencia, setCompetencia] = useState(comp());
+  const [responsavel, setResponsavel] = useState('');
+  const [nomes, setNomes] = useState<string[]>([]);
   const [board, setBoard] = useState<Stage[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTask, setActiveTask] = useState<TaskCard | null>(null);
   const [openTask, setOpenTask] = useState<TaskCard | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  useEffect(() => {
+    fetch(`${API}/api/v1/paineis/responsaveis`, { headers: authHeaders() })
+      .then((r) => r.ok ? r.json() : null).then((d) => d && setNomes(d.nomes ?? [])).catch(() => {});
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/v1/workflow/kanban?competencia=${competencia}`, { headers: authHeaders() });
+      const u = `${API}/api/v1/workflow/kanban?competencia=${competencia}${responsavel ? `&responsavel=${encodeURIComponent(responsavel)}` : ''}`;
+      const r = await fetch(u, { headers: authHeaders() });
       const d = await r.json();
       setBoard(Array.isArray(d) ? d : []);
     } catch (e: any) {
@@ -60,7 +68,7 @@ export default function KanbanPage() {
     } finally {
       setLoading(false);
     }
-  }, [competencia, toast]);
+  }, [competencia, responsavel, toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -131,6 +139,14 @@ export default function KanbanPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <select
+            value={responsavel}
+            onChange={(e) => setResponsavel(e.target.value)}
+            className="px-3 py-1.5 bg-[#161b2e] border border-[#1e2740] rounded-lg text-xs text-white outline-none"
+          >
+            <option value="">Todos os analistas</option>
+            {nomes.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
           <input
             type="month"
             value={competencia}

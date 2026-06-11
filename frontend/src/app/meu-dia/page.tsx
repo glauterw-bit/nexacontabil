@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { Sun, Loader2, AlertTriangle, CalendarClock, FileWarning, CheckCircle2, Building2 } from 'lucide-react';
+import { Sun, Loader2, AlertTriangle, CalendarClock, FileWarning, CheckCircle2, Building2, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -63,16 +64,23 @@ export default function MeuDiaPage() {
           <CheckCircle2 size={18} /> Tudo em dia! Nenhuma pendência.
         </div>
       )}
-      {data?.aFazer?.map((t: any, i: number) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#161b27', border: '1px solid #2a3142', borderLeft: `3px solid ${cor(t.prioridade)}`, borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
-          <span style={{ color: cor(t.prioridade) }}>{ico(t.tipo)}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{t.titulo}</div>
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>{t.cliente}</div>
+      {data?.aFazer?.map((t: any, i: number) => {
+        const clicavel = t.tipo === 'inconsistencia' && t.companyId;
+        const inner = (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#161b27', border: '1px solid #2a3142', borderLeft: `3px solid ${cor(t.prioridade)}`, borderRadius: 10, padding: '12px 16px', marginBottom: 8, cursor: clicavel ? 'pointer' : 'default', transition: 'border-color .15s' }}>
+            <span style={{ color: cor(t.prioridade) }}>{ico(t.tipo)}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{t.titulo}</div>
+              <div style={{ fontSize: 12, color: '#94a3b8' }}>{t.cliente}</div>
+            </div>
+            {t.data && <span style={{ fontSize: 12, color: cor(t.prioridade) }}>{dataBR(t.data)}</span>}
+            {clicavel && <span style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 12, color: '#6366f1' }}>como corrigir <ChevronRight size={14} /></span>}
           </div>
-          {t.data && <span style={{ fontSize: 12, color: cor(t.prioridade) }}>{dataBR(t.data)}</span>}
-        </div>
-      ))}
+        );
+        return clicavel
+          ? <Link key={i} href={`/cliente-erros?companyId=${t.companyId}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{inner}</Link>
+          : <div key={i}>{inner}</div>;
+      })}
     </div>
   );
 }

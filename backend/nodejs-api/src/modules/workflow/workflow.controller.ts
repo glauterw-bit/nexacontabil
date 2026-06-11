@@ -57,8 +57,8 @@ export class WorkflowController {
 
   // ─── Tasks ───────────────────────────────────────────────
   @Get('kanban')
-  kanban(@Query('competencia') competencia?: string, @Query('analystId') analystId?: string, @Query('stage') stage?: string) {
-    return this.service.listKanban({ competencia, analystId, stage });
+  kanban(@Query('competencia') competencia?: string, @Query('analystId') analystId?: string, @Query('stage') stage?: string, @Query('responsavel') responsavel?: string) {
+    return this.service.listKanban({ competencia, analystId, stage, responsavel });
   }
 
   @Post('tasks/ensure')

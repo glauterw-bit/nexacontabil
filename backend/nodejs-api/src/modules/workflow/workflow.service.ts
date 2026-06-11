@@ -184,11 +184,15 @@ export class WorkflowService {
    * Lista tasks em formato Kanban (agrupado por estagio).
    * Filtros opcionais: analystId, competencia, stage.
    */
-  async listKanban(filters: { competencia?: string; analystId?: string; stage?: string } = {}) {
+  async listKanban(filters: { competencia?: string; analystId?: string; stage?: string; responsavel?: string } = {}) {
     const where: any = {};
     if (filters.competencia) where.competencia = filters.competencia;
     if (filters.analystId) where.analystId = filters.analystId;
     if (filters.stage) where.stage = filters.stage;
+    if (filters.responsavel) {
+      const cos = await this.prisma.company.findMany({ where: { responsavel: filters.responsavel }, select: { id: true } });
+      where.companyId = { in: cos.map((c) => c.id) };
+    }
 
     const tasks = await this.prisma.workflowTask.findMany({
       where,

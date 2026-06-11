@@ -27,6 +27,11 @@ export class PaineisController {
     return this.service.meuDia(responsavel);
   }
 
+  @Get('cliente-erros')
+  clienteErros(@Query('companyId') companyId: string) {
+    return this.service.clienteErros(companyId);
+  }
+
   @Get('responsaveis')
   responsaveis() {
     return this.service.responsaveis();
