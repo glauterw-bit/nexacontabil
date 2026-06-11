@@ -44,6 +44,7 @@ const NAV_MAIN: NavItem[] = [
   { href: '/inconsistencias', icon: ShieldCheck,     label: 'Inconsistências',   badge: 'Malha' },
   { href: '/prazos',          icon: ClipboardList,   label: 'Prazos & SLA' },
   { href: '/produtividade',   icon: Users,           label: 'Produtividade' },
+  { href: '/atribuir-responsavel', icon: UserCheck,  label: 'Atribuir Responsáveis' },
   { href: '/kanban',          icon: Kanban,          label: 'Kanban da Equipe' },
 ];
 

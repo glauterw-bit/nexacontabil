@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { Users, Loader2, Info } from 'lucide-react';
+import Link from 'next/link';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -34,7 +35,8 @@ export default function ProdutividadePage() {
       {data?.precisaAtribuir && (
         <div style={{ display: 'flex', gap: 10, padding: 14, background: '#161b27', border: '1px solid #3a3215', borderRadius: 10, marginTop: 18, color: '#fcd34d', fontSize: 13 }}>
           <Info size={18} />
-          <div><strong>{data.semResponsavel} clientes sem responsável atribuído.</strong> Atribua um responsável a cada cliente (na Carteira / Empresas) para que os números por analista fiquem precisos.</div>
+          <div style={{ flex: 1 }}><strong>{data.semResponsavel} clientes sem responsável atribuído.</strong> Atribua um responsável a cada cliente para que os números por analista fiquem precisos.</div>
+          <Link href="/atribuir-responsavel" style={{ padding: '7px 14px', borderRadius: 8, background: '#f59e0b', color: '#3a2806', fontWeight: 700, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap' }}>Atribuir agora →</Link>
         </div>
       )}
 

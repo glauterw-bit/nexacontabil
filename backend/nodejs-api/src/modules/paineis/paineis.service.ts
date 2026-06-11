@@ -156,6 +156,68 @@ export class PaineisService {
   }
 
   // ───────────────────────────────────────────────────────────
+  // ATRIBUIÇÃO cliente → responsável (destrava Meu Dia e Produtividade)
+  // ───────────────────────────────────────────────────────────
+  async responsaveis() {
+    const [companies, users] = await Promise.all([
+      this.prisma.company.findMany({ select: { responsavel: true } }),
+      this.prisma.user.findMany({ where: { active: true }, select: { name: true } }),
+    ]);
+    const nomes = new Set<string>();
+    for (const c of companies) if (c.responsavel) nomes.add(c.responsavel);
+    for (const u of users) if (u.name) nomes.add(u.name);
+    return {
+      nomes: [...nomes].sort((a, b) => a.localeCompare(b)),
+      total: companies.length,
+      naoAtribuidos: companies.filter((c) => !c.responsavel).length,
+    };
+  }
+
+  async listarClientes(q?: string, sem?: boolean) {
+    const where: any = {};
+    if (q) where.name = { contains: q, mode: 'insensitive' };
+    if (sem) where.responsavel = null;
+    return this.prisma.company.findMany({
+      where,
+      select: { id: true, name: true, responsavel: true, active: true, taxRegime: true, sharepointDocsCount: true },
+      orderBy: { name: 'asc' }, take: 800,
+    });
+  }
+
+  async atribuir(companyIds: string[], responsavel: string) {
+    const r = (responsavel || '').trim();
+    if (!companyIds?.length) return { atualizados: 0 };
+    await this.prisma.company.updateMany({
+      where: { id: { in: companyIds } },
+      data: { responsavel: r || null },
+    });
+    return { atualizados: companyIds.length, responsavel: r || null };
+  }
+
+  /** Distribui automaticamente (round-robin) os clientes sem responsável. */
+  async distribuir(nomes: string[]) {
+    const limpos = [...new Set((nomes ?? []).map((n) => n.trim()).filter(Boolean))];
+    if (!limpos.length) return { distribuidos: 0, erro: 'Informe ao menos um responsável.' };
+    const semResp = await this.prisma.company.findMany({
+      where: { responsavel: null }, select: { id: true }, orderBy: { name: 'asc' },
+    });
+    const buckets = new Map<string, string[]>();
+    semResp.forEach((c, idx) => {
+      const n = limpos[idx % limpos.length];
+      if (!buckets.has(n)) buckets.set(n, []);
+      buckets.get(n)!.push(c.id);
+    });
+    for (const [n, ids] of buckets) {
+      await this.prisma.company.updateMany({ where: { id: { in: ids } }, data: { responsavel: n } });
+    }
+    return {
+      distribuidos: semResp.length,
+      entre: limpos,
+      porResponsavel: [...buckets.entries()].map(([nome, ids]) => ({ nome, clientes: ids.length })),
+    };
+  }
+
+  // ───────────────────────────────────────────────────────────
   // 4. MEU DIA — central de trabalho acionável
   //    O que precisa de ação agora: erros a corrigir, obrigações
   //    a vencer, XMLs recentes. Filtra por responsável quando há.
