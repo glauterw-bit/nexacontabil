@@ -87,6 +87,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Gestão & Relacionamento',
     items: [
       { href: '/audit',           icon: Hash,          label: 'Auditoria' },
+      { href: '/atendimentos',    icon: MessageCircle, label: 'Central de Atendimento', badge: 'MEGA' },
       { href: '/whatsapp',        icon: MessageCircle, label: 'WhatsApp IA',  badge: 'WA' },
       { href: '/comunicados',     icon: Megaphone,     label: 'Comunicados' },
       { href: '/crm',             icon: Users,         label: 'CRM / Pipeline' },

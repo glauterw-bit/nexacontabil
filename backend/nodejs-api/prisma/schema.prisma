@@ -1555,3 +1555,28 @@ model RelatorioEnvio {
   @@index([esteiraExecucaoId])
   @@map("relatorio_envios")
 }
+
+// Central de Atendimento unificada — consolida canais (MEGA, WhatsApp,
+// e-mail, telefone) num inbox só. MEGA empurra tickets via /atendimentos/ingest.
+model Atendimento {
+  id           String    @id @default(uuid())
+  canal        String    @default("manual") // mega | whatsapp | email | telefone | manual
+  externalId   String?   // id do atendimento no sistema de origem (MEGA)
+  companyId    String?
+  clienteNome  String?
+  contato      String?   // telefone/email do solicitante
+  assunto      String?
+  mensagem     String?
+  categoria    String?   // fiscal | contabil | folha | financeiro | outro
+  status       String    @default("aberto") // aberto | em_andamento | resolvido
+  prioridade   String    @default("normal") // baixa | normal | alta | urgente
+  responsavel  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  resolvedAt   DateTime?
+
+  @@index([canal, status])
+  @@index([responsavel, status])
+  @@index([externalId])
+  @@map("atendimentos")
+}
