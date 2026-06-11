@@ -15,8 +15,13 @@ export default function MeuDiaPage() {
   const [loading, setLoading] = useState(true);
   const [analista, setAnalista] = useState('');
   const [nomes, setNomes] = useState<string[]>([]);
+  const [ehAnalista, setEhAnalista] = useState(false);
 
   useEffect(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('aura_user') || '{}');
+      if (u?.role === 'analista') setEhAnalista(true);
+    } catch {}
     fetch(`${API}/api/v1/paineis/responsaveis`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null).then((d) => d && setNomes(d.nomes ?? [])).catch(() => {});
   }, []);
@@ -42,12 +47,14 @@ export default function MeuDiaPage() {
         <Sun size={24} color="#f59e0b" /> Meu Dia
       </h1>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <p style={{ color: '#94a3b8', marginTop: 4 }}>Tudo que precisa de ação agora, priorizado.</p>
-        <select value={analista} onChange={(e) => setAnalista(e.target.value)}
-          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #2a3142', background: '#161b27', color: '#e2e8f0', fontSize: 14 }}>
-          <option value="">Toda a carteira</option>
-          {nomes.map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
+        <p style={{ color: '#94a3b8', marginTop: 4 }}>Tudo que precisa de ação agora, priorizado.{ehAnalista && data?.responsavel ? ` (${data.responsavel})` : ''}</p>
+        {!ehAnalista && (
+          <select value={analista} onChange={(e) => setAnalista(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #2a3142', background: '#161b27', color: '#e2e8f0', fontSize: 14 }}>
+            <option value="">Toda a carteira</option>
+            {nomes.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 14, marginTop: 20, flexWrap: 'wrap' }}>

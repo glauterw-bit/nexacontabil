@@ -130,7 +130,38 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/saude-fiscal',   icon: HeartPulse, label: 'Saúde Fiscal' },
       { href: '/abertura-empresa', icon: Store,    label: 'Abertura de Empresa' },
       { href: '/mei',            icon: Award,      label: 'MEI — DAS / DASN' },
+      { href: '/guia',           icon: FileText,   label: 'Guia de Uso' },
       { href: '/settings',       icon: Settings,   label: 'Configurações' },
+    ],
+  },
+];
+
+// ── Visão do ANALISTA — só o fluxo dele ──
+const NAV_MAIN_ANALISTA: NavItem[] = [
+  { href: '/meu-dia',       icon: Gauge,         label: 'Meu Dia',           badge: 'Hoje' },
+  { href: '/atendimentos',  icon: MessageCircle, label: 'Atendimentos',      badge: 'WA' },
+  { href: '/prazos',        icon: ClipboardList, label: 'Meus Prazos' },
+  { href: '/inconsistencias', icon: ShieldCheck, label: 'Inconsistências',   badge: 'Malha' },
+  { href: '/buscar-docs',   icon: Search,        label: 'Buscar Documentos', badge: 'IA' },
+];
+const NAV_GROUPS_ANALISTA: NavGroup[] = [
+  {
+    label: 'Operação Fiscal',
+    items: [
+      { href: '/captura-xml',     icon: Inbox,     label: 'Captura de XMLs' },
+      { href: '/esteira-fiscal',  icon: Workflow,  label: 'Esteira Fiscal' },
+      { href: '/exportar-dominio', icon: FileDown, label: 'Exportar p/ Domínio' },
+      { href: '/ncm-inteligente', icon: Boxes,     label: 'Banco de NCM' },
+      { href: '/risco-fiscal',    icon: ShieldCheck, label: 'Risco Fiscal' },
+    ],
+  },
+  {
+    label: 'Apoio',
+    items: [
+      { href: '/dashboard',  icon: Building2, label: 'Painel do Cliente' },
+      { href: '/copilot',    icon: Bot,       label: 'Copilot IA' },
+      { href: '/guia',       icon: FileText,  label: 'Guia de Uso' },
+      { href: '/settings',   icon: Settings,  label: 'Configurações' },
     ],
   },
 ];
@@ -145,6 +176,9 @@ export function Sidebar() {
   const router = useRouter();
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { user, logout } = useAuth();
+  const isAnalista = user?.role === 'analista';
+  const mainNav = isAnalista ? NAV_MAIN_ANALISTA : NAV_MAIN;
+  const groupsNav = isAnalista ? NAV_GROUPS_ANALISTA : NAV_GROUPS;
 
   const handleLogout = () => {
     logout();
@@ -240,7 +274,7 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-1">
         {/* Main nav items */}
-        {NAV_MAIN.map(({ href, icon: Icon, label, badge }) => (
+        {mainNav.map(({ href, icon: Icon, label, badge }) => (
           <Link key={href} href={href} className={navItemClass(href)}>
             <Icon className="h-4 w-4 flex-shrink-0" />
             {label}
@@ -253,7 +287,7 @@ export function Sidebar() {
         ))}
 
         {/* Grouped nav items */}
-        {NAV_GROUPS.map(group => (
+        {groupsNav.map(group => (
           <div key={group.label} className="pt-3">
             <p className="px-3 text-xs text-gray-600 font-medium uppercase tracking-wider mb-1">
               {group.label}

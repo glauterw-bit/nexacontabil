@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { Public } from '../../common/public.decorator';
 import { AtendimentosService } from './atendimentos.service';
 
@@ -7,8 +7,10 @@ export class AtendimentosController {
   constructor(private readonly service: AtendimentosService) {}
 
   @Get()
-  listar(@Query('canal') canal?: string, @Query('status') status?: string, @Query('responsavel') responsavel?: string, @Query('q') q?: string) {
-    return this.service.listar({ canal, status, responsavel, q });
+  listar(@Req() req: any, @Query('canal') canal?: string, @Query('status') status?: string, @Query('responsavel') responsavel?: string, @Query('q') q?: string) {
+    // analista vê só os atendimentos atribuídos a ele
+    const resp = req?.user?.role === 'analista' ? req.user.name : responsavel;
+    return this.service.listar({ canal, status, responsavel: resp, q });
   }
 
   @Get('stats')

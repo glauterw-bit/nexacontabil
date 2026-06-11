@@ -43,6 +43,36 @@ export class AuthService {
     return this._buildResponse(user);
   }
 
+  /**
+   * Cria um login (role=analista) para cada responsável da carteira.
+   * Idempotente: se o e-mail já existe, não recria. Retorna as credenciais
+   * para o gestor distribuir. Senha padrão deve ser trocada no 1º acesso.
+   */
+  async provisionarEquipe(senhaPadrao = 'Nexa@2026') {
+    const responsaveis = await this.prisma.company.findMany({
+      where: { responsavel: { not: null } },
+      select: { responsavel: true }, distinct: ['responsavel'],
+    });
+    const slug = (nome: string) => nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z\s]/g, '').trim().replace(/\s+/g, '.');
+    const out: { nome: string; email: string; senha: string; status: string }[] = [];
+    for (const r of responsaveis) {
+      const nome = r.responsavel!;
+      const email = `${slug(nome)}@domo.com.br`;
+      const existing = await this.prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        if (existing.role !== 'analista') await this.prisma.user.update({ where: { id: existing.id }, data: { role: 'analista' } });
+        out.push({ nome, email, senha: '(já existente)', status: 'existente' });
+        continue;
+      }
+      await this.prisma.user.create({
+        data: { name: nome, email, password: await bcrypt.hash(senhaPadrao, 10), role: 'analista', active: true },
+      });
+      out.push({ nome, email, senha: senhaPadrao, status: 'criado' });
+    }
+    return { total: out.length, criados: out.filter((o) => o.status === 'criado').length, analistas: out };
+  }
+
   async me(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

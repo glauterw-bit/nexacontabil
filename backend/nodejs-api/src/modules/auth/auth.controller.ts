@@ -58,6 +58,13 @@ export class AuthController {
     return this.authService.listUsers(req.user, role);
   }
 
+  // Cria os logins dos analistas a partir dos responsáveis da carteira.
+  @Post('provisionar-equipe')
+  @UseGuards(JwtAuthGuard)
+  provisionarEquipe(@Body() body: { senhaPadrao?: string }) {
+    return this.authService.provisionarEquipe(body?.senhaPadrao);
+  }
+
   @Put('profile')
   @UseGuards(JwtAuthGuard)
   updateProfile(@Request() req: any, @Body() dto: UpdateProfileDto) {

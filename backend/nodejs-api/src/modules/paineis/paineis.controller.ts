@@ -1,6 +1,11 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PaineisService } from './paineis.service';
+
+// Analista só enxerga a própria carteira: ignora o param e usa o nome do login.
+function escopo(req: any, responsavel?: string) {
+  return req?.user?.role === 'analista' ? req.user.name : responsavel;
+}
 
 @Controller('paineis')
 @UseGuards(JwtAuthGuard)
@@ -8,13 +13,13 @@ export class PaineisController {
   constructor(private readonly service: PaineisService) {}
 
   @Get('inconsistencias')
-  inconsistencias(@Query('responsavel') responsavel?: string) {
-    return this.service.inconsistencias(responsavel);
+  inconsistencias(@Req() req: any, @Query('responsavel') responsavel?: string) {
+    return this.service.inconsistencias(escopo(req, responsavel));
   }
 
   @Get('prazos')
-  prazos(@Query('responsavel') responsavel?: string) {
-    return this.service.prazos(responsavel);
+  prazos(@Req() req: any, @Query('responsavel') responsavel?: string) {
+    return this.service.prazos(escopo(req, responsavel));
   }
 
   @Get('produtividade')
@@ -23,8 +28,8 @@ export class PaineisController {
   }
 
   @Get('meu-dia')
-  meuDia(@Query('responsavel') responsavel?: string) {
-    return this.service.meuDia(responsavel);
+  meuDia(@Req() req: any, @Query('responsavel') responsavel?: string) {
+    return this.service.meuDia(escopo(req, responsavel));
   }
 
   @Get('cliente-erros')
