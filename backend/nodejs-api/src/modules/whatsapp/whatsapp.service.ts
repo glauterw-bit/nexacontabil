@@ -73,8 +73,10 @@ export class WhatsappService {
       await this.prisma.atendimentoMensagem.create({
         data: { atendimentoId, direcao: 'in', texto: body, canal: 'whatsapp' },
       });
+      return atendimentoId;
     } catch (e: any) {
       this.logger.warn(`registrarAtendimento falhou: ${e?.message ?? e}`);
+      return null;
     }
   }
 
@@ -82,29 +84,35 @@ export class WhatsappService {
     this.logger.log(`WhatsApp in from ${msg.from}: "${msg.body.slice(0, 80)}"`);
 
     const ctx = await this.identifyClient(msg.from);
-    await this.registrarAtendimento(msg.from, ctx?.company ?? null, msg.body);
-    if (!ctx) {
-      return {
-        text: '👋 Olá! Não identifiquei seu cadastro. Por favor entre em contato com seu contador para vincular este número.',
-      };
-    }
+    const atendimentoId = await this.registrarAtendimento(msg.from, ctx?.company ?? null, msg.body);
 
+    const reply = await this.computeReply(msg, ctx);
+
+    // registra a resposta da IA na thread (autor='IA'), pra a equipe ver
+    if (atendimentoId && reply?.text) {
+      await this.prisma.atendimentoMensagem.create({
+        data: { atendimentoId, direcao: 'out', texto: reply.text, autor: 'IA', canal: 'whatsapp' },
+      }).catch(() => undefined);
+      // se a IA pediu escalonamento, marca como prioridade alta
+      if (reply.escalateToHuman) {
+        await this.prisma.atendimento.update({ where: { id: atendimentoId }, data: { prioridade: 'alta' } }).catch(() => undefined);
+      }
+    }
+    return reply;
+  }
+
+  private async computeReply(msg: IncomingMessage, ctx: { company: any } | null): Promise<WhatsappReply> {
+    if (!ctx) {
+      return { text: '👋 Olá! Não identifiquei seu cadastro. Por favor entre em contato com seu contador para vincular este número.' };
+    }
     const company = ctx.company;
     const body = msg.body.toLowerCase().trim();
 
     // Quick patterns — não gasta Claude para perguntas simples
-    if (/(das|imposto|pagar|guia)/.test(body)) {
-      return this.respondDAS(company.id, company.name);
-    }
-    if (/(certid|cnd|negativa)/.test(body)) {
-      return this.respondCertidoes(company.id);
-    }
-    if (/(obriga|vencen|calend|agenda)/.test(body)) {
-      return this.respondObrigacoes(company.id);
-    }
-    if (/(nota|nfe|nfs)/.test(body)) {
-      return this.respondNotas(company.id);
-    }
+    if (/(das|imposto|pagar|guia)/.test(body)) return this.respondDAS(company.id, company.name);
+    if (/(certid|cnd|negativa)/.test(body)) return this.respondCertidoes(company.id);
+    if (/(obriga|vencen|calend|agenda)/.test(body)) return this.respondObrigacoes(company.id);
+    if (/(nota|nfe|nfs)/.test(body)) return this.respondNotas(company.id);
 
     // Caso default: pergunta ao Claude com contexto da empresa
     return this.respondWithClaude(msg, company);
