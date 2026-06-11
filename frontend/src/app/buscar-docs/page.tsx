@@ -95,7 +95,23 @@ export default function BuscarDocsPage() {
             <Card label="Com inconsistência" value={`${data.comInconsistencia}`} cor={data.comInconsistencia ? '#f59e0b' : '#10b981'} />
           </div>
 
-          {data.encontrados === 0 && (
+          {/* como o sistema interpretou a busca — transparência p/ o analista confiar */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14, fontSize: 12 }}>
+            {data.clienteBuscado && <Chip txt={`cliente: ${data.clienteBuscado}`} cor={data.clienteNaoEncontrado ? '#ef4444' : '#10b981'} />}
+            {data.filtrosInterpretados?.year && <Chip txt={`período: ${data.filtrosInterpretados.monthStart ? data.filtrosInterpretados.monthStart + '/' : ''}${data.filtrosInterpretados.year}`} cor="#6366f1" />}
+            {data.filtrosInterpretados?.minValue != null && <Chip txt={`acima de ${BRL(data.filtrosInterpretados.minValue)}`} cor="#6366f1" />}
+            {data.filtrosInterpretados?.maxValue != null && <Chip txt={`até ${BRL(data.filtrosInterpretados.maxValue)}`} cor="#6366f1" />}
+            {data.filtroInconsistencia && <Chip txt="só com inconsistência" cor="#f59e0b" />}
+            {data.truncado && <Chip txt={`mostrando 50 de ${data.totalDisponivel}`} cor="#64748b" />}
+          </div>
+
+          {data.clienteNaoEncontrado && (
+            <div style={{ padding: 16, color: '#fca5a5', background: '#1f1113', border: '1px solid #3a1a1d', borderRadius: 10, marginBottom: 12, fontSize: 13 }}>
+              Não encontrei o cliente <strong>"{data.clienteBuscado}"</strong> na carteira. Verifique o nome ou busque por outro termo.
+            </div>
+          )}
+
+          {data.encontrados === 0 && !data.clienteNaoEncontrado && (
             <div style={{ padding: 24, textAlign: 'center', color: '#64748b', border: '1px dashed #2a3142', borderRadius: 10 }}>
               Nenhum documento encontrado para essa busca.
             </div>
@@ -139,6 +155,10 @@ export default function BuscarDocsPage() {
       )}
     </div>
   );
+}
+
+function Chip({ txt, cor }: { txt: string; cor: string }) {
+  return <span style={{ padding: '3px 10px', borderRadius: 20, border: `1px solid ${cor}40`, background: `${cor}14`, color: cor }}>{txt}</span>;
 }
 
 function Card({ label, value, cor, sub }: { label: string; value: string; cor?: string; sub?: string }) {

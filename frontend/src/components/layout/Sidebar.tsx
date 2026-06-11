@@ -35,21 +35,28 @@ interface NavGroup {
   items: NavItem[];
 }
 
-// ── Fluxo fiscal — o dia a dia do departamento (topo, fixo) ──
+// ── GESTÃO — visão do gestor (topo, fixo, prioridade máxima) ──
 const NAV_MAIN: NavItem[] = [
-  { href: '/visao-geral',     icon: LayoutDashboard, label: 'Visão Geral',      badge: 'Admin' },
-  { href: '/dashboard',       icon: Building2,        label: 'Painel do Cliente' },
-  { href: '/captura-xml',     icon: Inbox,         label: 'Captura de XMLs', badge: 'Fiscal' },
-  { href: '/buscar-docs',     icon: Search,        label: 'Buscar Documentos', badge: 'IA' },
-  { href: '/esteira-fiscal',  icon: Workflow,      label: 'Esteira Fiscal',  badge: 'Auto' },
-  { href: '/carteira',        icon: Briefcase,     label: 'Carteira',        badge: 'Live' },
-  { href: '/ncm-inteligente', icon: Boxes,         label: 'Banco de NCM',    badge: 'IA' },
-  { href: '/risco-fiscal',    icon: ShieldCheck,   label: 'Risco Fiscal',    badge: 'AI' },
-  { href: '/copilot',         icon: Bot,           label: 'Copilot IA',      badge: 'AI' },
-  { href: '/whatsapp',        icon: MessageCircle, label: 'WhatsApp IA',     badge: 'WA' },
+  { href: '/torre-controle',  icon: Gauge,           label: 'Torre de Controle', badge: 'Gestor' },
+  { href: '/visao-geral',     icon: LayoutDashboard, label: 'Visão Geral',       badge: 'Admin' },
+  { href: '/dashboard',       icon: Building2,       label: 'Painel do Cliente' },
+  { href: '/kanban',          icon: Kanban,          label: 'Kanban da Equipe' },
+  { href: '/gestao-equipe',   icon: Users,           label: 'Produtividade' },
 ];
 
 const NAV_GROUPS: NavGroup[] = [
+  {
+    label: '⚡ Trabalho do Analista',
+    items: [
+      { href: '/buscar-docs',     icon: Search,        label: 'Buscar Documentos', badge: 'IA' },
+      { href: '/captura-xml',     icon: Inbox,         label: 'Captura de XMLs',   badge: 'Fiscal' },
+      { href: '/esteira-fiscal',  icon: Workflow,      label: 'Esteira Fiscal',    badge: 'Auto' },
+      { href: '/risco-fiscal',    icon: ShieldCheck,   label: 'Risco Fiscal',      badge: 'AI' },
+      { href: '/ncm-inteligente', icon: Boxes,         label: 'Banco de NCM',      badge: 'IA' },
+      { href: '/exportar-dominio', icon: FileDown,     label: 'Exportar p/ Domínio' },
+      { href: '/copilot',         icon: Bot,           label: 'Copilot IA',        badge: 'AI' },
+    ],
+  },
   {
     label: 'Fiscal — Apuração & Entrega',
     items: [
@@ -57,14 +64,14 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/simples-nacional',icon: Award,         label: 'Simples Nacional' },
       { href: '/sped',            icon: FileCode,      label: 'SPED / EFD' },
       { href: '/fiscal',          icon: Receipt,       label: 'NF-e / NFS-e' },
-      { href: '/exportar-dominio', icon: FileDown,     label: 'Exportar p/ Domínio' },
       { href: '/onvio',           icon: Building2,     label: 'Onvio · Domínio', badge: 'TR' },
       { href: '/certidoes',       icon: ShieldCheck,   label: 'Certidões' },
     ],
   },
   {
-    label: 'Implantação & Conexões',
+    label: 'Carteira & Implantação',
     items: [
+      { href: '/carteira',           icon: Briefcase,     label: 'Carteira',        badge: 'Live' },
       { href: '/onboarding-cliente', icon: Building2,     label: 'Onboarding Cliente' },
       { href: '/companies',          icon: Building2,     label: 'Empresas' },
       { href: '/migracao',           icon: ArrowLeftRight,label: 'Migração em Massa' },
@@ -73,12 +80,13 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Gestão & Operação',
+    label: 'Gestão & Relacionamento',
     items: [
-      { href: '/torre-controle',  icon: Gauge,    label: 'Torre de Controle', badge: 'Gestor' },
-      { href: '/kanban',          icon: Kanban,   label: 'Kanban Operacional' },
-      { href: '/gestao-equipe',   icon: Users,    label: 'Gestão de Equipe' },
-      { href: '/audit',           icon: Hash,     label: 'Auditoria' },
+      { href: '/audit',           icon: Hash,          label: 'Auditoria' },
+      { href: '/whatsapp',        icon: MessageCircle, label: 'WhatsApp IA',  badge: 'WA' },
+      { href: '/comunicados',     icon: Megaphone,     label: 'Comunicados' },
+      { href: '/crm',             icon: Users,         label: 'CRM / Pipeline' },
+      { href: '/portal-cliente',  icon: Globe,         label: 'Portal do Cliente' },
     ],
   },
   {
@@ -109,7 +117,7 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Consultoria & Relacionamento',
+    label: 'Consultoria & Tributário',
     items: [
       { href: '/tributario',     icon: Scale,      label: 'Plan. Tributário' },
       { href: '/reforma-tributaria', icon: Scale,  label: 'Reforma Tributária', badge: 'CBS/IBS' },
@@ -117,9 +125,6 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/saude-fiscal',   icon: HeartPulse, label: 'Saúde Fiscal' },
       { href: '/abertura-empresa', icon: Store,    label: 'Abertura de Empresa' },
       { href: '/mei',            icon: Award,      label: 'MEI — DAS / DASN' },
-      { href: '/crm',            icon: Users,      label: 'CRM / Pipeline' },
-      { href: '/comunicados',    icon: Megaphone,  label: 'Comunicados' },
-      { href: '/portal-cliente', icon: Globe,      label: 'Portal do Cliente' },
       { href: '/settings',       icon: Settings,   label: 'Configurações' },
     ],
   },

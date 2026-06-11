@@ -61,20 +61,31 @@ export class BuscaDocsService {
     // intenção "só os que têm problema" — não vem nos filtros estruturados
     const soComInconsist = /(inconsist|diverg|erro|irregular|problema|errad)/i.test(query);
 
-    // resolve cliente pelo nome (issuerKeyword ou keywords)
+    // Cliente: SÓ o campo explícito da IA — nunca uma keyword solta
+    // (senão "notas com erro" vira busca por cliente chamado "erro").
     let companyIds: string[] | undefined;
-    const termoCliente = f.issuerKeyword || (f.keywords ?? []).find((k) => k.length > 3);
-    if (termoCliente) {
-      const cos = await this.prisma.company.findMany({
+    let clienteMatches: { id: string; name: string }[] = [];
+    const termoCliente = (f.issuerKeyword || '').trim();
+    const pediuCliente = termoCliente.length >= 3;
+    if (pediuCliente) {
+      clienteMatches = await this.prisma.company.findMany({
         where: { name: { contains: termoCliente, mode: 'insensitive' } },
-        select: { id: true },
+        select: { id: true, name: true },
         take: 30,
       });
-      if (cos.length) companyIds = cos.map((c) => c.id);
+      if (clienteMatches.length) companyIds = clienteMatches.map((c) => c.id);
     }
 
     const where: any = {};
-    if (companyIds) where.companyId = { in: companyIds };
+    if (companyIds) {
+      where.companyId = { in: companyIds };
+    } else if (pediuCliente) {
+      // não achou empresa: tenta casar pelo emitente/destinatário nos próprios docs
+      where.OR = [
+        { issuerName: { contains: termoCliente, mode: 'insensitive' } },
+        { recipientName: { contains: termoCliente, mode: 'insensitive' } },
+      ];
+    }
     if (f.type?.length) {
       const tipos = f.type.map((t) => (t === 'nf-e' ? 'nfe' : t)).filter((t) => ['nfe', 'nfse', 'cte', 'nfce'].includes(t));
       if (tipos.length) where.type = { in: tipos };
@@ -90,10 +101,15 @@ export class BuscaDocsService {
     }
     if (f.cnpj) where.OR = [{ issuerCnpj: f.cnpj }, { recipientCnpj: f.cnpj }];
 
-    // se filtrar por inconsistência, buscamos mais (fiscalValidation é JSON,
-    // não dá pra filtrar no SQL) e cortamos depois
+    // ordena por relevância: valor desc quando o usuário falou em valor,
+    // senão por data (mais recente primeiro)
+    const orderBy: any = (f.minValue != null || f.maxValue != null)
+      ? { totalValue: 'desc' }
+      : { issueDate: 'desc' };
+
+    // busca uma janela maior pra dedup + filtro de inconsistência em memória
     const docs = await this.prisma.document.findMany({
-      where, orderBy: { issueDate: 'desc' }, take: soComInconsist ? 500 : 60,
+      where, orderBy, take: soComInconsist ? 800 : 200,
     });
 
     // nome dos clientes
@@ -121,10 +137,21 @@ export class BuscaDocsService {
     });
 
     if (soComInconsist) todos = todos.filter((r) => r.inconsistencias.length > 0);
-    const resultados = todos.slice(0, 60);
 
+    // DEDUP: mesma nota não aparece duas vezes (por arquivo, ou nº+valor+cliente)
+    const vistos = new Set<string>();
+    const unicos = todos.filter((r) => {
+      const k = r.arquivo || `${r.cliente}|${r.numero}|${r.valor}`;
+      if (vistos.has(k)) return false;
+      vistos.add(k);
+      return true;
+    });
+
+    const resultados = unicos.slice(0, 50);
+
+    // totais sobre TODO o conjunto encontrado (não só os 50 exibidos)
     let valorTotal = 0, comInconsist = 0;
-    for (const r of resultados) {
+    for (const r of unicos) {
       valorTotal += r.valor ?? 0;
       if (r.inconsistencias.length) comInconsist++;
     }
@@ -133,8 +160,12 @@ export class BuscaDocsService {
       consulta: query,
       filtrosInterpretados: f,
       filtroInconsistencia: soComInconsist,
+      clienteBuscado: pediuCliente ? termoCliente : null,
+      clientesEncontrados: clienteMatches.map((c) => c.name),
+      clienteNaoEncontrado: pediuCliente && !companyIds && unicos.length === 0,
       encontrados: resultados.length,
-      totalDisponivel: todos.length,
+      totalDisponivel: unicos.length,
+      truncado: unicos.length > 50,
       valorTotal: Math.round(valorTotal * 100) / 100,
       comInconsistencia: comInconsist,
       resultados,
