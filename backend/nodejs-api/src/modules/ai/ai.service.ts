@@ -309,13 +309,7 @@ Retorne APENAS um JSON válido:
     numNotas: number; topNcms: { ncm: string; desc?: string; total: number }[];
     notasComSt: number; inconsistencias: number;
   }): Promise<any> {
-    const base = {
-      resumoExecutivo: `${dados.nome}: faturamento de R$ ${Math.round(dados.faturamento).toLocaleString('pt-BR')} no ${dados.regime}, carga tributária de ${dados.cargaTributaria.toFixed(1)}%.`,
-      scoreSaude: dados.inconsistencias > 5 ? 60 : dados.inconsistencias > 0 ? 80 : 92,
-      fiscal: { observacoes: [], oportunidades: [], riscos: dados.inconsistencias ? [`${dados.inconsistencias} inconsistência(s) a revisar`] : [] },
-      contabil: { observacoes: [], recomendacoes: [] },
-      economiaPotencial: 'Configure ANTHROPIC_API_KEY para estimativa de economia.',
-    };
+    const base = this._insightHeuristico(dados);
     if (!this.hasKey) return base;
 
     try {
@@ -351,11 +345,49 @@ Retorne APENAS um JSON válido:
       const text = msg.content[0].type === 'text' ? msg.content[0].text : '';
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) return base;
-      return { ...base, ...JSON.parse(jsonMatch[0]) };
+      return { ...base, ...JSON.parse(jsonMatch[0]), fonte: 'ia' };
     } catch (err: any) {
       this.logger.warn(`gerarInsightsContabeis falhou: ${err.message}`);
       return base;
     }
+  }
+
+  /** Análise por regras (fallback sem IA) — substantiva, baseada nos números reais. */
+  private _insightHeuristico(dados: any) {
+    const fiscal: any = { observacoes: [], oportunidades: [], riscos: [] };
+    const contabil: any = { observacoes: [], recomendacoes: [] };
+    const carga = dados.cargaTributaria ?? 0;
+    const fmt = (n: number) => `R$ ${Math.round(n).toLocaleString('pt-BR')}`;
+
+    if (carga > 0) fiscal.observacoes.push(`Carga tributária de ${carga.toFixed(1)}% sobre o faturamento do período (${fmt(dados.faturamento)}).`);
+
+    if (dados.regime === 'SIMPLES_NACIONAL') {
+      contabil.recomendacoes.push('Monitorar o faturamento acumulado em 12 meses: sublimite do Simples R$ 4,8 mi (e R$ 3,6 mi para ICMS/ISS por fora).');
+      if (carga > 15) fiscal.oportunidades.push('Carga acima do típico para Simples — revisar o anexo de enquadramento e o Fator R (folha/receita pode mudar de anexo IV→III).');
+    } else if (dados.regime === 'LUCRO_PRESUMIDO') {
+      fiscal.oportunidades.push('Avaliar Lucro Real vs Presumido: se a margem efetiva for menor que a presunção, o Real reduz IRPJ/CSLL.');
+      if (dados.impostos.pis + dados.impostos.cofins > 0) fiscal.oportunidades.push('No Presumido o PIS/COFINS é cumulativo — confirmar se não há produtos monofásicos recolhidos a maior.');
+    } else if (dados.regime === 'LUCRO_REAL') {
+      fiscal.oportunidades.push('Lucro Real: garantir o aproveitamento integral de créditos de PIS/COFINS não-cumulativos sobre insumos e despesas.');
+    }
+
+    if (dados.notasComSt > 0 && dados.numNotas > 0) {
+      const pct = Math.round((dados.notasComSt / dados.numNotas) * 100);
+      fiscal.observacoes.push(`${dados.notasComSt} de ${dados.numNotas} notas (${pct}%) com Substituição Tributária (${fmt(dados.impostos.st)} de ICMS-ST).`);
+      if (dados.impostos.st > dados.impostos.icms && dados.impostos.st > 0) fiscal.riscos.push('ST supera o ICMS próprio — conferir MVA/base de cálculo para evitar recolhimento a maior.');
+    }
+    if (dados.inconsistencias > 0) fiscal.riscos.push(`${dados.inconsistencias} inconsistência(s) de tributação detectada(s) — revisar na Central de Inconsistências.`);
+    if (dados.impostos.pis + dados.impostos.cofins > 0) contabil.observacoes.push(`PIS/COFINS no período: ${fmt(dados.impostos.pis + dados.impostos.cofins)}.`);
+    if (dados.topNcms?.length) contabil.observacoes.push(`Concentração em ${dados.topNcms.length} NCMs principais — base para padronização de cadastro e tributação.`);
+
+    const score = dados.inconsistencias > 5 ? 62 : dados.inconsistencias > 0 ? 78 : 88;
+    return {
+      resumoExecutivo: `${dados.nome}: ${fmt(dados.faturamento)} no ${dados.regime}, carga de ${carga.toFixed(1)}% e ${dados.numNotas} notas no período. ${dados.inconsistencias ? dados.inconsistencias + ' ponto(s) a revisar.' : 'Sem inconsistências de ICMS detectadas.'}`,
+      scoreSaude: score,
+      fiscal, contabil,
+      economiaPotencial: 'Estimativa detalhada requer a IA avançada (ANTHROPIC_API_KEY). Esta é uma análise por regras.',
+      fonte: 'regras',
+    };
   }
 
   // ─── Busca natural: NL → filtros SQL Prisma ──────────────────────────────

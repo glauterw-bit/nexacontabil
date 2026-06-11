@@ -128,7 +128,10 @@ function InsightDrawer({ companyId, onClose }: { companyId: string; onClose: () 
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: '#0009', display: 'flex', justifyContent: 'flex-end', zIndex: 50 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: 540, maxWidth: '96vw', height: '100%', background: '#0f1420', borderLeft: `1px solid ${COLORS.border}`, overflowY: 'auto', padding: 22 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: COLORS.acao }}><Sparkles size={18} /> Insight de IA</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: COLORS.acao }}>
+            <Sparkles size={18} /> Insight
+            {p.fonte && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: p.fonte === 'ia' ? `${COLORS.acao}22` : `${COLORS.atencao}22`, color: p.fonte === 'ia' ? COLORS.acao : COLORS.atencao }}>{p.fonte === 'ia' ? 'IA avançada' : 'por regras'}</span>}
+          </div>
           <X size={18} style={{ cursor: 'pointer', color: COLORS.faint }} onClick={onClose} />
         </div>
         {loading ? <div style={{ textAlign: 'center', padding: 40 }}><Loader2 size={24} className="animate-spin" /></div> :
