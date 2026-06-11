@@ -27,6 +27,11 @@ export class PaineisController {
     return this.service.produtividade();
   }
 
+  @Get('gerencial')
+  gerencial() {
+    return this.service.gerencial();
+  }
+
   @Get('meu-dia')
   meuDia(@Req() req: any, @Query('responsavel') responsavel?: string) {
     return this.service.meuDia(escopo(req, responsavel));

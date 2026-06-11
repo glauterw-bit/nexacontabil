@@ -108,6 +108,36 @@ export class PaineisService {
     };
   }
 
+  // Painel gerencial: número-herói + KPIs + saúde da equipe num call só.
+  async gerencial() {
+    const [prod, inc, prazos] = await Promise.all([
+      this.produtividade(), this.inconsistencias(), this.prazos(),
+    ]);
+    const atendAbertos = await this.prisma.atendimento.count({ where: { status: { not: 'resolvido' } } });
+    const equipe = prod.equipe.filter((e: any) => !e.responsavel.includes('Sem responsável'));
+    return {
+      hero: {
+        emRisco: prazos.atrasadas + prazos.proximas7dias,
+        atrasadas: prazos.atrasadas,
+        proximas7dias: prazos.proximas7dias,
+      },
+      kpis: {
+        docs: prod.totalDocs,
+        notasErro: inc.totalNotas,
+        erros: inc.totalErros,
+        valorEnvolvido: inc.valorEnvolvido,
+        clientesComErro: inc.clientesAfetados,
+        atendAbertos,
+        analistas: prod.analistas,
+        clientes: prod.equipe.reduce((s: number, e: any) => s + e.clientes, 0),
+      },
+      equipe,
+      topClientesErro: inc.ranking.slice(0, 8),
+      obrigacoesPorTipo: prazos.porTipo,
+      insights: prod.insights,
+    };
+  }
+
   // Detalhe dos erros de UM cliente, com causa + como corrigir.
   async clienteErros(companyId: string) {
     const empresa = await this.prisma.company.findUnique({
