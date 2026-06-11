@@ -324,7 +324,7 @@ Retorne APENAS um JSON válido:
 Cliente: ${dados.nome}
 Regime: ${dados.regime} · Segmento: ${dados.segmento ?? 'n/d'}
 Faturamento (período analisado): R$ ${Math.round(dados.faturamento).toLocaleString('pt-BR')}
-Carga tributária: ${dados.cargaTributaria.toFixed(1)}%
+Carga tributária: ${dados.cargaTributaria.toFixed(1)}%${dados.das ? ` (Simples: DAS efetivo ${dados.das.aliquotaEfetiva}%, Anexo ${dados.das.anexo} faixa ${dados.das.faixa}, RBT12 ~R$ ${Math.round(dados.rbt12 ?? 0).toLocaleString('pt-BR')})` : ''}
 Impostos: ICMS R$ ${Math.round(dados.impostos.icms).toLocaleString('pt-BR')} · IPI R$ ${Math.round(dados.impostos.ipi).toLocaleString('pt-BR')} · PIS R$ ${Math.round(dados.impostos.pis).toLocaleString('pt-BR')} · COFINS R$ ${Math.round(dados.impostos.cofins).toLocaleString('pt-BR')} · ST R$ ${Math.round(dados.impostos.st).toLocaleString('pt-BR')}
 Notas: ${dados.numNotas} (${dados.notasComSt} com Substituição Tributária)
 Top NCMs: ${ncmList || 'n/d'}
@@ -362,8 +362,11 @@ Retorne APENAS um JSON válido:
     if (carga > 0) fiscal.observacoes.push(`Carga tributária de ${carga.toFixed(1)}% sobre o faturamento do período (${fmt(dados.faturamento)}).`);
 
     if (dados.regime === 'SIMPLES_NACIONAL') {
+      if (dados.das) {
+        fiscal.observacoes.push(`DAS estimado: alíquota efetiva de ${dados.das.aliquotaEfetiva}% (Anexo ${dados.das.anexo}, faixa ${dados.das.faixa}), ~${fmt(dados.das.dasAnual)}/ano sobre RBT12 de ${fmt(dados.rbt12 ?? 0)}.`);
+        if (dados.das.anexo === 'V' || dados.das.aliquotaEfetiva > 15.5) fiscal.oportunidades.push('Avaliar o Fator R: se a folha for ≥ 28% da receita, migra do Anexo V para o III e reduz a alíquota.');
+      }
       contabil.recomendacoes.push('Monitorar o faturamento acumulado em 12 meses: sublimite do Simples R$ 4,8 mi (e R$ 3,6 mi para ICMS/ISS por fora).');
-      if (carga > 15) fiscal.oportunidades.push('Carga acima do típico para Simples — revisar o anexo de enquadramento e o Fator R (folha/receita pode mudar de anexo IV→III).');
     } else if (dados.regime === 'LUCRO_PRESUMIDO') {
       fiscal.oportunidades.push('Avaliar Lucro Real vs Presumido: se a margem efetiva for menor que a presunção, o Real reduz IRPJ/CSLL.');
       if (dados.impostos.pis + dados.impostos.cofins > 0) fiscal.oportunidades.push('No Presumido o PIS/COFINS é cumulativo — confirmar se não há produtos monofásicos recolhidos a maior.');
