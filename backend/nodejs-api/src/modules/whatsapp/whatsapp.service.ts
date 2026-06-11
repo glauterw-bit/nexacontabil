@@ -43,10 +43,39 @@ export class WhatsappService {
     return { company };
   }
 
+  /**
+   * Registra/atualiza a conversa do WhatsApp como um Atendimento na Central
+   * (substitui o uso do MEGA: todo atendimento vira ticket gerenciável aqui).
+   * Upsert por telefone pra não duplicar a cada mensagem.
+   */
+  private async registrarAtendimento(phone: string, company: any | null, body: string) {
+    try {
+      const externalId = phone.replace(/\D/g, '');
+      const existing = await this.prisma.atendimento.findFirst({ where: { canal: 'whatsapp', externalId } });
+      if (existing) {
+        await this.prisma.atendimento.update({
+          where: { id: existing.id },
+          data: { mensagem: body, status: existing.status === 'resolvido' ? 'aberto' : existing.status },
+        });
+      } else {
+        await this.prisma.atendimento.create({
+          data: {
+            canal: 'whatsapp', externalId, companyId: company?.id ?? null,
+            clienteNome: company?.name ?? 'Contato não identificado', contato: phone,
+            assunto: 'Atendimento WhatsApp', mensagem: body, categoria: 'fiscal', status: 'aberto',
+          },
+        });
+      }
+    } catch (e: any) {
+      this.logger.warn(`registrarAtendimento falhou: ${e?.message ?? e}`);
+    }
+  }
+
   async handleIncoming(msg: IncomingMessage): Promise<WhatsappReply> {
     this.logger.log(`WhatsApp in from ${msg.from}: "${msg.body.slice(0, 80)}"`);
 
     const ctx = await this.identifyClient(msg.from);
+    await this.registrarAtendimento(msg.from, ctx?.company ?? null, msg.body);
     if (!ctx) {
       return {
         text: '👋 Olá! Não identifiquei seu cadastro. Por favor entre em contato com seu contador para vincular este número.',
