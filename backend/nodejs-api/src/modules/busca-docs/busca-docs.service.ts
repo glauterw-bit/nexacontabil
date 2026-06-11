@@ -113,9 +113,14 @@ export class BuscaDocsService {
       ? { totalValue: 'desc' }
       : { issueDate: 'desc' };
 
-    // busca uma janela maior pra dedup + filtro de inconsistência em memória
+    // Quando filtra por inconsistência (fiscalValidation é JSON, não dá pra
+    // filtrar no SQL), precisamos varrer TODOS os candidatos — senão notas
+    // com erro fora da janela mais recente somem. Sem extractedData p/ aliviar.
     const docs = await this.prisma.document.findMany({
-      where, orderBy, take: soComInconsist ? 800 : 200,
+      where, orderBy,
+      ...(soComInconsist
+        ? { select: { id: true, companyId: true, originalFilename: true, number: true, totalValue: true, issueDate: true, issuerName: true, type: true, fiscalValidation: true } }
+        : { take: 200 }),
     });
 
     // nome dos clientes
