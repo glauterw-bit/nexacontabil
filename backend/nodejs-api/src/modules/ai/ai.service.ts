@@ -308,6 +308,7 @@ Retorne APENAS um JSON válido:
     impostos: { icms: number; ipi: number; pis: number; cofins: number; st: number; total: number };
     numNotas: number; topNcms: { ncm: string; desc?: string; total: number }[];
     notasComSt: number; inconsistencias: number;
+    das?: { anexo: string; faixa: number; aliquotaEfetiva: number; dasAnual: number } | null; rbt12?: number;
   }): Promise<any> {
     const base = this._insightHeuristico(dados);
     if (!this.hasKey) return base;
