@@ -298,6 +298,66 @@ Retorne APENAS um JSON válido:
     }
   }
 
+  /**
+   * Insights contábeis avançados — análise fiscal + contábil + tributária
+   * sobre os dados reais agregados do cliente. Gera diagnóstico de especialista.
+   */
+  async gerarInsightsContabeis(dados: {
+    nome: string; regime: string; segmento?: string;
+    faturamento: number; cargaTributaria: number;
+    impostos: { icms: number; ipi: number; pis: number; cofins: number; st: number; total: number };
+    numNotas: number; topNcms: { ncm: string; desc?: string; total: number }[];
+    notasComSt: number; inconsistencias: number;
+  }): Promise<any> {
+    const base = {
+      resumoExecutivo: `${dados.nome}: faturamento de R$ ${Math.round(dados.faturamento).toLocaleString('pt-BR')} no ${dados.regime}, carga tributária de ${dados.cargaTributaria.toFixed(1)}%.`,
+      scoreSaude: dados.inconsistencias > 5 ? 60 : dados.inconsistencias > 0 ? 80 : 92,
+      fiscal: { observacoes: [], oportunidades: [], riscos: dados.inconsistencias ? [`${dados.inconsistencias} inconsistência(s) a revisar`] : [] },
+      contabil: { observacoes: [], recomendacoes: [] },
+      economiaPotencial: 'Configure ANTHROPIC_API_KEY para estimativa de economia.',
+    };
+    if (!this.hasKey) return base;
+
+    try {
+      const ncmList = dados.topNcms.slice(0, 10).map((n) => `${n.ncm} (R$ ${Math.round(n.total).toLocaleString('pt-BR')})`).join(', ');
+      const msg = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 2048,
+        messages: [{
+          role: 'user',
+          content: `Você é o maior especialista em contabilidade fiscal, tributária e gerencial do Brasil. Analise os dados REAIS deste cliente e gere insights poderosos, específicos e acionáveis — nada genérico.
+
+Cliente: ${dados.nome}
+Regime: ${dados.regime} · Segmento: ${dados.segmento ?? 'n/d'}
+Faturamento (período analisado): R$ ${Math.round(dados.faturamento).toLocaleString('pt-BR')}
+Carga tributária: ${dados.cargaTributaria.toFixed(1)}%
+Impostos: ICMS R$ ${Math.round(dados.impostos.icms).toLocaleString('pt-BR')} · IPI R$ ${Math.round(dados.impostos.ipi).toLocaleString('pt-BR')} · PIS R$ ${Math.round(dados.impostos.pis).toLocaleString('pt-BR')} · COFINS R$ ${Math.round(dados.impostos.cofins).toLocaleString('pt-BR')} · ST R$ ${Math.round(dados.impostos.st).toLocaleString('pt-BR')}
+Notas: ${dados.numNotas} (${dados.notasComSt} com Substituição Tributária)
+Top NCMs: ${ncmList || 'n/d'}
+Inconsistências detectadas: ${dados.inconsistencias}
+
+Gere análise nas dimensões FISCAL e CONTÁBIL. Considere: adequação do regime, carga tributária vs. benchmark do segmento, exposição a ST, recuperação de créditos (PIS/COFINS, ICMS), possíveis benefícios fiscais, riscos de autuação, e oportunidades reais de economia.
+
+Retorne APENAS um JSON válido:
+{
+  "resumoExecutivo": "2-3 frases diretas sobre a saúde fiscal/contábil",
+  "scoreSaude": número de 0 a 100,
+  "fiscal": { "observacoes": ["..."], "oportunidades": ["..."], "riscos": ["..."] },
+  "contabil": { "observacoes": ["..."], "recomendacoes": ["..."] },
+  "economiaPotencial": "estimativa e de onde viria a economia"
+}`,
+        }],
+      });
+      const text = msg.content[0].type === 'text' ? msg.content[0].text : '';
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return base;
+      return { ...base, ...JSON.parse(jsonMatch[0]) };
+    } catch (err: any) {
+      this.logger.warn(`gerarInsightsContabeis falhou: ${err.message}`);
+      return base;
+    }
+  }
+
   // ─── Busca natural: NL → filtros SQL Prisma ──────────────────────────────
 
   /**

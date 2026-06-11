@@ -1581,6 +1581,21 @@ model Atendimento {
   @@map("atendimentos")
 }
 
+// Insights contábeis gerados por IA avançada sobre os dados reais do cliente.
+model ClienteInsight {
+  id              String   @id @default(uuid())
+  companyId       String   @unique
+  payload         String   // JSON: resumoExecutivo, fiscal{}, contabil{}, economiaPotencial
+  scoreSaude      Int?
+  cargaTributaria Float?
+  faturamento     Float?
+  economiaPotencial String?
+  modelo          String?
+  geradoEm        DateTime @default(now())
+
+  @@map("cliente_insights")
+}
+
 // Thread de mensagens de um atendimento (cliente <-> escritório).
 model AtendimentoMensagem {
   id            String   @id @default(uuid())
