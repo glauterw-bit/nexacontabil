@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { Headset, Loader2, Plus, MessageCircle, Building2, Mail, Phone, X } from 'lucide-react';
+import { Headset, Loader2, Plus, MessageCircle, Building2, Mail, Phone, X, Send } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -28,6 +28,7 @@ export default function AtendimentosPage() {
   const [status, setStatus] = useState('');
   const [nomes, setNomes] = useState<string[]>([]);
   const [novo, setNovo] = useState(false);
+  const [aberto, setAberto] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,7 +106,7 @@ export default function AtendimentosPage() {
               return (
                 <div key={a.id} style={{ background: '#161b27', border: '1px solid #2a3142', borderLeft: `3px solid ${stCor[a.status]}`, borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setAberto(a.id)}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 6, background: `${c.cor}22`, color: c.cor, fontSize: 11, fontWeight: 600 }}><Ico size={12} /> {c.label}</span>
                         <strong style={{ fontSize: 14 }}>{a.clienteNome ?? 'Cliente'}</strong>
@@ -131,6 +132,64 @@ export default function AtendimentosPage() {
 
       <datalist id="resp-at">{nomes.map((n) => <option key={n} value={n} />)}</datalist>
       {novo && <NovoModal nomes={nomes} onClose={() => setNovo(false)} onSaved={() => { setNovo(false); load(); }} />}
+      {aberto && <ConversaDrawer id={aberto} onClose={() => { setAberto(null); load(); }} />}
+    </div>
+  );
+}
+
+function ConversaDrawer({ id, onClose }: { id: string; onClose: () => void }) {
+  const [data, setData] = useState<any>(null);
+  const [texto, setTexto] = useState('');
+  const [enviando, setEnviando] = useState(false);
+
+  const load = useCallback(async () => {
+    const r = await fetch(`${API}/api/v1/atendimentos/${id}`, { headers: authHeaders() });
+    if (r.ok) setData(await r.json());
+  }, [id]);
+  useEffect(() => { load(); }, [load]);
+
+  async function enviar() {
+    if (!texto.trim()) return;
+    setEnviando(true);
+    try {
+      const r = await fetch(`${API}/api/v1/atendimentos/${id}/responder`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ texto }) });
+      const d = await r.json();
+      if (d.dev) alert('Mensagem registrada. (WhatsApp em modo dev — configure as chaves p/ envio real.)');
+      setTexto(''); load();
+    } finally { setEnviando(false); }
+  }
+
+  const at = data?.atendimento;
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: '#0008', display: 'flex', justifyContent: 'flex-end', zIndex: 50 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 460, maxWidth: '95vw', height: '100%', background: '#0f1420', borderLeft: '1px solid #2a3142', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: 16, borderBottom: '1px solid #1a1f2b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <strong>{at?.clienteNome ?? '—'}</strong>
+            <div style={{ fontSize: 12, color: '#64748b' }}>{at?.contato} · {at?.canal}</div>
+          </div>
+          <X size={18} style={{ cursor: 'pointer', color: '#64748b' }} onClick={onClose} />
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {!data ? <div style={{ textAlign: 'center', paddingTop: 40 }}><Loader2 size={24} className="animate-spin" /></div> :
+            data.mensagens.length === 0 ? <div style={{ color: '#64748b', fontSize: 13, textAlign: 'center', paddingTop: 20 }}>Sem mensagens registradas ainda.</div> :
+            data.mensagens.map((m: any) => (
+              <div key={m.id} style={{ alignSelf: m.direcao === 'out' ? 'flex-end' : 'flex-start', maxWidth: '80%', background: m.direcao === 'out' ? '#6366f1' : '#1a2030', color: m.direcao === 'out' ? '#fff' : '#e2e8f0', padding: '8px 12px', borderRadius: 12, fontSize: 13 }}>
+                {m.texto}
+                <div style={{ fontSize: 10, color: m.direcao === 'out' ? '#c7d2fe' : '#64748b', marginTop: 3 }}>{m.autor ?? (m.direcao === 'in' ? 'Cliente' : '')} · {new Date(m.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+              </div>
+            ))}
+        </div>
+
+        <div style={{ padding: 12, borderTop: '1px solid #1a1f2b', display: 'flex', gap: 8 }}>
+          <input value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && enviar()} placeholder="Responder ao cliente…"
+            style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #2a3142', background: '#161b27', color: '#e2e8f0', fontSize: 14 }} />
+          <button onClick={enviar} disabled={enviando} style={{ padding: '0 14px', borderRadius: 8, border: 'none', background: '#22c55e', color: '#04240f', cursor: 'pointer' }}>
+            {enviando ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

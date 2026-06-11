@@ -1,9 +1,41 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 @Injectable()
 export class AtendimentosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly whatsapp: WhatsappService,
+  ) {}
+
+  async detalhe(id: string) {
+    const atendimento = await this.prisma.atendimento.findUnique({ where: { id } });
+    if (!atendimento) throw new NotFoundException('Atendimento não encontrado');
+    const mensagens = await this.prisma.atendimentoMensagem.findMany({
+      where: { atendimentoId: id }, orderBy: { createdAt: 'asc' },
+    });
+    return { atendimento, mensagens };
+  }
+
+  /** Responde pelo painel: grava na thread e envia ao cliente pelo canal. */
+  async responder(id: string, texto: string, autor?: string) {
+    const at = await this.prisma.atendimento.findUnique({ where: { id } });
+    if (!at) throw new NotFoundException('Atendimento não encontrado');
+    if (!texto?.trim()) return { ok: false, erro: 'Mensagem vazia.' };
+
+    let envio: any = { ok: false, dev: true };
+    if (at.canal === 'whatsapp' && at.contato) {
+      envio = await this.whatsapp.sendMessage(at.contato.replace(/\D/g, ''), texto);
+    }
+    await this.prisma.atendimentoMensagem.create({
+      data: { atendimentoId: id, direcao: 'out', texto, autor: autor ?? 'Escritório', canal: at.canal },
+    });
+    await this.prisma.atendimento.update({
+      where: { id }, data: { status: at.status === 'aberto' ? 'em_andamento' : at.status },
+    });
+    return { ok: true, enviado: envio.ok === true, dev: envio.dev === true };
+  }
 
   async listar(filtros: { canal?: string; status?: string; responsavel?: string; q?: string } = {}) {
     const where: any = {};

@@ -1580,3 +1580,17 @@ model Atendimento {
   @@index([externalId])
   @@map("atendimentos")
 }
+
+// Thread de mensagens de um atendimento (cliente <-> escritório).
+model AtendimentoMensagem {
+  id            String   @id @default(uuid())
+  atendimentoId String
+  direcao       String   // in (cliente) | out (escritório)
+  texto         String
+  autor         String?  // nome do analista (quando out) / IA
+  canal         String   @default("whatsapp")
+  createdAt     DateTime @default(now())
+
+  @@index([atendimentoId, createdAt])
+  @@map("atendimento_mensagens")
+}

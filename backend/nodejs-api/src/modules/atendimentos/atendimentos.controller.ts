@@ -16,6 +16,16 @@ export class AtendimentosController {
     return this.service.stats();
   }
 
+  @Get(':id')
+  detalhe(@Param('id') id: string) {
+    return this.service.detalhe(id);
+  }
+
+  @Post(':id/responder')
+  responder(@Param('id') id: string, @Body() body: { texto: string; autor?: string }) {
+    return this.service.responder(id, body?.texto ?? '', body?.autor);
+  }
+
   @Post()
   criar(@Body() body: any) {
     return this.service.criar(body);

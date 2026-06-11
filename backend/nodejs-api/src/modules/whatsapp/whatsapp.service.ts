@@ -52,20 +52,27 @@ export class WhatsappService {
     try {
       const externalId = phone.replace(/\D/g, '');
       const existing = await this.prisma.atendimento.findFirst({ where: { canal: 'whatsapp', externalId } });
+      let atendimentoId: string;
       if (existing) {
         await this.prisma.atendimento.update({
           where: { id: existing.id },
           data: { mensagem: body, status: existing.status === 'resolvido' ? 'aberto' : existing.status },
         });
+        atendimentoId = existing.id;
       } else {
-        await this.prisma.atendimento.create({
+        const novo = await this.prisma.atendimento.create({
           data: {
             canal: 'whatsapp', externalId, companyId: company?.id ?? null,
             clienteNome: company?.name ?? 'Contato não identificado', contato: phone,
             assunto: 'Atendimento WhatsApp', mensagem: body, categoria: 'fiscal', status: 'aberto',
           },
         });
+        atendimentoId = novo.id;
       }
+      // grava a mensagem recebida na thread
+      await this.prisma.atendimentoMensagem.create({
+        data: { atendimentoId, direcao: 'in', texto: body, canal: 'whatsapp' },
+      });
     } catch (e: any) {
       this.logger.warn(`registrarAtendimento falhou: ${e?.message ?? e}`);
     }
