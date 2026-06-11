@@ -63,9 +63,15 @@ export class BuscaDocsService {
 
     // Cliente: SÓ o campo explícito da IA — nunca uma keyword solta
     // (senão "notas com erro" vira busca por cliente chamado "erro").
+    // E nunca um termo fiscal: a IA às vezes joga "ICMS"/"nota" no issuerKeyword.
+    const STOP = new Set(['icms', 'ipi', 'pis', 'cofins', 'iss', 'st', 'das', 'darf',
+      'imposto', 'impostos', 'tributo', 'tributacao', 'nota', 'notas', 'nfe', 'nf-e',
+      'nfse', 'documento', 'documentos', 'inconsistencia', 'inconsistencias', 'erro',
+      'erros', 'divergencia', 'divergencias', 'problema', 'fiscal', 'cfop', 'ncm']);
     let companyIds: string[] | undefined;
     let clienteMatches: { id: string; name: string }[] = [];
-    const termoCliente = (f.issuerKeyword || '').trim();
+    let termoCliente = (f.issuerKeyword || '').trim();
+    if (termoCliente && STOP.has(termoCliente.toLowerCase())) termoCliente = '';
     const pediuCliente = termoCliente.length >= 3;
     if (pediuCliente) {
       clienteMatches = await this.prisma.company.findMany({
