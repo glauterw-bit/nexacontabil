@@ -108,6 +108,51 @@ export class PaineisService {
     };
   }
 
+  /**
+   * Limpeza da carteira: desativa (active=false, REVERSÍVEL) os registros que
+   * são lixo do import — pastas sem regime fiscal E sem nenhum documento,
+   * clientes demo e duplicados vazios. NUNCA desativa quem tem documentos.
+   */
+  async limparCarteira(dryRun = false) {
+    const REGIMES = new Set(['SIMPLES_NACIONAL', 'LUCRO_PRESUMIDO', 'LUCRO_REAL', 'MEI']);
+    const grouped = await this.prisma.document.groupBy({ by: ['companyId'], _count: { _all: true } });
+    const docsBy = new Map(grouped.map((g) => [g.companyId, g._count._all]));
+    const docs = (id: string) => docsBy.get(id) ?? 0;
+    const all = await this.prisma.company.findMany({ select: { id: true, name: true, taxRegime: true, active: true } });
+
+    const isDemo = (c: any) => /\(demo\)|\bdemo\b|exemplo|sample/i.test(c.name ?? '');
+    const isVazia = (c: any) => docs(c.id) === 0 && !REGIMES.has(c.taxRegime);
+
+    // duplicados: mesmo nome → mantém o com mais docs, marca os vazios restantes
+    const byName = new Map<string, any[]>();
+    for (const c of all) { const k = (c.name ?? '').trim().toUpperCase(); if (!byName.has(k)) byName.set(k, []); byName.get(k)!.push(c); }
+    const dupExtras: any[] = [];
+    for (const arr of byName.values()) {
+      if (arr.length > 1) {
+        const sorted = [...arr].sort((a, b) => docs(b.id) - docs(a.id));
+        dupExtras.push(...sorted.slice(1).filter((c) => docs(c.id) === 0));
+      }
+    }
+
+    const remover = new Map<string, any>();
+    for (const c of all) if ((isDemo(c) || isVazia(c)) && docs(c.id) === 0) remover.set(c.id, c);
+    for (const c of dupExtras) remover.set(c.id, c);
+    const ids = [...remover.keys()];
+
+    if (!dryRun && ids.length) {
+      await this.prisma.company.updateMany({ where: { id: { in: ids } }, data: { active: false } });
+    }
+    return {
+      dryRun,
+      total: all.length,
+      desativados: ids.length,
+      demo: all.filter(isDemo).length,
+      pastasVazias: all.filter(isVazia).length,
+      duplicadosVazios: dupExtras.length,
+      ativosRestantes: all.length - ids.length,
+    };
+  }
+
   // Painel gerencial: número-herói + KPIs + saúde da equipe num call só.
   async gerencial() {
     const [prod, inc, prazos] = await Promise.all([
@@ -129,7 +174,7 @@ export class PaineisService {
         clientesComErro: inc.clientesAfetados,
         atendAbertos,
         analistas: prod.analistas,
-        clientes: prod.equipe.reduce((s: number, e: any) => s + e.clientes, 0),
+        clientes: prod.equipe.reduce((s: number, e: any) => s + (e.clientesAtivos ?? 0), 0),
       },
       equipe,
       topClientesErro: inc.ranking.slice(0, 8),

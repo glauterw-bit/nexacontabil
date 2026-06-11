@@ -32,6 +32,11 @@ export class PaineisController {
     return this.service.gerencial();
   }
 
+  @Post('limpar-carteira')
+  limparCarteira(@Body() body: { dryRun?: boolean }) {
+    return this.service.limparCarteira(body?.dryRun ?? false);
+  }
+
   @Get('meu-dia')
   meuDia(@Req() req: any, @Query('responsavel') responsavel?: string) {
     return this.service.meuDia(escopo(req, responsavel));
