@@ -160,8 +160,9 @@ export class AnaliseClienteService {
     const ruleMap = new Map<string, any[]>();
     for (const r of rules) { const a = ruleMap.get(r.ncm) ?? []; a.push(r); ruleMap.set(r.ncm, a); }
 
-    const companies = await this.prisma.company.findMany({ select: { id: true, segmentoFiscal: true } });
+    const companies = await this.prisma.company.findMany({ select: { id: true, segmentoFiscal: true, taxRegime: true } });
     const segBy = new Map(companies.map((c) => [c.id, c.segmentoFiscal]));
+    const regimeBy = new Map(companies.map((c) => [c.id, c.taxRegime]));
 
     const docs = await this.prisma.document.findMany({
       where: { extractedData: { not: null } },
@@ -172,6 +173,7 @@ export class AnaliseClienteService {
     for (const d of docs) {
       let nf: any; try { nf = JSON.parse(d.extractedData as string); } catch { continue; }
       const seg = segBy.get(d.companyId);
+      const regime = regimeBy.get(d.companyId);
       const incs: string[] = [];
       for (const it of (nf?.itens ?? [])) {
         if (!it.ncm) continue;
@@ -181,24 +183,34 @@ export class AnaliseClienteService {
 
         const cfop = String(it.cfop ?? '');
         const d1 = cfop[0]; // 5=saída intra, 6=saída interestadual, 1/2=entradas, 7=exterior
+        const cst = String(it.cst ?? '').trim();
+        const isCSOSN = cst.length === 3;       // Simples Nacional usa CSOSN (3 díg)
+        const isSimples = regime === 'SIMPLES_NACIONAL' || isCSOSN;
 
-        // ── ICMS consciente de UF (só saídas) ──
-        if (it.icms != null) {
+        // ── ICMS — só validamos onde a comparação É FIEL ──
+        // Pulamos o que legitimamente NÃO destaca ICMS próprio:
+        //  Simples (CSOSN) → ICMS via DAS
+        //  CST 40/41/50/51 → isento/não-trib/suspenso/diferido (pICMS 0 correto)
+        //  CST 60 → ICMS-ST já recolhido anteriormente (pICMS 0 correto)
+        const semIcmsProprio = ['40', '41', '50', '51', '60'].includes(cst);
+        const tributadoIntegral = cst === '00' || cst === '10' || cst === ''; // 00/10 destacam ICMS próprio
+        const validaIcms = !isSimples && !semIcmsProprio && tributadoIntegral;
+
+        if (validaIcms && it.icms != null) {
           if (d1 === '5') { // operação interna → compara com a alíquota interna padrão
-            if (rule.icmsAliquota != null && Math.abs(rule.icmsAliquota - it.icms) > 0.5) {
-              incs.push(`NCM ${it.ncm}: ICMS interno ${it.icms}% (padrão ${rule.icmsAliquota}%)`); divergencias++;
+            if (rule.icmsAliquota != null && rule.icmsAliquota > 0 && Math.abs(rule.icmsAliquota - it.icms) > 0.5) {
+              incs.push(`NCM ${it.ncm}: ICMS interno ${it.icms}% (padrão ${rule.icmsAliquota}%) — CST ${cst || '00'}`); divergencias++;
             }
           } else if (d1 === '6') { // interestadual → alíquotas legais 4/7/12
             const a = Math.round(it.icms);
             if (![0, 4, 7, 12].includes(a)) {
-              incs.push(`NCM ${it.ncm}: ICMS interestadual ${it.icms}% fora do legal (4/7/12%)`); divergencias++;
+              incs.push(`NCM ${it.ncm}: ICMS interestadual ${it.icms}% fora do legal (4/7/12%) — CST ${cst || '00'}`); divergencias++;
             }
           }
           // entradas (1/2/3) e exportação (7): não valida ICMS de saída
         }
-
-        // CFOP NÃO entra como erro: varia legitimamente por tipo de venda
-        // (ST, contribuinte/consumidor, intra/inter). Só ICMS é sinal confiável.
+        // CST 20/90 (redução de base / outros) e CFOP: variam legitimamente —
+        // não entram como erro pra não gerar falso positivo. Só sinal confiável.
       }
       await this.prisma.document.update({ where: { id: d.id }, data: { fiscalValidation: JSON.stringify({ ok: incs.length === 0, inconsistencias: incs }) } });
       revalidados++; totalInconsist += incs.length; if (incs.length) comInconsistencia++;

@@ -276,8 +276,12 @@ export class NcmInteligenteService {
         const cur = bySeg.get(seg) ?? { icms: [], cfops: {}, cfops3: {}, ipi: [], pis: [], cofins: [], descricao: it.descricao, count: 0 };
         const cfop = String(it.cfop ?? '');
         const intra = cfop.startsWith('5'); // saída dentro do estado = ICMS interno padrão
-        // ICMS interno aprende SÓ das operações internas (5xxx); interestadual tem alíquota legal própria
-        if (it.icms != null && intra) cur.icms.push(Number(it.icms));
+        // ICMS interno aprende SÓ de notas TRIBUTADAS INTEGRALMENTE (CST 00/10)
+        // e internas. Exclui ST (60), isento/não-trib (40/41/50/51) e Simples
+        // (CSOSN 3 díg) — senão o padrão vira lixo (mistura 0% de ST com 18%).
+        const cstA = String(it.cst ?? '').trim();
+        const tributadoIntegral = cstA === '00' || cstA === '10';
+        if (it.icms != null && intra && tributadoIntegral && Number(it.icms) > 0) cur.icms.push(Number(it.icms));
         if (it.ipi != null) cur.ipi.push(Number(it.ipi));
         if (it.pis != null) cur.pis.push(Number(it.pis));
         if (it.cofins != null) cur.cofins.push(Number(it.cofins));
