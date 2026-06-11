@@ -12,14 +12,22 @@ const dataBR = (d: any) => d ? new Date(d).toLocaleDateString('pt-BR', { day: '2
 export default function MeuDiaPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [analista, setAnalista] = useState('');
+  const [nomes, setNomes] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch(`${API}/api/v1/paineis/responsaveis`, { headers: authHeaders() })
+      .then((r) => r.ok ? r.json() : null).then((d) => d && setNomes(d.nomes ?? [])).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/v1/paineis/meu-dia`, { headers: authHeaders() });
+      const u = `${API}/api/v1/paineis/meu-dia${analista ? `?responsavel=${encodeURIComponent(analista)}` : ''}`;
+      const r = await fetch(u, { headers: authHeaders() });
       if (r.ok) setData(await r.json());
     } catch { /* noop */ } finally { setLoading(false); }
-  }, []);
+  }, [analista]);
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}><Loader2 size={32} className="animate-spin" /></div>;
@@ -32,7 +40,14 @@ export default function MeuDiaPage() {
       <h1 style={{ fontSize: 24, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
         <Sun size={24} color="#f59e0b" /> Meu Dia
       </h1>
-      <p style={{ color: '#94a3b8', marginTop: 4 }}>Tudo que precisa de ação agora, priorizado. {data?.responsavel ? `(${data.responsavel})` : '(toda a carteira)'}</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <p style={{ color: '#94a3b8', marginTop: 4 }}>Tudo que precisa de ação agora, priorizado.</p>
+        <select value={analista} onChange={(e) => setAnalista(e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #2a3142', background: '#161b27', color: '#e2e8f0', fontSize: 14 }}>
+          <option value="">Toda a carteira</option>
+          {nomes.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </div>
 
       <div style={{ display: 'flex', gap: 14, marginTop: 20, flexWrap: 'wrap' }}>
         <Stat label="Obrigações vencidas" value={r.obrigacoesVencidas} cor="#ef4444" />
