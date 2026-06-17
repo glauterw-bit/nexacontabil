@@ -45,6 +45,7 @@ const NAV_MAIN: NavItem[] = [
   { href: '/inconsistencias', icon: ShieldCheck,     label: 'Inconsistências',   badge: 'Malha' },
   { href: '/insights',        icon: Boxes,           label: 'Insights de IA',    badge: 'IA' },
   { href: '/organizacao',     icon: FolderTree,      label: 'Organização Docs',  badge: 'Novo' },
+  { href: '/apuracao',        icon: ClipboardList,   label: 'Apuração',          badge: 'Fiscal' },
   { href: '/prazos',          icon: ClipboardList,   label: 'Prazos & SLA' },
   { href: '/produtividade',   icon: Users,           label: 'Produtividade' },
   { href: '/atribuir-responsavel', icon: UserCheck,  label: 'Atribuir Responsáveis' },
