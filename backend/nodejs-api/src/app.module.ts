@@ -78,6 +78,7 @@ import { AtendimentosModule } from './modules/atendimentos/atendimentos.module';
 import { InsightsModule } from './modules/insights/insights.module';
 import { OrganizacaoModule } from './modules/organizacao/organizacao.module';
 import { ApuracaoModule } from './modules/apuracao/apuracao.module';
+import { SolicitacoesModule } from './modules/solicitacoes/solicitacoes.module';
 import { GestaoAdminModule } from './modules/gestao-admin/gestao-admin.module';
 import { BenchmarkModule } from './modules/benchmark/benchmark.module';
 import { BalanceSheetModule } from './modules/balance-sheet/balance-sheet.module';
@@ -202,6 +203,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     InsightsModule,
     OrganizacaoModule,
     ApuracaoModule,
+    SolicitacoesModule,
     GestaoAdminModule,
     BenchmarkModule,
     BalanceSheetModule,
