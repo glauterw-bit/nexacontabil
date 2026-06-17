@@ -56,9 +56,9 @@ export default function OrganizacaoPage() {
         subtitle="Todos os documentos organizados por natureza fiscal, contábil e cliente." />
 
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-        <Kpi label="Documentos" value={d.totalNotas?.toLocaleString('pt-BR')} />
+        <Kpi label="Documentos" value={d.totalNotas?.toLocaleString('pt-BR')} sub={`${d.docsAtivos} ativos · ${d.docsInativos} históricos`} />
         <Kpi label="Valor total" value={BRL(d.totalValor)} />
-        <Kpi label="Clientes ativos" value={d.clientesAtivos} />
+        <Kpi label="Clientes" value={d.clientes} sub={`${d.empresasAtivas} ativos · ${d.empresasInativas} inativos`} />
         <Kpi label="Notas monofásicas" value={d.fiscal?.monofasico?.notas ?? 0} cor={COLORS.atencao} />
       </div>
 

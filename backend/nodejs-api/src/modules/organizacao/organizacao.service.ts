@@ -23,8 +23,10 @@ export class OrganizacaoService {
       where: { extractedData: { not: null } },
       select: { companyId: true, type: true, totalValue: true, issueDate: true, extractedData: true },
     });
-    const companies = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true, taxRegime: true, segmentoFiscal: true } });
+    // inclui TODAS as empresas (ativas + inativas/históricas) — organiza todos os docs
+    const companies = await this.prisma.company.findMany({ select: { id: true, name: true, taxRegime: true, segmentoFiscal: true, active: true } });
     const coById = new Map(companies.map((c) => [c.id, c]));
+    let docsAtivos = 0, docsInativos = 0;
 
     const porTipoDoc = new Map<string, any>();      // nfe / nfse
     const porDirecao = new Map<string, any>();       // entrada / saída
@@ -43,8 +45,9 @@ export class OrganizacaoService {
       const nf = safe(d.extractedData); if (!nf) continue;
       const v = d.totalValue ?? nf.totais?.produtos ?? 0;
       const co = coById.get(d.companyId);
-      if (!co) continue; // ignora docs de empresas desativadas (limpeza)
+      if (!co) continue; // empresa não existe mais
       totalValor += v; totalNotas++;
+      if (co.active) docsAtivos++; else docsInativos++;
       inc(porTipoDoc, (d.type || 'outro').toUpperCase(), v);
       if (d.issueDate) inc(porMes, new Date(d.issueDate).toISOString().slice(0, 7), v);
       inc(porRegime, co.taxRegime ?? 'n/d', v);
@@ -79,7 +82,11 @@ export class OrganizacaoService {
       .sort((a, b) => b.valor - a.valor);
 
     return {
-      totalNotas, totalValor: Math.round(totalValor * 100) / 100, clientesAtivos: clientes.length,
+      totalNotas, totalValor: Math.round(totalValor * 100) / 100,
+      clientes: clientes.length,
+      docsAtivos, docsInativos,
+      empresasAtivas: companies.filter((c) => c.active).length,
+      empresasInativas: companies.filter((c) => !c.active).length,
       fiscal: {
         porTipoDoc: arr(porTipoDoc),
         porDirecao: arr(porDirecao),       // entrada x saída
