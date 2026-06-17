@@ -76,6 +76,7 @@ import { BuscaDocsModule } from './modules/busca-docs/busca-docs.module';
 import { PaineisModule } from './modules/paineis/paineis.module';
 import { AtendimentosModule } from './modules/atendimentos/atendimentos.module';
 import { InsightsModule } from './modules/insights/insights.module';
+import { OrganizacaoModule } from './modules/organizacao/organizacao.module';
 import { GestaoAdminModule } from './modules/gestao-admin/gestao-admin.module';
 import { BenchmarkModule } from './modules/benchmark/benchmark.module';
 import { BalanceSheetModule } from './modules/balance-sheet/balance-sheet.module';
@@ -198,6 +199,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     PaineisModule,
     AtendimentosModule,
     InsightsModule,
+    OrganizacaoModule,
     GestaoAdminModule,
     BenchmarkModule,
     BalanceSheetModule,

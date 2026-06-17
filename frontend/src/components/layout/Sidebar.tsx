@@ -10,7 +10,7 @@ import {
   Calendar, Users, Receipt, BarChart3, TrendingUp, Target, HeartPulse,
   Banknote, PenLine, ClipboardList, Landmark, Scale, Package, FileCode,
   Briefcase, UserCheck, Award, Globe, DollarSign, Kanban, Megaphone, Store,
-  Workflow, Boxes, FileDown, Gauge, Inbox, Search
+  Workflow, Boxes, FileDown, Gauge, Inbox, Search, FolderTree
 } from 'lucide-react';
 import { useCompany, Company } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -44,6 +44,7 @@ const NAV_MAIN: NavItem[] = [
   { href: '/dashboard',       icon: Building2,       label: 'Painel do Cliente' },
   { href: '/inconsistencias', icon: ShieldCheck,     label: 'Inconsistências',   badge: 'Malha' },
   { href: '/insights',        icon: Boxes,           label: 'Insights de IA',    badge: 'IA' },
+  { href: '/organizacao',     icon: FolderTree,      label: 'Organização Docs',  badge: 'Novo' },
   { href: '/prazos',          icon: ClipboardList,   label: 'Prazos & SLA' },
   { href: '/produtividade',   icon: Users,           label: 'Produtividade' },
   { href: '/atribuir-responsavel', icon: UserCheck,  label: 'Atribuir Responsáveis' },
