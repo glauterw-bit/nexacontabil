@@ -12,6 +12,9 @@ class FluxoController {
   @Get('colunas')
   colunas() { return COLUNAS; }
 
+  @Get('competencias')
+  competencias() { return this.service.competencias(); }
+
   @Get('board')
   board(@Query('departamento') dep = 'fiscal', @Query('competencia') comp = '') {
     return this.service.board(dep, comp || new Date().toISOString().slice(0, 7));

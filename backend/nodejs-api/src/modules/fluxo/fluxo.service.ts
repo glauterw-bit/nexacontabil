@@ -94,7 +94,17 @@ export class FluxoService {
     let encontrado = false; let arquivo: string | null = null;
     try {
       const itens = await this.onedrive.search(conn.id, { folderId: company.sharepointItemId, driveId: company.sharepointDriveId, pageSize: 200 });
-      const match = (itens ?? []).find((i: any) => !i.isFolder && RECIBO_RX.test(i.name ?? ''));
+      // 1) arquivos de recibo soltos na pasta do cliente
+      let match = (itens ?? []).find((i: any) => !i.isFolder && RECIBO_RX.test(i.name ?? ''));
+      // 2) procura dentro de subpastas tipo "Recibos / Obrigações / Comprovantes"
+      if (!match) {
+        const subs = (itens ?? []).filter((i: any) => i.isFolder && /(recibo|obrigac|comprovante|protocolo|entrega|fiscal|acessor)/i.test(i.name ?? '')).slice(0, 3);
+        for (const sub of subs) {
+          const filhos = await this.onedrive.search(conn.id, { folderId: sub.id, driveId: company.sharepointDriveId, pageSize: 200 });
+          match = (filhos ?? []).find((f: any) => !f.isFolder && RECIBO_RX.test(f.name ?? ''));
+          if (match) break;
+        }
+      }
       if (match) { encontrado = true; arquivo = match.name; }
     } catch (e: any) {
       this.logger.warn(`verificarRecibo ${companyId}: ${e?.message ?? e}`);
@@ -110,16 +120,40 @@ export class FluxoService {
     return { reciboEncontrado: encontrado, arquivo };
   }
 
-  /** Verifica recibos de um LOTE pequeno (clientes na validação). Seguro. */
-  async verificarRecibosLote(competencia: string, limit = 8) {
+  /**
+   * Verifica recibos dos clientes AINDA NÃO verificados nessa competência.
+   * Lote pequeno (sequencial) — chamar em loop até `restantes` zerar.
+   */
+  async verificarRecibosLote(competencia: string, limit = 5) {
+    const checados = new Set(
+      (await this.prisma.fluxoEstado.findMany({
+        where: { departamento: 'fiscal', competencia, reciboCheckedAt: { not: null } },
+        select: { companyId: true },
+      })).map((e) => e.companyId),
+    );
     const companies = await this.prisma.company.findMany({
-      where: { active: true, sharepointItemId: { not: null } }, select: { id: true }, take: limit,
+      where: { active: true, sharepointItemId: { not: null } }, select: { id: true }, orderBy: { name: 'asc' },
     });
+    const pendentes = companies.filter((c) => !checados.has(c.id));
+    const lote = pendentes.slice(0, limit);
     let achados = 0;
-    for (const c of companies) {
+    for (const c of lote) {
       const r = await this.verificarRecibo(c.id, competencia, 'fiscal');
       if (r.reciboEncontrado) achados++;
     }
-    return { verificados: companies.length, recibosEncontrados: achados };
+    return { verificados: lote.length, recibosEncontrados: achados, restantes: pendentes.length - lote.length };
+  }
+
+  /** Meses (competências) com documentos — pra apurar retroativo. */
+  async competencias() {
+    const docs = await this.prisma.document.findMany({ where: { issueDate: { not: null } }, select: { issueDate: true } });
+    const m = new Map<string, number>();
+    for (const d of docs) {
+      const c = new Date(d.issueDate as Date).toISOString().slice(0, 7);
+      m.set(c, (m.get(c) ?? 0) + 1);
+    }
+    return [...m.entries()]
+      .map(([competencia, docs]) => ({ competencia, docs }))
+      .sort((a, b) => b.competencia.localeCompare(a.competencia));
   }
 }

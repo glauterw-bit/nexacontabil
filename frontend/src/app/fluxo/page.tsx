@@ -17,6 +17,12 @@ export default function FluxoPage() {
   const [loading, setLoading] = useState(true);
   const [verificando, setVerificando] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [meses, setMeses] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch(`${API}/api/v1/fluxo/competencias`, { headers: authHeaders() })
+      .then((r) => r.ok ? r.json() : null).then((d) => { if (d?.length) { setMeses(d); setComp(d[0].competencia); } }).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,7 +56,14 @@ export default function FluxoPage() {
         subtitle="Acompanhe cada cliente nas etapas do mês. A validação de recibos é automática (lê o drive)."
         action={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input type="month" value={comp} onChange={(e) => setComp(e.target.value)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 13 }} />
+            {meses.length > 0 ? (
+              <select value={comp} onChange={(e) => setComp(e.target.value)} title="Mês a apurar (retroativo)"
+                style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 13 }}>
+                {meses.map((m) => <option key={m.competencia} value={m.competencia}>{m.competencia} ({m.docs} docs)</option>)}
+              </select>
+            ) : (
+              <input type="month" value={comp} onChange={(e) => setComp(e.target.value)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 13 }} />
+            )}
             <button onClick={load} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.muted, cursor: 'pointer' }}><RefreshCw size={14} /></button>
           </div>
         } />
