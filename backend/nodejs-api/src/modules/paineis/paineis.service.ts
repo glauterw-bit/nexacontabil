@@ -3,51 +3,83 @@ import { PrismaService } from '../../database/prisma.service';
 
 function safe(s: any) { try { return s ? JSON.parse(s) : null; } catch { return null; } }
 
-/** Traduz uma inconsistência fiscal em causa + passo a passo de correção. */
+const O_QUE_E: Record<string, string> = {
+  ICMS: 'O ICMS é o imposto estadual sobre a circulação de mercadorias — cobrado quando o produto é vendido.',
+  PIS: 'O PIS é um imposto federal sobre o faturamento (a receita) da empresa.',
+  COFINS: 'A COFINS é uma contribuição federal sobre o faturamento, parceira do PIS.',
+  IPI: 'O IPI é o imposto federal sobre produtos industrializados — incide na saída da indústria.',
+  NCM: 'O NCM é o código que classifica o produto e define como ele é tributado.',
+};
+
+/** Traduz uma inconsistência fiscal em explicação pra leigo + passos de correção. */
 function comoCorrigir(erro: string) {
   const ncm = (erro.match(/NCM (\d+)/) || [])[1] ?? '';
+
   if (/ICMS interno .*padr[aã]o/i.test(erro)) {
     const m = erro.match(/interno ([\d.]+)%\s*\(padr[aã]o ([\d.]+)%/i);
     const aplicada = m?.[1] ?? '?', correta = m?.[2] ?? '?';
     const isento = correta === '0' || correta === '0.0';
     return {
-      categoria: 'Alíquota de ICMS interna divergente',
-      severidade: 'alta',
-      causa: `A nota aplicou ICMS de ${aplicada}% numa operação interna, mas o padrão do NCM ${ncm} (Banco de NCM) é ${correta}%.`,
+      categoria: 'Alíquota de ICMS interna divergente', severidade: 'alta', oQueE: O_QUE_E.ICMS,
+      causa: `A nota aplicou ICMS de ${aplicada}% numa operação interna, mas o padrão do NCM ${ncm} é ${correta}%.`,
+      emMiudos: isento
+        ? `Esta venda cobrou ${aplicada}% de ICMS, mas nas outras notas desse mesmo produto o ICMS costuma ser 0% (isento ou Simples Nacional). Ou esta nota cobrou imposto a mais, ou o produto realmente é tributado e o "padrão 0%" está errado.`
+        : `Esta venda cobrou ${aplicada}% de ICMS, mas o normal para esse produto é ${correta}%. Provavelmente alguém digitou a alíquota errada — está pagando ${Number(aplicada) > Number(correta) ? 'a mais' : 'a menos'} de imposto.`,
       passos: [
-        `Abra o cadastro do produto (NCM ${ncm}) no Domínio e confira a tributação de ICMS.`,
-        isento
-          ? `O padrão é 0% — se for isento/cesta básica/Simples, ajuste o CST/CSOSN para isenção e zere o ICMS.`
-          : `Ajuste a alíquota interna para ${correta}% (ou confirme se há redução de base/benefício que justifique ${aplicada}%).`,
-        `Se a nota estiver correta e o padrão errado, corrija a regra no Banco de NCM (o cliente pode ter particularidade).`,
+        `Abra o produto (NCM ${ncm}) no Domínio e confira a tributação de ICMS.`,
+        isento ? `Se for isento/cesta básica/Simples, ajuste o CST/CSOSN e zere o ICMS.` : `Ajuste a alíquota para ${correta}% (ou confirme se há redução/benefício que justifique ${aplicada}%).`,
+        `Se a nota estiver certa e o padrão errado, corrija a regra no Banco de NCM.`,
       ],
     };
   }
+
   if (/interestadual .*fora do legal/i.test(erro)) {
     const m = erro.match(/interestadual ([\d.]+)%/i);
     return {
-      categoria: 'ICMS interestadual fora da alíquota legal',
-      severidade: 'alta',
-      causa: `Operação interestadual com ICMS de ${m?.[1] ?? '?'}%. A legislação só admite 4% (importados), 7% ou 12% conforme origem/destino.`,
+      categoria: 'ICMS interestadual fora da alíquota legal', severidade: 'alta', oQueE: O_QUE_E.ICMS,
+      causa: `Operação interestadual com ICMS de ${m?.[1] ?? '?'}%. A lei só admite 4%, 7% ou 12%.`,
+      emMiudos: `Quando a venda é para OUTRO estado, a lei só permite ICMS de 4% (produto importado), 7% ou 12% — depende de onde sai e onde chega. Esta nota usou ${m?.[1] ?? '?'}%, que não é nenhum desses. Provável erro de digitação.`,
       passos: [
-        `Verifique a UF de origem e destino e aplique a alíquota legal (4% / 7% / 12%).`,
-        `Cheque o CST/CSOSN e se a operação tem ST ou DIFAL.`,
-        `Corrija o lançamento no Domínio para a alíquota correta.`,
+        `Veja a UF de origem e destino e use a alíquota legal (4% / 7% / 12%).`,
+        `Confira o CST/CSOSN e se tem ST ou DIFAL.`,
+        `Corrija o lançamento no Domínio.`,
       ],
     };
   }
-  if (/sem regra/i.test(erro)) {
+
+  // PIS / COFINS / IPI: "veio X% (esperado Y%)"
+  const vm = erro.match(/(PIS|COFINS|IPI) veio ([\d.]+)%\s*\(esperado ([\d.]+)%/i);
+  if (vm) {
+    const imp = vm[1].toUpperCase(); const veio = vm[2]; const esp = vm[3];
+    const espZero = esp === '0' || esp === '0.0';
+    const taxaReal = imp === 'PIS' ? '1,65%' : imp === 'COFINS' ? '7,6%' : 'conforme a TIPI';
     return {
-      categoria: 'NCM sem classificação',
-      severidade: 'media',
-      causa: `O NCM ${ncm} ainda não tem regra de tributação no Banco de NCM.`,
-      passos: [`Classifique o NCM ${ncm} no Banco de NCM (alíquotas e CST por segmento) para que a validação passe a cobrir esse produto.`],
+      categoria: `${imp} destacado diferente do padrão`, severidade: 'media', oQueE: O_QUE_E[imp],
+      causa: `A nota destacou ${imp} de ${veio}%, mas o padrão do NCM ${ncm} é ${esp}%.`,
+      emMiudos: espZero
+        ? `Esta nota cobrou ${imp} de ${veio}%, mas nas outras notas desse produto o ${imp} aparece como 0%. Isso geralmente significa uma de duas coisas: (1) o vendedor é Simples Nacional — aí o ${imp} já está embutido no boleto único do mês (o DAS) e NÃO aparece separado na nota; ou (2) o produto é "monofásico" — o ${imp} é cobrado só na fábrica e zera na revenda. Se a empresa for Simples, o ${veio}% NÃO deveria estar aqui (erro). Se for Lucro Real, o ${veio}% está CERTO (é a alíquota normal — ${taxaReal}) e o "padrão 0%" só apareceu porque a maioria das outras notas era de Simples.`
+        : `Esta nota cobrou ${imp} de ${veio}%, diferente dos ${esp}% que é o padrão desse produto. Vale conferir qual é o correto para o regime da empresa.`,
+      passos: [
+        `Confira o REGIME da empresa: Simples Nacional → ${imp} vai no DAS (não destaca na nota); Lucro Real → ${imp} de ${taxaReal} é o normal.`,
+        `Veja se o produto (NCM ${ncm}) é monofásico — nesse caso o ${imp} na revenda é 0%.`,
+        `Confirmado o erro, ajuste o CST de ${imp} e a alíquota no Domínio. Se a nota estiver certa, corrija o padrão no Banco de NCM.`,
+      ],
     };
   }
+
+  if (/sem regra/i.test(erro)) {
+    return {
+      categoria: 'NCM sem classificação', severidade: 'media', oQueE: O_QUE_E.NCM,
+      causa: `O NCM ${ncm} ainda não tem regra de tributação no Banco de NCM.`,
+      emMiudos: `O sistema ainda não conhece como esse produto (NCM ${ncm}) deve ser tributado, então não consegue conferir os impostos dele. Basta cadastrar a tributação uma vez e ele passa a validar sozinho.`,
+      passos: [`Classifique o NCM ${ncm} no Banco de NCM (alíquotas e CST por segmento).`],
+    };
+  }
+
   return {
-    categoria: 'Inconsistência fiscal',
-    severidade: 'media',
+    categoria: 'Inconsistência fiscal', severidade: 'media', oQueE: '',
     causa: erro,
+    emMiudos: 'O sistema encontrou uma diferença na tributação desta nota em relação ao padrão. Revise o lançamento para confirmar.',
     passos: ['Revise o lançamento e a tributação correspondente no Domínio.'],
   };
 }

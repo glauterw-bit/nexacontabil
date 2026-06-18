@@ -88,7 +88,14 @@ function Conteudo() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 14, color: sevCor(p.severidade) }}>
                 <AlertTriangle size={14} /> {p.categoria}
               </div>
+              {p.oQueE && <div style={{ fontSize: 12, color: '#94a3b8', margin: '3px 0', fontStyle: 'italic' }}>{p.oQueE}</div>}
               <div style={{ fontSize: 13, color: '#cbd5e1', margin: '4px 0' }}>{p.causa}</div>
+              {p.emMiudos && (
+                <div style={{ background: '#13182a', borderLeft: '3px solid #6366f1', borderRadius: 6, padding: '8px 12px', margin: '6px 0' }}>
+                  <div style={{ fontSize: 11, color: '#818cf8', fontWeight: 600, marginBottom: 3 }}>EM MIÚDOS (explicação simples)</div>
+                  <div style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.6 }}>{p.emMiudos}</div>
+                </div>
+              )}
               <div style={{ background: '#10141d', borderRadius: 8, padding: '8px 12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#34d399', fontWeight: 600, marginBottom: 4 }}>
                   <Wrench size={13} /> Como corrigir
