@@ -1609,3 +1609,20 @@ model AtendimentoMensagem {
   @@index([atendimentoId, createdAt])
   @@map("atendimento_mensagens")
 }
+
+// Estado de cada cliente no Fluxo de Trabalho (Contábil / Fiscal) por competência.
+model FluxoEstado {
+  id               String    @id @default(uuid())
+  companyId        String
+  departamento     String    // contabil | fiscal
+  competencia      String    // YYYY-MM
+  etapa            String    // chave da coluna atual
+  reciboEncontrado Boolean   @default(false)
+  reciboArquivo    String?   // nome do arquivo de recibo achado no drive
+  reciboCheckedAt  DateTime?
+  atualizadoEm     DateTime  @updatedAt
+
+  @@unique([companyId, departamento, competencia])
+  @@index([departamento, competencia])
+  @@map("fluxo_estados")
+}

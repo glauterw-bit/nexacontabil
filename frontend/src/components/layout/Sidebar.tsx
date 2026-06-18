@@ -50,6 +50,7 @@ const NAV_MAIN: NavItem[] = [
   { href: '/prazos',          icon: ClipboardList,   label: 'Prazos & SLA' },
   { href: '/produtividade',   icon: Users,           label: 'Produtividade' },
   { href: '/atribuir-responsavel', icon: UserCheck,  label: 'Atribuir Responsáveis' },
+  { href: '/fluxo',           icon: Workflow,        label: 'Fluxo de Trabalho', badge: 'Novo' },
   { href: '/kanban',          icon: Kanban,          label: 'Kanban da Equipe' },
 ];
 

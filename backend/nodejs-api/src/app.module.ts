@@ -79,6 +79,7 @@ import { InsightsModule } from './modules/insights/insights.module';
 import { OrganizacaoModule } from './modules/organizacao/organizacao.module';
 import { ApuracaoModule } from './modules/apuracao/apuracao.module';
 import { SolicitacoesModule } from './modules/solicitacoes/solicitacoes.module';
+import { FluxoModule } from './modules/fluxo/fluxo.module';
 import { GestaoAdminModule } from './modules/gestao-admin/gestao-admin.module';
 import { BenchmarkModule } from './modules/benchmark/benchmark.module';
 import { BalanceSheetModule } from './modules/balance-sheet/balance-sheet.module';
@@ -204,6 +205,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     OrganizacaoModule,
     ApuracaoModule,
     SolicitacoesModule,
+    FluxoModule,
     GestaoAdminModule,
     BenchmarkModule,
     BalanceSheetModule,
