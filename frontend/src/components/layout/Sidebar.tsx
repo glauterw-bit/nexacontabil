@@ -37,7 +37,8 @@ interface NavGroup {
 
 // ── GESTÃO — visão do gestor (topo, fixo, prioridade máxima) ──
 const NAV_MAIN: NavItem[] = [
-  { href: '/gerencial',       icon: LayoutDashboard, label: 'Painel Gerencial',  badge: 'Novo' },
+  { href: '/operacao',        icon: LayoutDashboard, label: 'Central de Operação', badge: 'Gestor' },
+  { href: '/gerencial',       icon: LayoutDashboard, label: 'Painel Gerencial' },
   { href: '/meu-dia',         icon: Gauge,           label: 'Meu Dia',           badge: 'Hoje' },
   { href: '/visao-geral',     icon: Building2,       label: 'Visão Geral',       badge: 'Admin' },
   { href: '/dashboard',       icon: Building2,       label: 'Painel do Cliente' },

@@ -215,6 +215,74 @@ export class PaineisService {
     };
   }
 
+  /**
+   * CENTRAL DE OPERAÇÃO — a situação TOTAL da carteira num lugar só:
+   * documentos, declarações (entregas), pendências e inconsistências,
+   * com um semáforo por cliente (verde/amarelo/vermelho). Leitura única.
+   */
+  async operacao(competencia?: string) {
+    const comp = competencia || new Date().toISOString().slice(0, 7);
+    const companies = await this.prisma.company.findMany({
+      where: { active: true }, select: { id: true, name: true, taxRegime: true, responsavel: true },
+    });
+    const ids = companies.map((c) => c.id);
+    const [docs, fluxos] = await Promise.all([
+      this.prisma.document.findMany({ where: { companyId: { in: ids }, extractedData: { not: null } }, select: { companyId: true, totalValue: true, extractedData: true, fiscalValidation: true } }),
+      this.prisma.fluxoEstado.findMany({ where: { departamento: 'fiscal', competencia: comp, companyId: { in: ids } }, select: { companyId: true, reciboEncontrado: true } }),
+    ]);
+    const reciboBy = new Map(fluxos.map((f) => [f.companyId, f.reciboEncontrado]));
+
+    type Ag = { docs: number; entradas: number; saidas: number; inc: number; valorInc: number };
+    const ag = new Map<string, Ag>();
+    for (const d of docs) {
+      const a = ag.get(d.companyId) ?? { docs: 0, entradas: 0, saidas: 0, inc: 0, valorInc: 0 };
+      a.docs++;
+      const nf = safe(d.extractedData);
+      const dir = String(nf?.itens?.[0]?.cfop ?? '')[0];
+      if (['1', '2', '3'].includes(dir)) a.entradas++; else if (['5', '6', '7'].includes(dir)) a.saidas++;
+      const inc = safe(d.fiscalValidation)?.inconsistencias ?? [];
+      if (inc.length) { a.inc += inc.length; a.valorInc += d.totalValue ?? 0; }
+      ag.set(d.companyId, a);
+    }
+
+    const REGIMES = new Set(['SIMPLES_NACIONAL', 'LUCRO_PRESUMIDO', 'LUCRO_REAL', 'MEI']);
+    let verdes = 0, amarelos = 0, vermelhos = 0;
+    let totDocs = 0, comDocs = 0, semDocs = 0, semEntradas = 0, comInc = 0, declEntregue = 0;
+    let totInc = 0, valorInc = 0, clientesInc = 0;
+    const clientes = companies.map((c) => {
+      const a = ag.get(c.id) ?? { docs: 0, entradas: 0, saidas: 0, inc: 0, valorInc: 0 };
+      const entregue = reciboBy.get(c.id) ?? false;
+      totDocs += a.docs; if (a.docs > 0) comDocs++; else semDocs++;
+      if (a.docs > 0 && a.entradas === 0) semEntradas++;
+      if (a.inc > 0) { comInc++; clientesInc++; totInc += a.inc; valorInc += a.valorInc; }
+      if (entregue) declEntregue++;
+      // semáforo: vermelho = sem docs ou muita inconsistência; amarelo = sem entradas / alguma inconsist / não entregou; verde = ok
+      let status: 'verde' | 'amarelo' | 'vermelho';
+      const pend: string[] = [];
+      if (a.docs === 0) pend.push('sem documentos');
+      if (a.docs > 0 && a.entradas === 0) pend.push('sem entradas');
+      if (a.inc > 0) pend.push(`${a.inc} inconsistência(s)`);
+      if (!REGIMES.has(c.taxRegime ?? '')) pend.push('sem regime');
+      if (!entregue) pend.push('declaração não entregue');
+      if (a.docs === 0 || a.inc >= 5) status = 'vermelho';
+      else if (a.entradas === 0 || a.inc > 0 || !entregue) status = 'amarelo';
+      else status = 'verde';
+      if (status === 'verde') verdes++; else if (status === 'amarelo') amarelos++; else vermelhos++;
+      return { companyId: c.id, cliente: c.name, regime: c.taxRegime, responsavel: c.responsavel, docs: a.docs, inconsistencias: a.inc, valorInc: Math.round(a.valorInc * 100) / 100, declaracaoEntregue: entregue, status, pendencias: pend };
+    }).sort((x, y) => ({ vermelho: 0, amarelo: 1, verde: 2 } as any)[x.status] - ({ vermelho: 0, amarelo: 1, verde: 2 } as any)[y.status] || y.inconsistencias - x.inconsistencias);
+
+    return {
+      competencia: comp,
+      totalClientes: companies.length,
+      semaforo: { verdes, amarelos, vermelhos },
+      documentos: { total: totDocs, clientesComDocs: comDocs, clientesSemDocs: semDocs },
+      declaracoes: { entregues: declEntregue, pendentes: companies.length - declEntregue },
+      pendencias: { clientes: amarelos + vermelhos, semDocumentos: semDocs, semEntradas },
+      inconsistencias: { notas: totInc, valor: Math.round(valorInc * 100) / 100, clientes: clientesInc },
+      clientes,
+    };
+  }
+
   // Detalhe dos erros de UM cliente, com causa + como corrigir.
   async clienteErros(companyId: string) {
     const empresa = await this.prisma.company.findUnique({

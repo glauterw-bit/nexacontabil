@@ -32,6 +32,11 @@ export class PaineisController {
     return this.service.gerencial();
   }
 
+  @Get('operacao')
+  operacao(@Query('competencia') competencia?: string) {
+    return this.service.operacao(competencia);
+  }
+
   @Post('limpar-carteira')
   limparCarteira(@Body() body: { dryRun?: boolean }) {
     return this.service.limparCarteira(body?.dryRun ?? false);
