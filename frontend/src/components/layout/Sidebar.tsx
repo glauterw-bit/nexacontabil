@@ -39,7 +39,6 @@ interface NavGroup {
 const NAV_MAIN: NavItem[] = [
   { href: '/gerencial',       icon: LayoutDashboard, label: 'Painel Gerencial',  badge: 'Novo' },
   { href: '/meu-dia',         icon: Gauge,           label: 'Meu Dia',           badge: 'Hoje' },
-  { href: '/torre-controle',  icon: Gauge,           label: 'Torre de Controle', badge: 'Gestor' },
   { href: '/visao-geral',     icon: Building2,       label: 'Visão Geral',       badge: 'Admin' },
   { href: '/dashboard',       icon: Building2,       label: 'Painel do Cliente' },
   { href: '/inconsistencias', icon: ShieldCheck,     label: 'Inconsistências',   badge: 'Malha' },
@@ -51,7 +50,6 @@ const NAV_MAIN: NavItem[] = [
   { href: '/produtividade',   icon: Users,           label: 'Produtividade' },
   { href: '/atribuir-responsavel', icon: UserCheck,  label: 'Atribuir Responsáveis' },
   { href: '/fluxo',           icon: Workflow,        label: 'Fluxo de Trabalho', badge: 'Novo' },
-  { href: '/kanban',          icon: Kanban,          label: 'Kanban da Equipe' },
 ];
 
 const NAV_GROUPS: NavGroup[] = [
@@ -61,7 +59,6 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/buscar-docs',     icon: Search,        label: 'Buscar Documentos', badge: 'IA' },
       { href: '/captura-xml',     icon: Inbox,         label: 'Captura de XMLs',   badge: 'Fiscal' },
       { href: '/esteira-fiscal',  icon: Workflow,      label: 'Esteira Fiscal',    badge: 'Auto' },
-      { href: '/risco-fiscal',    icon: ShieldCheck,   label: 'Risco Fiscal',      badge: 'AI' },
       { href: '/ncm-inteligente', icon: Boxes,         label: 'Banco de NCM',      badge: 'IA' },
       { href: '/exportar-dominio', icon: FileDown,     label: 'Exportar p/ Domínio' },
       { href: '/copilot',         icon: Bot,           label: 'Copilot IA',        badge: 'AI' },
@@ -70,7 +67,6 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Fiscal — Apuração & Entrega',
     items: [
-      { href: '/obrigacoes',      icon: ClipboardList, label: 'Obrigações' },
       { href: '/simples-nacional',icon: Award,         label: 'Simples Nacional' },
       { href: '/sped',            icon: FileCode,      label: 'SPED / EFD' },
       { href: '/fiscal',          icon: Receipt,       label: 'NF-e / NFS-e' },
@@ -83,7 +79,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/carteira',           icon: Briefcase,     label: 'Carteira',        badge: 'Live' },
       { href: '/onboarding-cliente', icon: Building2,     label: 'Onboarding Cliente' },
-      { href: '/companies',          icon: Building2,     label: 'Empresas' },
       { href: '/migracao',           icon: ArrowLeftRight,label: 'Migração em Massa' },
       { href: '/drive-conectado',    icon: Globe,         label: 'Drives Conectados' },
       { href: '/integracoes',        icon: Settings,      label: 'Integrações', badge: 'Setup' },
@@ -133,7 +128,6 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/tributario',     icon: Scale,      label: 'Plan. Tributário' },
       { href: '/reforma-tributaria', icon: Scale,  label: 'Reforma Tributária', badge: 'CBS/IBS' },
       { href: '/benchmark',      icon: Target,     label: 'Benchmark' },
-      { href: '/saude-fiscal',   icon: HeartPulse, label: 'Saúde Fiscal' },
       { href: '/abertura-empresa', icon: Store,    label: 'Abertura de Empresa' },
       { href: '/mei',            icon: Award,      label: 'MEI — DAS / DASN' },
       { href: '/guia',           icon: FileText,   label: 'Guia de Uso' },
@@ -158,7 +152,6 @@ const NAV_GROUPS_ANALISTA: NavGroup[] = [
       { href: '/esteira-fiscal',  icon: Workflow,  label: 'Esteira Fiscal' },
       { href: '/exportar-dominio', icon: FileDown, label: 'Exportar p/ Domínio' },
       { href: '/ncm-inteligente', icon: Boxes,     label: 'Banco de NCM' },
-      { href: '/risco-fiscal',    icon: ShieldCheck, label: 'Risco Fiscal' },
     ],
   },
   {
