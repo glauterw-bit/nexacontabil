@@ -23,6 +23,20 @@ export const COLUNAS: Record<string, { key: string; label: string; cor: string }
 // termos que identificam um recibo/comprovante de entrega no drive
 const RECIBO_RX = /(recibo|protocolo|comprovante|entrega|declarac|transmiss|\.rec\b)/i;
 
+const MESES_NOME = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+/** Reconhece se o nome do arquivo se refere à competência (YYYY-MM). */
+function refereAoMes(nome: string, competencia: string): boolean {
+  const [y, m] = competencia.split('-');
+  if (!y || !m) return false;
+  const yy = y.slice(2);
+  const nome3 = MESES_NOME[parseInt(m, 10) - 1];
+  const rx = new RegExp(
+    `(${m}[\\/\\-\\.]?${y}|${y}[\\/\\-\\.]?${m}|${m}[\\/\\-\\.]?${yy}|${nome3}[a-z]*[\\/\\-\\. ]?${yy}|${nome3}[a-z]*[\\/\\-\\. ]?${y})`,
+    'i',
+  );
+  return rx.test(nome ?? '');
+}
+
 @Injectable()
 export class FluxoService {
   private readonly logger = new Logger(FluxoService.name);
@@ -93,19 +107,18 @@ export class FluxoService {
 
     let encontrado = false; let arquivo: string | null = null;
     try {
+      // junta os arquivos de recibo da pasta raiz + subpastas (Recibos/Obrigações/...)
       const itens = await this.onedrive.search(conn.id, { folderId: company.sharepointItemId, driveId: company.sharepointDriveId, pageSize: 200 });
-      // 1) arquivos de recibo soltos na pasta do cliente
-      let match = (itens ?? []).find((i: any) => !i.isFolder && RECIBO_RX.test(i.name ?? ''));
-      // 2) procura dentro de subpastas tipo "Recibos / Obrigações / Comprovantes"
-      if (!match) {
-        const subs = (itens ?? []).filter((i: any) => i.isFolder && /(recibo|obrigac|comprovante|protocolo|entrega|fiscal|acessor)/i.test(i.name ?? '')).slice(0, 3);
-        for (const sub of subs) {
-          const filhos = await this.onedrive.search(conn.id, { folderId: sub.id, driveId: company.sharepointDriveId, pageSize: 200 });
-          match = (filhos ?? []).find((f: any) => !f.isFolder && RECIBO_RX.test(f.name ?? ''));
-          if (match) break;
-        }
+      const candidatos: any[] = (itens ?? []).filter((i: any) => !i.isFolder && RECIBO_RX.test(i.name ?? ''));
+      const subs = (itens ?? []).filter((i: any) => i.isFolder && /(recibo|obrigac|comprovante|protocolo|entrega|fiscal|acessor)/i.test(i.name ?? '')).slice(0, 3);
+      for (const sub of subs) {
+        const filhos = await this.onedrive.search(conn.id, { folderId: sub.id, driveId: company.sharepointDriveId, pageSize: 200 });
+        candidatos.push(...(filhos ?? []).filter((f: any) => !f.isFolder && RECIBO_RX.test(f.name ?? '')));
       }
-      if (match) { encontrado = true; arquivo = match.name; }
+      // prioriza o recibo DO MÊS (nome cita a competência); senão, marca como genérico
+      const doMes = candidatos.find((c) => refereAoMes(c.name ?? '', competencia));
+      if (doMes) { encontrado = true; arquivo = doMes.name; }
+      else if (candidatos.length) { encontrado = true; arquivo = `(genérico) ${candidatos[0].name}`; }
     } catch (e: any) {
       this.logger.warn(`verificarRecibo ${companyId}: ${e?.message ?? e}`);
       return { reciboEncontrado: false, motivo: 'erro ao ler o drive' };
