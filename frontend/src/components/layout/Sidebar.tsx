@@ -237,7 +237,7 @@ export function Sidebar() {
         <p className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Cliente / Empresa</p>
         {companies.length === 0 ? (
           <Link
-            href="/companies"
+            href="/onboarding-cliente"
             className="flex items-center gap-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors py-2"
           >
             <Plus className="h-4 w-4" />
