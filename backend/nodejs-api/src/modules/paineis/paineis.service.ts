@@ -225,8 +225,9 @@ export class PaineisService {
     // senão o mês atual. Evita mostrar "0 entregues" num mês ainda não fechado.
     let comp = competencia;
     if (!comp) {
+      // mês mais recente com ENTREGAS reais (recibo achado); senão o atual
       const ult = await this.prisma.fluxoEstado.findFirst({
-        where: { departamento: 'fiscal', reciboCheckedAt: { not: null } },
+        where: { departamento: 'fiscal', reciboEncontrado: true },
         orderBy: { competencia: 'desc' }, select: { competencia: true },
       });
       comp = ult?.competencia ?? new Date().toISOString().slice(0, 7);

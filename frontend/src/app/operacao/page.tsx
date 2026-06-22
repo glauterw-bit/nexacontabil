@@ -21,14 +21,21 @@ export default function OperacaoPage() {
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<string>('');
   const [busca, setBusca] = useState('');
+  const [comp, setComp] = useState('');
+  const [meses, setMeses] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch(`${API}/api/v1/fluxo/competencias`, { headers: authHeaders() })
+      .then((r) => r.ok ? r.json() : null).then((m) => m && setMeses(m)).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/v1/paineis/operacao`, { headers: authHeaders() });
-      if (r.ok) setD(await r.json());
+      const r = await fetch(`${API}/api/v1/paineis/operacao${comp ? `?competencia=${comp}` : ''}`, { headers: authHeaders() });
+      if (r.ok) { const j = await r.json(); setD(j); if (!comp) setComp(j.competencia); }
     } catch {} finally { setLoading(false); }
-  }, []);
+  }, [comp]);
   useEffect(() => { load(); }, [load]);
 
   if (loading) return <div style={{ textAlign: 'center', padding: 60, color: COLORS.muted }}><Loader2 size={32} className="animate-spin" /></div>;
@@ -52,7 +59,13 @@ export default function OperacaoPage() {
   return (
     <div style={{ maxWidth: 1150, margin: '0 auto', padding: 24 }}>
       <PageHeader icon={<Activity size={24} color={COLORS.acao} />} title="Central de Operação"
-        subtitle={`Situação total da carteira · competência ${d.competencia}`} />
+        subtitle="Situação total da carteira — documentos, declarações, pendências e inconsistências."
+        action={meses.length > 0 && (
+          <select value={comp} onChange={(e) => setComp(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 13 }}>
+            {meses.map((m) => <option key={m.competencia} value={m.competencia}>{m.competencia} ({m.docs} docs)</option>)}
+          </select>
+        )} />
 
       {!d.mesProcessado && (
         <div style={{ marginBottom: 14, padding: 10, background: '#1a1f10', border: '1px solid #3a3215', borderRadius: 8, fontSize: 13, color: '#fcd34d' }}>
