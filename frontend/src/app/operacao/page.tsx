@@ -52,7 +52,13 @@ export default function OperacaoPage() {
   return (
     <div style={{ maxWidth: 1150, margin: '0 auto', padding: 24 }}>
       <PageHeader icon={<Activity size={24} color={COLORS.acao} />} title="Central de Operação"
-        subtitle="A situação total da carteira num lugar só — documentos, declarações, pendências e inconsistências." />
+        subtitle={`Situação total da carteira · competência ${d.competencia}`} />
+
+      {!d.mesProcessado && (
+        <div style={{ marginBottom: 14, padding: 10, background: '#1a1f10', border: '1px solid #3a3215', borderRadius: 8, fontSize: 13, color: '#fcd34d' }}>
+          Este mês ainda não teve os recibos verificados no drive — por isso a coluna "Declaração" aparece em branco. Use o <Link href="/fluxo" style={{ color: COLORS.atencao }}>Fluxo</Link> para validar os recibos.
+        </div>
+      )}
 
       {/* Semáforo-herói */}
       <Card style={{ marginBottom: 16 }}>

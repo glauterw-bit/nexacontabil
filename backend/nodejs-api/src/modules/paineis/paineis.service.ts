@@ -221,16 +221,26 @@ export class PaineisService {
    * com um semáforo por cliente (verde/amarelo/vermelho). Leitura única.
    */
   async operacao(competencia?: string) {
-    const comp = competencia || new Date().toISOString().slice(0, 7);
+    // default: o mês JÁ PROCESSADO mais recente (com recibos verificados),
+    // senão o mês atual. Evita mostrar "0 entregues" num mês ainda não fechado.
+    let comp = competencia;
+    if (!comp) {
+      const ult = await this.prisma.fluxoEstado.findFirst({
+        where: { departamento: 'fiscal', reciboCheckedAt: { not: null } },
+        orderBy: { competencia: 'desc' }, select: { competencia: true },
+      });
+      comp = ult?.competencia ?? new Date().toISOString().slice(0, 7);
+    }
     const companies = await this.prisma.company.findMany({
       where: { active: true }, select: { id: true, name: true, taxRegime: true, responsavel: true },
     });
     const ids = companies.map((c) => c.id);
     const [docs, fluxos] = await Promise.all([
       this.prisma.document.findMany({ where: { companyId: { in: ids }, extractedData: { not: null } }, select: { companyId: true, totalValue: true, extractedData: true, fiscalValidation: true } }),
-      this.prisma.fluxoEstado.findMany({ where: { departamento: 'fiscal', competencia: comp, companyId: { in: ids } }, select: { companyId: true, reciboEncontrado: true } }),
+      this.prisma.fluxoEstado.findMany({ where: { departamento: 'fiscal', competencia: comp, companyId: { in: ids }, reciboCheckedAt: { not: null } }, select: { companyId: true, reciboEncontrado: true } }),
     ]);
     const reciboBy = new Map(fluxos.map((f) => [f.companyId, f.reciboEncontrado]));
+    const mesProcessado = fluxos.length > 0; // só pune declaração se o mês já foi verificado
 
     type Ag = { docs: number; entradas: number; saidas: number; inc: number; valorInc: number };
     const ag = new Map<string, Ag>();
@@ -259,13 +269,14 @@ export class PaineisService {
       // semáforo: vermelho = sem docs ou muita inconsistência; amarelo = sem entradas / alguma inconsist / não entregou; verde = ok
       let status: 'verde' | 'amarelo' | 'vermelho';
       const pend: string[] = [];
+      const declPendente = mesProcessado && !entregue; // só conta se o mês já foi verificado
       if (a.docs === 0) pend.push('sem documentos');
       if (a.docs > 0 && a.entradas === 0) pend.push('sem entradas');
       if (a.inc > 0) pend.push(`${a.inc} inconsistência(s)`);
       if (!REGIMES.has(c.taxRegime ?? '')) pend.push('sem regime');
-      if (!entregue) pend.push('declaração não entregue');
+      if (declPendente) pend.push('declaração não entregue');
       if (a.docs === 0 || a.inc >= 5) status = 'vermelho';
-      else if (a.entradas === 0 || a.inc > 0 || !entregue) status = 'amarelo';
+      else if (a.entradas === 0 || a.inc > 0 || declPendente) status = 'amarelo';
       else status = 'verde';
       if (status === 'verde') verdes++; else if (status === 'amarelo') amarelos++; else vermelhos++;
       return { companyId: c.id, cliente: c.name, regime: c.taxRegime, responsavel: c.responsavel, docs: a.docs, inconsistencias: a.inc, valorInc: Math.round(a.valorInc * 100) / 100, declaracaoEntregue: entregue, status, pendencias: pend };
@@ -273,6 +284,7 @@ export class PaineisService {
 
     return {
       competencia: comp,
+      mesProcessado,
       totalClientes: companies.length,
       semaforo: { verdes, amarelos, vermelhos },
       documentos: { total: totDocs, clientesComDocs: comDocs, clientesSemDocs: semDocs },
