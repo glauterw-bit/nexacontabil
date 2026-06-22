@@ -7,9 +7,9 @@ import { useEffect } from 'react';
 import {
   LayoutDashboard, FileText, ArrowLeftRight, Bot,
   Settings, ShieldCheck, Zap, Building2, ChevronDown, Plus, MessageCircle, Hash, LogOut,
-  Calendar, Users, Receipt, BarChart3, TrendingUp, Target, HeartPulse,
+  Calendar, Users, Receipt, BarChart3, TrendingUp, Target,
   Banknote, PenLine, ClipboardList, Landmark, Scale, Package, FileCode,
-  Briefcase, UserCheck, Award, Globe, DollarSign, Kanban, Megaphone, Store,
+  Briefcase, UserCheck, Award, Globe, DollarSign, Megaphone, Store,
   Workflow, Boxes, FileDown, Gauge, Inbox, Search, FolderTree
 } from 'lucide-react';
 import { useCompany, Company } from '@/contexts/CompanyContext';
