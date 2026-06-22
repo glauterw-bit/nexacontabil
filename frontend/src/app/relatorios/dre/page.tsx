@@ -53,7 +53,7 @@ export default function DREPage() {
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
         <Building2 className="h-12 w-12 text-gray-600" />
         <p className="text-gray-400 text-sm">Selecione uma empresa para gerar o DRE.</p>
-        <Link href="/companies" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">
+        <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">
           Gerenciar Empresas
         </Link>
       </div>
@@ -107,7 +107,7 @@ export default function DREPage() {
           <p className="text-sm font-medium text-white">Sem lançamentos no período</p>
           <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
             Não há transações contábeis aprovadas neste mês. Lance documentos em <Link href="/transactions" className="text-indigo-400 hover:underline">Lançamentos</Link> ou
-            use a <Link href="/inteligencia" className="text-indigo-400 hover:underline">Análise IA em lote</Link>.
+            use a <Link href="/insights" className="text-indigo-400 hover:underline">Análise IA em lote</Link>.
           </p>
         </div>
       ) : (

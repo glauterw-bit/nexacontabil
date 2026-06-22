@@ -71,7 +71,7 @@ export default function SimplesNacionalPage() {
         <div className="text-center">
           <Building2 className="h-12 w-12 text-gray-600 mx-auto mb-4" />
           <p className="text-gray-400">Selecione uma empresa no menu lateral</p>
-          <Link href="/companies" className="mt-4 inline-block text-indigo-400 hover:underline">Cadastrar empresa</Link>
+          <Link href="/carteira" className="mt-4 inline-block text-indigo-400 hover:underline">Cadastrar empresa</Link>
         </div>
       </div>
     );

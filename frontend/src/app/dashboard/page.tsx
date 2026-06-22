@@ -102,7 +102,7 @@ export default function DashboardPage() {
             <Kpi label="Risco de malha fina" value={ia?.malhaFina ? `${ia.malhaFina.score}` : '—'} sub={ia?.malhaFina ? `nível ${ia.malhaFina.level}` : 'sem dados'} icon={ShieldAlert} color={ia?.malhaFina ? nivelCor(ia.malhaFina.level) : '#64748b'} />
           </div>
 
-          <Card title="Cronograma fiscal e contábil" icon={CalendarClock} action={<Link href="/kanban" className="text-xs text-indigo-400 hover:underline">Kanban →</Link>}>
+          <Card title="Cronograma fiscal e contábil" icon={CalendarClock} action={<Link href="/fluxo" className="text-xs text-indigo-400 hover:underline">Kanban →</Link>}>
             <div className="flex items-stretch gap-1.5 overflow-x-auto pb-1">
               {(cr?.etapas ?? []).map((e: any, i: number) => {
                 const s = ST[e.status] ?? ST.pendente;
@@ -145,7 +145,7 @@ export default function DashboardPage() {
               )}
             </Card>
 
-            <Card title="Próximas obrigações" icon={CalendarClock} action={<Link href="/obrigacoes" className="text-xs text-indigo-400 hover:underline">Ver todas →</Link>}>
+            <Card title="Próximas obrigações" icon={CalendarClock} action={<Link href="/prazos" className="text-xs text-indigo-400 hover:underline">Ver todas →</Link>}>
               {(!data.obrigacoes.proximas || data.obrigacoes.proximas.length === 0) ? (
                 <Empty msg={data.obrigacoes.vencidas > 0 ? `${data.obrigacoes.vencidas} obrigação(ões) vencida(s)` : 'Sem obrigações cadastradas neste cliente.'} />
               ) : (
@@ -206,7 +206,7 @@ export default function DashboardPage() {
             </Card>
           )}
 
-          <Card title="Análises da IA — fiscal e contábil" icon={Brain} action={<Link href="/risco-fiscal" className="text-xs text-indigo-400 hover:underline">Risco fiscal →</Link>}>
+          <Card title="Análises da IA — fiscal e contábil" icon={Brain} action={<Link href="/inconsistencias" className="text-xs text-indigo-400 hover:underline">Risco fiscal →</Link>}>
             <div className="grid md:grid-cols-3 gap-4">
               <div className="rounded-lg border border-[#1e2740] bg-[#0f1117] p-4">
                 <div className="flex items-center gap-2 mb-2"><ShieldAlert className="h-4 w-4 text-indigo-400" /><span className="text-xs text-gray-400">Risco de malha fina</span></div>

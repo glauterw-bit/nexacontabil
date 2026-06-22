@@ -120,7 +120,7 @@ export default function FiscalPage() {
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
         <Building2 className="h-12 w-12 text-gray-600" />
         <p className="text-gray-400 text-sm">Selecione uma empresa para gerenciar notas fiscais.</p>
-        <Link href="/companies" className="btn-primary">Gerenciar Empresas</Link>
+        <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
       </div>
     );
   }

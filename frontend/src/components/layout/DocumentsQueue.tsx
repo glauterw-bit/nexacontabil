@@ -42,7 +42,7 @@ export function DocumentsQueue({ companyId }: Props) {
     <div className="card-aura h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-semibold text-white">Últimos Documentos</h2>
-        <Link href="/documents" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+        <Link href="/captura-xml" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
           Ver todos →
         </Link>
       </div>
@@ -55,7 +55,7 @@ export function DocumentsQueue({ companyId }: Props) {
         <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
           <FileText className="h-8 w-8 text-gray-600 mb-2" />
           <p className="text-sm text-gray-500">Nenhum documento ainda</p>
-          <Link href="/documents" className="text-xs text-indigo-400 mt-2 hover:underline">
+          <Link href="/captura-xml" className="text-xs text-indigo-400 mt-2 hover:underline">
             Enviar primeiro documento
           </Link>
         </div>

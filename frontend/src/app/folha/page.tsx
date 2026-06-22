@@ -148,7 +148,7 @@ export default function FolhaPage() {
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
         <Building2 className="h-12 w-12 text-gray-600" />
         <p className="text-gray-400 text-sm">Selecione uma empresa para ver a folha de pagamento.</p>
-        <Link href="/companies" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">
+        <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">
           Gerenciar Empresas
         </Link>
       </div>
