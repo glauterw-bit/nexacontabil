@@ -270,14 +270,17 @@ export class PaineisService {
       // semáforo: vermelho = sem docs ou muita inconsistência; amarelo = sem entradas / alguma inconsist / não entregou; verde = ok
       let status: 'verde' | 'amarelo' | 'vermelho';
       const pend: string[] = [];
-      const declPendente = mesProcessado && !entregue; // só conta se o mês já foi verificado
+      // SEMÁFORO baseado só em sinais CONFIÁVEIS: tem documento + sem erro fiscal.
+      // (entradas e recibo entram como info, não derrubam o status — são sinais
+      //  incompletos: entradas vêm pelo Onvio, e nem todo recibo está no drive)
+      const declPendente = mesProcessado && !entregue;
       if (a.docs === 0) pend.push('sem documentos');
       if (a.docs > 0 && a.entradas === 0) pend.push('sem entradas');
       if (a.inc > 0) pend.push(`${a.inc} inconsistência(s)`);
       if (!REGIMES.has(c.taxRegime ?? '')) pend.push('sem regime');
       if (declPendente) pend.push('declaração não entregue');
       if (a.docs === 0 || a.inc >= 5) status = 'vermelho';
-      else if (a.entradas === 0 || a.inc > 0 || declPendente) status = 'amarelo';
+      else if (a.inc > 0) status = 'amarelo';
       else status = 'verde';
       if (status === 'verde') verdes++; else if (status === 'amarelo') amarelos++; else vermelhos++;
       return { companyId: c.id, cliente: c.name, regime: c.taxRegime, responsavel: c.responsavel, docs: a.docs, inconsistencias: a.inc, valorInc: Math.round(a.valorInc * 100) / 100, declaracaoEntregue: entregue, status, pendencias: pend };
