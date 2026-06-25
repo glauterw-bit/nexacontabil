@@ -42,6 +42,7 @@ const NAV_MAIN: NavItem[] = [
   { href: '/meu-dia',         icon: Gauge,           label: 'Meu Dia',           badge: 'Hoje' },
   { href: '/visao-geral',     icon: Building2,       label: 'Visão Geral',       badge: 'Admin' },
   { href: '/dashboard',       icon: Building2,       label: 'Painel do Cliente' },
+  { href: '/farois',          icon: Target,          label: 'Faróis',            badge: 'Risco' },
   { href: '/inconsistencias', icon: ShieldCheck,     label: 'Inconsistências',   badge: 'Malha' },
   { href: '/insights',        icon: Boxes,           label: 'Insights de IA',    badge: 'IA' },
   { href: '/organizacao',     icon: FolderTree,      label: 'Organização Docs',  badge: 'Novo' },

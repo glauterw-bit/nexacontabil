@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { monofasicoPorNcm } from '../organizacao/classificacao.util';
 
 function safe(s: any) { try { return s ? JSON.parse(s) : null; } catch { return null; } }
+const r2 = (n: number) => Math.round((n || 0) * 100) / 100;
 
 const O_QUE_E: Record<string, string> = {
   ICMS: 'O ICMS é o imposto estadual sobre a circulação de mercadorias — cobrado quando o produto é vendido.',
@@ -296,6 +298,83 @@ export class PaineisService {
       pendencias: { clientes: amarelos + vermelhos, semDocumentos: semDocs, semEntradas },
       inconsistencias: { notas: totInc, valor: Math.round(valorInc * 100) / 100, clientes: clientesInc },
       clientes,
+    };
+  }
+
+  /**
+   * CENTRAL DE FARÓIS — alertas inteligentes de Risco & Oportunidade:
+   * 1) sublimite do Simples · 2) queda de faturamento · 3) monofásico
+   * (economia) · 4) concentração de receita. Leitura única, segura.
+   */
+  async farois() {
+    const companies = await this.prisma.company.findMany({
+      where: { active: true }, select: { id: true, name: true, taxRegime: true },
+    });
+    const coById = new Map(companies.map((c) => [c.id, c]));
+    const docs = await this.prisma.document.findMany({
+      where: { companyId: { in: companies.map((c) => c.id) }, extractedData: { not: null } },
+      select: { companyId: true, totalValue: true, issueDate: true, extractedData: true },
+    });
+
+    type C = { meses: Map<string, number>; mono: number; monoNotas: number; total: number };
+    const byClient = new Map<string, C>();
+    for (const d of docs) {
+      const nf = safe(d.extractedData);
+      const dir = String(nf?.itens?.[0]?.cfop ?? '')[0];
+      const saida = ['5', '6', '7'].includes(dir) || dir === '';
+      const v = d.totalValue ?? nf?.totais?.produtos ?? 0;
+      const c = byClient.get(d.companyId) ?? { meses: new Map(), mono: 0, monoNotas: 0, total: 0 };
+      if (saida) {
+        c.total += v;
+        if (d.issueDate) { const comp = new Date(d.issueDate).toISOString().slice(0, 7); c.meses.set(comp, (c.meses.get(comp) ?? 0) + v); }
+      }
+      let temMono = false;
+      for (const it of (nf?.itens ?? [])) { if (monofasicoPorNcm(it.ncm)) { c.mono += it.valor ?? 0; temMono = true; } }
+      if (temMono) c.monoNotas++;
+      byClient.set(d.companyId, c);
+    }
+
+    // 1) SUBLIMITE DO SIMPLES (RBT12 = soma dos 12 meses mais recentes)
+    const sublimite: any[] = [];
+    for (const [id, c] of byClient) {
+      const co = coById.get(id); if (co?.taxRegime !== 'SIMPLES_NACIONAL') continue;
+      const comps = [...c.meses.keys()].sort().reverse();
+      const rbt12 = comps.slice(0, 12).reduce((s, k) => s + (c.meses.get(k) ?? 0), 0);
+      const pct = Math.round((rbt12 / 4800000) * 10000) / 100;
+      if (rbt12 > 0) sublimite.push({ companyId: id, nome: co.name, rbt12: r2(rbt12), pctLimite: pct, status: pct >= 95 ? 'vermelho' : pct >= 80 ? 'amarelo' : 'verde' });
+    }
+    sublimite.sort((a, b) => b.pctLimite - a.pctLimite);
+
+    // 2) QUEDA DE FATURAMENTO (último mês vs média dos anteriores)
+    const queda: any[] = [];
+    for (const [id, c] of byClient) {
+      const comps = [...c.meses.keys()].sort();
+      if (comps.length < 4) continue;
+      const ultimo = c.meses.get(comps[comps.length - 1]) ?? 0;
+      const ant = comps.slice(Math.max(0, comps.length - 7), comps.length - 1).map((k) => c.meses.get(k) ?? 0);
+      const media = ant.reduce((a, b) => a + b, 0) / ant.length;
+      if (media > 0 && ultimo < media * 0.7) {
+        queda.push({ companyId: id, nome: coById.get(id)?.name, ultimaComp: comps[comps.length - 1], ultimoMes: r2(ultimo), mediaAnterior: r2(media), quedaPct: Math.round((1 - ultimo / media) * 100) });
+      }
+    }
+    queda.sort((a, b) => b.quedaPct - a.quedaPct);
+
+    // 3) MONOFÁSICO (oportunidade de economia PIS/COFINS)
+    const mono: any[] = []; let monoTotal = 0, monoNotas = 0;
+    for (const [id, c] of byClient) { if (c.mono > 0) { mono.push({ companyId: id, nome: coById.get(id)?.name, valorMono: r2(c.mono), notasMono: c.monoNotas }); monoTotal += c.mono; monoNotas += c.monoNotas; } }
+    mono.sort((a, b) => b.valorMono - a.valorMono);
+
+    // 4) CONCENTRAÇÃO DE RECEITA (risco do escritório)
+    const totais = [...byClient.entries()].map(([id, c]) => ({ companyId: id, nome: coById.get(id)?.name, valor: c.total })).filter((x) => x.valor > 0).sort((a, b) => b.valor - a.valor);
+    const receitaTotal = totais.reduce((s, x) => s + x.valor, 0) || 1;
+    const top5 = totais.slice(0, 5).reduce((s, x) => s + x.valor, 0);
+    const top10 = totais.slice(0, 10).reduce((s, x) => s + x.valor, 0);
+
+    return {
+      sublimiteSimples: { emRisco: sublimite.filter((s) => s.status !== 'verde').length, total: sublimite.length, clientes: sublimite.slice(0, 25) },
+      quedaFaturamento: { emQueda: queda.length, clientes: queda.slice(0, 25) },
+      monofasico: { valorTotal: r2(monoTotal), notas: monoNotas, clientesAfetados: mono.length, clientes: mono.slice(0, 20) },
+      concentracao: { receitaTotal: r2(receitaTotal), top5Pct: Math.round((top5 / receitaTotal) * 1000) / 10, top10Pct: Math.round((top10 / receitaTotal) * 1000) / 10, topClientes: totais.slice(0, 10).map((x) => ({ ...x, valor: r2(x.valor), pct: Math.round((x.valor / receitaTotal) * 1000) / 10 })) },
     };
   }
 
