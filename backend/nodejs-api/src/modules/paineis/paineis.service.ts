@@ -345,16 +345,22 @@ export class PaineisService {
     }
     sublimite.sort((a, b) => b.pctLimite - a.pctLimite);
 
-    // 2) QUEDA DE FATURAMENTO (último mês vs média dos anteriores)
+    // 2) QUEDA DE FATURAMENTO — só clientes com MOVIMENTO RECENTE.
+    // (senão flagra cliente cujos dados acabam em 2022 = sem dado novo, não queda)
+    const cn = (comp: string) => { const [y, m] = comp.split('-').map(Number); return y * 12 + m; };
+    let maxGlobal = 0;
+    for (const c of byClient.values()) for (const k of c.meses.keys()) maxGlobal = Math.max(maxGlobal, cn(k));
     const queda: any[] = [];
     for (const [id, c] of byClient) {
       const comps = [...c.meses.keys()].sort();
       if (comps.length < 4) continue;
-      const ultimo = c.meses.get(comps[comps.length - 1]) ?? 0;
+      const ultimaComp = comps[comps.length - 1];
+      if (cn(ultimaComp) < maxGlobal - 2) continue; // só os ativos (até 2 meses do mais recente)
+      const ultimo = c.meses.get(ultimaComp) ?? 0;
       const ant = comps.slice(Math.max(0, comps.length - 7), comps.length - 1).map((k) => c.meses.get(k) ?? 0);
       const media = ant.reduce((a, b) => a + b, 0) / ant.length;
       if (media > 0 && ultimo < media * 0.7) {
-        queda.push({ companyId: id, nome: coById.get(id)?.name, ultimaComp: comps[comps.length - 1], ultimoMes: r2(ultimo), mediaAnterior: r2(media), quedaPct: Math.round((1 - ultimo / media) * 100) });
+        queda.push({ companyId: id, nome: coById.get(id)?.name, ultimaComp, ultimoMes: r2(ultimo), mediaAnterior: r2(media), quedaPct: Math.round((1 - ultimo / media) * 100) });
       }
     }
     queda.sort((a, b) => b.quedaPct - a.quedaPct);
