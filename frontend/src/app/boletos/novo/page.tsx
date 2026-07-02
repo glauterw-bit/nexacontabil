@@ -39,69 +39,69 @@ export default function NovoBoletoPage() {
       <div className="flex items-center gap-4">
         <Link href="/boletos" className="btn-ghost p-2"><ArrowLeft className="h-4 w-4" /></Link>
         <div>
-          <h1 className="text-2xl font-bold text-white">Novo Boleto</h1>
-          {selectedCompany && <p className="text-gray-400 text-sm mt-1">{selectedCompany.name}</p>}
+          <h1 className="text-2xl font-bold text-tx-strong">Novo Boleto</h1>
+          {selectedCompany && <p className="text-tx-muted text-sm mt-1">{selectedCompany.name}</p>}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Form */}
         <div className="card-aura space-y-4">
-          <h2 className="text-base font-semibold text-white">Dados do Boleto</h2>
+          <h2 className="text-base font-semibold text-tx-strong">Dados do Boleto</h2>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Nome do Pagador *</label>
+            <label className="block text-sm text-tx-muted mb-1.5">Nome do Pagador *</label>
             <input value={form.pagador} onChange={e => setForm(f => ({ ...f, pagador: e.target.value }))}
-              className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="Empresa ABC Ltda" />
+              className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="Empresa ABC Ltda" />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1.5">CNPJ / CPF *</label>
+            <label className="block text-sm text-tx-muted mb-1.5">CNPJ / CPF *</label>
             <input value={form.cnpjCpf} onChange={e => setForm(f => ({ ...f, cnpjCpf: e.target.value }))}
-              className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="00.000.000/0001-00" />
+              className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="00.000.000/0001-00" />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1.5">E-mail</label>
+            <label className="block text-sm text-tx-muted mb-1.5">E-mail</label>
             <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="pagador@email.com" />
+              className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="pagador@email.com" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Valor (R$) *</label>
+              <label className="block text-sm text-tx-muted mb-1.5">Valor (R$) *</label>
               <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setForm(f => ({ ...f, valor: e.target.value }))}
-                className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="1000.00" />
+                className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="1000.00" />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Vencimento *</label>
+              <label className="block text-sm text-tx-muted mb-1.5">Vencimento *</label>
               <input type="date" value={form.vencimento} onChange={e => setForm(f => ({ ...f, vencimento: e.target.value }))}
-                className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" />
+                className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" />
             </div>
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Descrição</label>
+            <label className="block text-sm text-tx-muted mb-1.5">Descrição</label>
             <input value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))}
-              className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="Honorários Contábeis — Mar/2026" />
+              className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="Honorários Contábeis — Mar/2026" />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Multa (%)</label>
+              <label className="block text-sm text-tx-muted mb-1.5">Multa (%)</label>
               <input type="number" min="0" step="0.1" value={form.multa} onChange={e => setForm(f => ({ ...f, multa: e.target.value }))}
-                className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" />
+                className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Juros (%/mês)</label>
+              <label className="block text-sm text-tx-muted mb-1.5">Juros (%/mês)</label>
               <input type="number" min="0" step="0.1" value={form.juros} onChange={e => setForm(f => ({ ...f, juros: e.target.value }))}
-                className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" />
+                className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Desconto (%)</label>
+              <label className="block text-sm text-tx-muted mb-1.5">Desconto (%)</label>
               <input type="number" min="0" step="0.1" value={form.desconto} onChange={e => setForm(f => ({ ...f, desconto: e.target.value }))}
-                className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" />
+                className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" />
             </div>
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Instruções ao Banco</label>
+            <label className="block text-sm text-tx-muted mb-1.5">Instruções ao Banco</label>
             <textarea value={form.instrucoes} onChange={e => setForm(f => ({ ...f, instrucoes: e.target.value }))} rows={3}
-              className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500 resize-none" placeholder="Ex: Após vencimento cobrar multa de 2% e juros de 1% ao mês." />
+              className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500 resize-none" placeholder="Ex: Após vencimento cobrar multa de 2% e juros de 1% ao mês." />
           </div>
           <button onClick={gerar} disabled={gerando} className="btn-primary w-full justify-center">
             {gerando ? (
@@ -114,7 +114,7 @@ export default function NovoBoletoPage() {
 
         {/* Preview */}
         <div className="card-aura space-y-4">
-          <h2 className="text-base font-semibold text-white">Preview do Boleto</h2>
+          <h2 className="text-base font-semibold text-tx-strong">Preview do Boleto</h2>
           <div className="bg-white rounded-xl p-4 text-gray-900">
             <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-3">
               <div>
@@ -154,7 +154,7 @@ export default function NovoBoletoPage() {
             )}
           </div>
           {gerado && (
-            <div className="flex items-center gap-2 text-sm text-green-400 bg-green-400/10 border border-green-400/30 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 text-sm text-ok bg-green-400/10 border border-green-400/30 rounded-lg px-3 py-2">
               <CreditCard className="h-4 w-4" />
               Boleto gerado com sucesso! Código de barras disponível.
             </div>

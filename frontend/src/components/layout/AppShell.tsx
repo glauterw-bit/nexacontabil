@@ -13,11 +13,11 @@ const AUTH_PATHS = ['/login', '/signup'];
 
 function Spinner() {
   return (
-    <div className="flex h-screen items-center justify-center bg-[#0f1117] flex-col gap-4">
-      <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center">
+    <div className="flex h-screen items-center justify-center bg-page flex-col gap-4">
+      <div className="h-10 w-10 rounded-xl bg-brand-600 flex items-center justify-center">
         <Zap className="h-5 w-5 text-white" />
       </div>
-      <div className="h-7 w-7 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <div className="h-7 w-7 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
 }
@@ -65,7 +65,7 @@ function AuthenticatedShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#0f1117]">
+      <div className="flex-1 flex flex-col overflow-hidden bg-page">
         <TopBar onOpenCommand={() => setCmdOpen(true)} />
         <main className="flex-1 overflow-y-auto">
           {children}

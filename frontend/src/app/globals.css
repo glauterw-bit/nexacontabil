@@ -2,6 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens NexaContábil ──
+   Light é o tema padrão (leitura de números é mais rápida em fundo claro).
+   Dark é opcional via classe .dark no <html> (toggle no topo).
+   Todas as cores do app derivam destes tokens — nunca use hex fixo nas telas. */
+
+:root {
+  --bg: #f6f7f9;            /* fundo da página */
+  --surface: #ffffff;       /* cartões */
+  --surface2: #f1f3f7;      /* áreas internas, inputs, hover */
+  --border: #e4e7ee;
+  --border-soft: #edeff5;   /* divisores de linha de tabela */
+  --tx: #1f2733;            /* texto padrão */
+  --tx-strong: #0d1424;     /* títulos e números */
+  --muted: #5d6675;
+  --faint: #949daf;
+
+  --acao: #4f46e5;          /* indigo — ação principal */
+  --acao-hover: #4338ca;
+  --ok: #0a8f5b;            /* verde — em dia / entregue */
+  --atencao: #c2610c;       /* âmbar — atenção */
+  --erro: #d92d20;          /* vermelho — crítico / atrasado */
+  --info: #175cd3;          /* azul — neutro informativo */
+
+  --dot-ok: #12b76a;        /* versões vivas para pontos de semáforo */
+  --dot-atencao: #f79009;
+  --dot-erro: #f04438;
+
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-pop: 0 8px 24px rgba(16, 24, 40, 0.12);
+}
+
+.dark {
+  /* Escuro rico (tema padrão) — profundidade azul-marinho, acentos vivos */
+  --bg: #0a0e18;
+  --surface: #131a2b;
+  --surface2: #0e1422;
+  --border: #273149;
+  --border-soft: #1c2438;
+  --tx: #dde4f0;
+  --tx-strong: #f8fafd;
+  --muted: #97a3bd;
+  --faint: #64708c;
+
+  --acao: #7c84ff;
+  --acao-hover: #929af8;
+  --ok: #3ee0a0;
+  --atencao: #ffc247;
+  --erro: #ff7a70;
+  --info: #6cb2ff;
+
+  --dot-ok: #12c581;
+  --dot-atencao: #f7a70a;
+  --dot-erro: #f5504a;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* Cartões com leve profundidade no escuro (nada de superfície chapada) */
+.dark .card-aura,
+.dark [data-rich-card] {
+  background-image: linear-gradient(160deg, rgba(124, 132, 255, 0.05), transparent 45%);
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -11,40 +75,40 @@
 
   html, body {
     height: 100%;
-    background-color: #0f1117;
-    color: #f9fafb;
+    background-color: var(--bg);
+    color: var(--tx);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
+    font-size: 14px;
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+  /* Números sempre alinhados em tabelas */
+  table, .num {
+    font-variant-numeric: tabular-nums;
   }
-  ::-webkit-scrollbar-track {
-    background: #0f1117;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #1e2740;
-    border-radius: 3px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #2d3a5a;
-  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--faint); }
+
+  ::selection { background: color-mix(in srgb, var(--acao) 25%, transparent); }
 }
 
 @layer components {
   .card-aura {
-    background-color: #161b2e;
+    background-color: var(--surface);
     border-radius: 0.75rem;
-    border: 1px solid #1e2740;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card);
     padding: 1.5rem;
   }
 
   .btn-primary {
-    background-color: #6366f1;
-    color: white;
+    background-color: var(--acao);
+    color: #fff;
     font-weight: 500;
+    font-size: 0.875rem;
     padding: 0.5rem 1rem;
     border-radius: 0.5rem;
     transition: background-color 0.15s;
@@ -54,17 +118,12 @@
     cursor: pointer;
     border: none;
   }
-  .btn-primary:hover {
-    background-color: #4f46e5;
-  }
-  .btn-primary:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
+  .btn-primary:hover { background-color: var(--acao-hover); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
   .btn-ghost {
     background: transparent;
-    color: #9ca3af;
+    color: var(--muted);
     padding: 0.5rem 0.75rem;
     border-radius: 0.5rem;
     transition: all 0.15s;
@@ -74,59 +133,43 @@
     cursor: pointer;
     border: none;
   }
-  .btn-ghost:hover {
-    background-color: rgba(255,255,255,0.05);
-    color: white;
-  }
+  .btn-ghost:hover { background-color: var(--surface2); color: var(--tx-strong); }
 
   .input-aura {
-    background-color: #0f1117;
-    border: 1px solid #1e2740;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 0.5rem;
     padding: 0.625rem 1rem;
-    color: white;
+    color: var(--tx);
     font-size: 0.875rem;
     outline: none;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
   .input-aura:focus {
-    border-color: #6366f1;
+    border-color: var(--acao);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--acao) 15%, transparent);
   }
-  .input-aura::placeholder {
-    color: #4b5563;
-  }
+  .input-aura::placeholder { color: var(--faint); }
 
   .badge-risk-baixo {
-    background-color: rgba(34,197,94,0.15);
-    color: #4ade80;
-    font-size: 0.7rem;
-    padding: 0.15rem 0.5rem;
-    border-radius: 9999px;
-    font-weight: 500;
+    background-color: color-mix(in srgb, var(--dot-ok) 14%, transparent);
+    color: var(--ok);
+    font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 9999px; font-weight: 500;
   }
   .badge-risk-médio {
-    background-color: rgba(234,179,8,0.15);
-    color: #facc15;
-    font-size: 0.7rem;
-    padding: 0.15rem 0.5rem;
-    border-radius: 9999px;
-    font-weight: 500;
+    background-color: color-mix(in srgb, var(--dot-atencao) 14%, transparent);
+    color: var(--atencao);
+    font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 9999px; font-weight: 500;
   }
   .badge-risk-alto {
-    background-color: rgba(239,68,68,0.15);
-    color: #f87171;
-    font-size: 0.7rem;
-    padding: 0.15rem 0.5rem;
-    border-radius: 9999px;
-    font-weight: 500;
+    background-color: color-mix(in srgb, var(--dot-erro) 14%, transparent);
+    color: var(--erro);
+    font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 9999px; font-weight: 500;
   }
   .badge-risk-crítico {
-    background-color: rgba(185,28,28,0.3);
-    color: #fca5a5;
-    font-size: 0.7rem;
-    padding: 0.15rem 0.5rem;
-    border-radius: 9999px;
-    font-weight: 500;
+    background-color: color-mix(in srgb, var(--dot-erro) 28%, transparent);
+    color: var(--erro);
+    font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 9999px; font-weight: 500;
     animation: pulse 2s infinite;
   }
 }

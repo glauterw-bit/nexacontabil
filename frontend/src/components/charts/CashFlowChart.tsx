@@ -37,14 +37,14 @@ export function CashFlowChart({ period }: Props) {
               <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#1e2740" />
-          <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-          <YAxis tickFormatter={fmt} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+          <XAxis dataKey="date" tick={{ fill: 'var(--faint)', fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis tickFormatter={fmt} tick={{ fill: 'var(--faint)', fontSize: 11 }} axisLine={false} tickLine={false} />
           <Tooltip
-            contentStyle={{ background: '#161b2e', border: '1px solid #1e2740', borderRadius: 8, color: '#fff' }}
+            contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--tx)' }}
             formatter={(v: number) => `R$ ${v.toLocaleString('pt-BR')}`}
           />
-          <Legend wrapperStyle={{ fontSize: 12, color: '#9ca3af' }} />
+          <Legend wrapperStyle={{ fontSize: 12, color: 'var(--muted)' }} />
           <Area type="monotone" dataKey="receitas" name="Receitas" stroke="#4f6ef7" fill="url(#colorReceitas)" strokeWidth={2} />
           <Area type="monotone" dataKey="despesas" name="Despesas" stroke="#ef4444" fill="url(#colorDespesas)" strokeWidth={2} />
         </AreaChart>

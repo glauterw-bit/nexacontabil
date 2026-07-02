@@ -9,6 +9,26 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // ── Tokens semânticos (respondem ao tema via CSS vars) ──
+        page: 'var(--bg)',
+        card: 'var(--surface)',
+        inset: 'var(--surface2)',
+        line: {
+          DEFAULT: 'var(--border)',
+          soft: 'var(--border-soft)',
+        },
+        tx: {
+          DEFAULT: 'var(--tx)',
+          strong: 'var(--tx-strong)',
+          muted: 'var(--muted)',
+          faint: 'var(--faint)',
+        },
+        acao: 'var(--acao)',
+        ok: 'var(--ok)',
+        warn: 'var(--atencao)',
+        err: 'var(--erro)',
+        info: 'var(--info)',
+        // ── Escala de marca (fixa, para botões/acentos) ──
         brand: {
           50:  '#eef2ff',
           100: '#e0e7ff',
@@ -18,11 +38,16 @@ module.exports = {
           700: '#4338ca',
           900: '#312e81',
         },
+        // legado — telas antigas referenciam surface-*
         surface: {
-          DEFAULT: '#0f1117',
-          card:   '#161b2e',
-          border: '#1e2740',
+          DEFAULT: 'var(--bg)',
+          card:   'var(--surface)',
+          border: 'var(--border)',
         },
+      },
+      boxShadow: {
+        card: 'var(--shadow-card)',
+        pop: 'var(--shadow-pop)',
       },
       borderRadius: {
         DEFAULT: '0.5rem',

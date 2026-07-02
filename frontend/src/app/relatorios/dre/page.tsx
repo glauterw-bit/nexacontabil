@@ -51,8 +51,8 @@ export default function DREPage() {
   if (!selectedCompany) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-gray-600" />
-        <p className="text-gray-400 text-sm">Selecione uma empresa para gerar o DRE.</p>
+        <Building2 className="h-12 w-12 text-tx-faint" />
+        <p className="text-tx-muted text-sm">Selecione uma empresa para gerar o DRE.</p>
         <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">
           Gerenciar Empresas
         </Link>
@@ -72,8 +72,8 @@ export default function DREPage() {
     <div className="p-6 md:p-8 space-y-6 max-w-6xl">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-white">Demonstração do Resultado (DRE)</h1>
-          <p className="text-gray-400 text-sm mt-0.5">{selectedCompany.name} · {periodLabel}</p>
+          <h1 className="text-xl font-semibold text-tx-strong">Demonstração do Resultado (DRE)</h1>
+          <p className="text-tx-muted text-sm mt-0.5">{selectedCompany.name} · {periodLabel}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <input
@@ -83,9 +83,9 @@ export default function DREPage() {
               const [y, m] = e.target.value.split('-').map(Number);
               setAno(y); setMes(m - 1);
             }}
-            className="px-3 py-1.5 bg-[#161b2e] border border-[#1e2740] rounded-lg text-xs text-white outline-none focus:border-indigo-500/50"
+            className="px-3 py-1.5 bg-inset border border-line rounded-lg text-xs text-tx-strong outline-none focus:border-indigo-500/50"
           />
-          <button disabled className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-[#1e2740] rounded-lg cursor-not-allowed" title="Em breve">
+          <button disabled className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-tx-muted bg-inset rounded-lg cursor-not-allowed" title="Em breve">
             <Download className="h-3.5 w-3.5" />
             PDF
           </button>
@@ -93,34 +93,34 @@ export default function DREPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-20 text-sm text-gray-500 flex items-center justify-center gap-2">
+        <div className="text-center py-20 text-sm text-tx-muted flex items-center justify-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" />
           Calculando DRE com base nos lançamentos…
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 text-sm text-red-300">
+        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 text-sm text-err">
           Erro ao gerar DRE: {error.message}
         </div>
       ) : !dre || (dre.groups?.length ?? 0) === 0 ? (
-        <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-10 text-center">
-          <Brain className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-          <p className="text-sm font-medium text-white">Sem lançamentos no período</p>
-          <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
-            Não há transações contábeis aprovadas neste mês. Lance documentos em <Link href="/transactions" className="text-indigo-400 hover:underline">Lançamentos</Link> ou
-            use a <Link href="/insights" className="text-indigo-400 hover:underline">Análise IA em lote</Link>.
+        <div className="rounded-xl border border-line bg-card p-10 text-center">
+          <Brain className="h-10 w-10 text-tx-faint mx-auto mb-3" />
+          <p className="text-sm font-medium text-tx-strong">Sem lançamentos no período</p>
+          <p className="text-xs text-tx-muted mt-1 max-w-md mx-auto">
+            Não há transações contábeis aprovadas neste mês. Lance documentos em <Link href="/transactions" className="text-acao hover:underline">Lançamentos</Link> ou
+            use a <Link href="/insights" className="text-acao hover:underline">Análise IA em lote</Link>.
           </p>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <KPI label="Receita Bruta" value={brl(dre.grossRevenue)} icon={TrendingUp} color="text-emerald-400" />
-            <KPI label="Lucro Bruto" value={brl(dre.grossProfit)} color="text-blue-400" />
-            <KPI label="EBIT" value={brl(dre.ebit)} color={dre.ebit >= 0 ? 'text-emerald-400' : 'text-red-400'} />
-            <KPI label="Lucro Líquido" value={brl(dre.netIncome)} color={dre.netIncome >= 0 ? 'text-emerald-400' : 'text-red-400'} highlight />
+            <KPI label="Receita Bruta" value={brl(dre.grossRevenue)} icon={TrendingUp} color="text-ok" />
+            <KPI label="Lucro Bruto" value={brl(dre.grossProfit)} color="text-info" />
+            <KPI label="EBIT" value={brl(dre.ebit)} color={dre.ebit >= 0 ? 'text-ok' : 'text-err'} />
+            <KPI label="Lucro Líquido" value={brl(dre.netIncome)} color={dre.netIncome >= 0 ? 'text-ok' : 'text-err'} highlight />
           </div>
 
-          <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5">
-            <h2 className="text-sm font-medium text-white mb-3">Resumo do período</h2>
+          <div className="rounded-xl border border-line bg-card p-5">
+            <h2 className="text-sm font-medium text-tx-strong mb-3">Resumo do período</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
               <Row label="(=) Receita Bruta" value={dre.grossRevenue} />
               <Row label="(-) Custos" value={-dre.totalCosts} negative />
@@ -134,14 +134,14 @@ export default function DREPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5">
-            <h2 className="text-sm font-medium text-white mb-3">Composição por grupo de contas</h2>
+          <div className="rounded-xl border border-line bg-card p-5">
+            <h2 className="text-sm font-medium text-tx-strong mb-3">Composição por grupo de contas</h2>
             <div className="h-64">
               <ResponsiveContainer>
                 <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 30 }}>
-                  <XAxis dataKey="name" angle={-30} textAnchor="end" tick={{ fontSize: 10, fill: '#9ca3af' }} height={50} />
-                  <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip contentStyle={{ background: '#0f1117', border: '1px solid #1e2740', borderRadius: 8, fontSize: 12 }} formatter={(v: any) => brl(v)} />
+                  <XAxis dataKey="name" angle={-30} textAnchor="end" tick={{ fontSize: 10, fill: 'var(--muted)' }} height={50} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--muted)' }} tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip contentStyle={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--tx)' }} formatter={(v: any) => brl(v)} />
                   <Bar dataKey="valor">
                     {chartData.map((d: any, i: number) => (
                       <Cell key={i} fill={d.isNegative ? '#f87171' : '#818cf8'} />
@@ -152,18 +152,18 @@ export default function DREPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5">
-            <h2 className="text-sm font-medium text-white mb-3">Detalhamento por conta</h2>
+          <div className="rounded-xl border border-line bg-card p-5">
+            <h2 className="text-sm font-medium text-tx-strong mb-3">Detalhamento por conta</h2>
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-gray-500 border-b border-[#1e2740]">
+                <tr className="text-left text-xs text-tx-muted border-b border-line">
                   <th className="pb-2 font-medium">Conta</th>
-                  <th className="pb-2 font-medium text-right">Débito</th>
-                  <th className="pb-2 font-medium text-right">Crédito</th>
-                  <th className="pb-2 font-medium text-right">Saldo</th>
+                  <th className="pb-2 font-medium text-right num">Débito</th>
+                  <th className="pb-2 font-medium text-right num">Crédito</th>
+                  <th className="pb-2 font-medium text-right num">Saldo</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1e2740]">
+              <tbody className="divide-y divide-line">
                 {dre.groups.map((g: any) => (
                   <Bloco key={g.code} group={g} />
                 ))}
@@ -171,7 +171,7 @@ export default function DREPage() {
             </table>
           </div>
 
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-tx-faint">
             Gerado em {new Date(dre.generatedAt).toLocaleString('pt-BR')}. Inclui transações com status approved/posted no período.
           </p>
         </>
@@ -183,21 +183,21 @@ export default function DREPage() {
 function Bloco({ group }: { group: any }) {
   return (
     <>
-      <tr className="bg-[#0f1117]">
-        <td className="py-2 font-medium text-indigo-300">{group.name}</td>
-        <td className="py-2 text-right font-mono text-xs text-gray-400">{brl(group.totalDebit)}</td>
-        <td className="py-2 text-right font-mono text-xs text-gray-400">{brl(group.totalCredit)}</td>
-        <td className="py-2 text-right font-mono text-white font-semibold">{brl(group.net)}</td>
+      <tr className="bg-inset">
+        <td className="py-2 font-medium text-acao">{group.name}</td>
+        <td className="py-2 text-right font-mono text-xs text-tx-muted num">{brl(group.totalDebit)}</td>
+        <td className="py-2 text-right font-mono text-xs text-tx-muted num">{brl(group.totalCredit)}</td>
+        <td className="py-2 text-right font-mono text-tx-strong font-semibold num">{brl(group.net)}</td>
       </tr>
       {(group.accounts ?? []).map((a: any) => (
-        <tr key={a.code} className="hover:bg-white/5">
-          <td className="py-2 pl-4 text-gray-300 text-xs">
-            <span className="text-gray-600 font-mono mr-2">{a.code}</span>
+        <tr key={a.code} className="hover:bg-inset">
+          <td className="py-2 pl-4 text-tx text-xs">
+            <span className="text-tx-faint font-mono mr-2">{a.code}</span>
             {a.name}
           </td>
-          <td className="py-2 text-right font-mono text-xs text-gray-400">{brl(a.debit)}</td>
-          <td className="py-2 text-right font-mono text-xs text-gray-400">{brl(a.credit)}</td>
-          <td className="py-2 text-right font-mono text-xs text-gray-200">{brl(a.net)}</td>
+          <td className="py-2 text-right font-mono text-xs text-tx-muted num">{brl(a.debit)}</td>
+          <td className="py-2 text-right font-mono text-xs text-tx-muted num">{brl(a.credit)}</td>
+          <td className="py-2 text-right font-mono text-xs text-tx num">{brl(a.net)}</td>
         </tr>
       ))}
     </>
@@ -206,21 +206,21 @@ function Bloco({ group }: { group: any }) {
 
 function KPI({ label, value, icon: Icon, color, highlight }: any) {
   return (
-    <div className={`rounded-xl border bg-[#161b2e] p-4 ${highlight ? 'border-indigo-500/40' : 'border-[#1e2740]'}`}>
+    <div className={`rounded-xl border bg-card p-4 ${highlight ? 'border-indigo-500/40' : 'border-line'}`}>
       <div className="flex items-center gap-2 mb-1.5">
-        {Icon && <Icon className={`h-4 w-4 ${color || 'text-gray-400'}`} />}
-        <p className="text-xs text-gray-500">{label}</p>
+        {Icon && <Icon className={`h-4 w-4 ${color || 'text-tx-muted'}`} />}
+        <p className="text-xs text-tx-muted">{label}</p>
       </div>
-      <p className={`text-lg font-bold ${color || 'text-white'}`}>{value}</p>
+      <p className={`text-lg font-bold ${color || 'text-tx-strong'}`}>{value}</p>
     </div>
   );
 }
 
 function Row({ label, value, bold, negative, highlight }: any) {
   return (
-    <div className={`flex justify-between py-1 ${highlight ? 'pt-2 border-t border-[#1e2740] text-base' : ''}`}>
-      <span className={`text-gray-400 ${bold ? 'text-white font-medium' : ''}`}>{label}</span>
-      <span className={`font-mono ${negative ? 'text-red-300' : bold ? 'text-white' : 'text-gray-200'} ${bold ? 'font-bold' : ''}`}>
+    <div className={`flex justify-between py-1 ${highlight ? 'pt-2 border-t border-line text-base' : ''}`}>
+      <span className={`text-tx-muted ${bold ? 'text-tx-strong font-medium' : ''}`}>{label}</span>
+      <span className={`font-mono num ${negative ? 'text-err' : bold ? 'text-tx-strong' : 'text-tx'} ${bold ? 'font-bold' : ''}`}>
         {brl(value)}
       </span>
     </div>

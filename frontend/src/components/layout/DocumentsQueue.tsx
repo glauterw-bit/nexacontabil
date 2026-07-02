@@ -17,8 +17,8 @@ interface Props { companyId: string }
 const statusIcon = (s: string) => {
   if (s === 'completed')    return <CheckCircle className="h-3.5 w-3.5 text-green-400 flex-shrink-0" />;
   if (s === 'needs_review') return <AlertTriangle className="h-3.5 w-3.5 text-yellow-400 flex-shrink-0" />;
-  if (s === 'pending')      return <Clock className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />;
-  return <Loader2 className="h-3.5 w-3.5 text-indigo-400 animate-spin flex-shrink-0" />;
+  if (s === 'pending')      return <Clock className="h-3.5 w-3.5 text-tx-muted flex-shrink-0" />;
+  return <Loader2 className="h-3.5 w-3.5 text-acao animate-spin flex-shrink-0" />;
 };
 
 const typeLabel: Record<string, string> = {
@@ -41,38 +41,38 @@ export function DocumentsQueue({ companyId }: Props) {
   return (
     <div className="card-aura h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-semibold text-white">Últimos Documentos</h2>
-        <Link href="/captura-xml" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+        <h2 className="text-base font-semibold text-tx-strong">Últimos Documentos</h2>
+        <Link href="/captura-xml" className="text-xs text-acao hover:text-indigo-300 transition-colors">
           Ver todos →
         </Link>
       </div>
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-5 w-5 text-indigo-400 animate-spin" />
+          <Loader2 className="h-5 w-5 text-acao animate-spin" />
         </div>
       ) : docs.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
-          <FileText className="h-8 w-8 text-gray-600 mb-2" />
-          <p className="text-sm text-gray-500">Nenhum documento ainda</p>
-          <Link href="/captura-xml" className="text-xs text-indigo-400 mt-2 hover:underline">
+          <FileText className="h-8 w-8 text-tx-faint mb-2" />
+          <p className="text-sm text-tx-muted">Nenhum documento ainda</p>
+          <Link href="/captura-xml" className="text-xs text-acao mt-2 hover:underline">
             Enviar primeiro documento
           </Link>
         </div>
       ) : (
         <div className="space-y-2 flex-1">
           {docs.map((doc: any) => (
-            <div key={doc.id} className="flex items-center gap-3 p-3 bg-[#0f1117] rounded-lg">
-              <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
+            <div key={doc.id} className="flex items-center gap-3 p-3 bg-inset rounded-lg">
+              <FileText className="h-4 w-4 text-tx-muted flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-white truncate">
+                <p className="text-sm text-tx-strong truncate">
                   {doc.issuerName || typeLabel[doc.type] || 'Documento'}
                 </p>
-                <p className="text-xs text-gray-500">{typeLabel[doc.type] ?? doc.type}</p>
+                <p className="text-xs text-tx-muted">{typeLabel[doc.type] ?? doc.type}</p>
               </div>
               <div className="flex flex-col items-end gap-1">
                 {doc.totalValue != null && (
-                  <span className="text-xs text-gray-400 font-mono">
+                  <span className="text-xs text-tx-muted font-mono">
                     R${Number(doc.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
                   </span>
                 )}

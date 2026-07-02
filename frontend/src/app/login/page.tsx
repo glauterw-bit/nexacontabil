@@ -29,73 +29,76 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1117] flex items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-8">
+    <div className="min-h-screen bg-page flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
         {/* Logo */}
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-indigo-600 mb-4">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-brand-600 shadow-card mb-4">
             <Zap className="h-7 w-7 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">DomoSYS</h1>
-          <p className="text-gray-400 text-sm mt-1">Contabilidade com Inteligência Artificial</p>
+          <h1 className="text-2xl font-bold text-tx-strong">DomoSYS</h1>
+          <p className="text-tx-muted text-sm mt-1">Contabilidade com Inteligência Artificial</p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">E-mail</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              placeholder="seu@email.com"
-              className="w-full bg-[#161b2e] border border-[#1e2740] rounded-xl px-4 py-3 text-white text-sm placeholder-gray-600 outline-none focus:border-indigo-500 transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Senha</label>
-            <div className="relative">
+        {/* Card */}
+        <div className="bg-card border border-line rounded-2xl shadow-card p-6">
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-tx mb-1.5">E-mail</label>
               <input
-                type={showPass ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
                 required
-                autoComplete="current-password"
-                placeholder="••••••••"
-                className="w-full bg-[#161b2e] border border-[#1e2740] rounded-xl px-4 py-3 pr-11 text-white text-sm placeholder-gray-600 outline-none focus:border-indigo-500 transition-colors"
+                autoComplete="email"
+                placeholder="seu@email.com"
+                className="input-aura w-full rounded-xl"
               />
-              <button
-                type="button"
-                onClick={() => setShowPass(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
-              >
-                {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
             </div>
-          </div>
 
-          {error && (
-            <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
+            <div>
+              <label className="block text-sm font-medium text-tx mb-1.5">Senha</label>
+              <div className="relative">
+                <input
+                  type={showPass ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  className="input-aura w-full rounded-xl pr-11"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-tx-faint hover:text-tx"
+                >
+                  {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Entrar
-          </button>
-        </form>
+            {error && (
+              <p className="text-err text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                {error}
+              </p>
+            )}
 
-        <p className="text-center text-sm text-gray-500">
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full justify-center py-3 rounded-xl"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Entrar
+            </button>
+          </form>
+        </div>
+
+        <p className="text-center text-sm text-tx-muted mt-6">
           Não tem conta?{' '}
-          <Link href="/signup" className="text-indigo-400 hover:text-indigo-300 transition-colors">
+          <Link href="/signup" className="text-acao font-medium hover:underline transition-colors">
             Criar conta
           </Link>
         </p>
