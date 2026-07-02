@@ -60,9 +60,16 @@ export class FiscalCalendarService {
 
   /**
    * Gera obrigações fiscais recorrentes do ano para uma empresa, baseado no regime.
-   * Usa as datas oficiais médias (DAS dia 20, FGTS dia 7, ISS dia 10/15/20 conforme município, etc).
+   * Datas 2026: DAS/PGDAS dia 20 · FGTS Digital dia 20 · DCTFWeb+MIT último dia útil · Reinf dia 15.
    * O contador ajusta depois caso necessário (ISS varia por município).
    */
+  /** Último dia ÚTIL do mês (sábado/domingo recuam p/ sexta) — regra DCTFWeb desde 2025. */
+  private ultimoDiaUtil(ano: number, mesIndex0: number): Date {
+    const d = new Date(ano, mesIndex0 + 1, 0); // último dia do mês
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+    return d;
+  }
+
   async gerarAnual(companyId: string, ano: number) {
     const company = await this.prisma.company.findUnique({ where: { id: companyId } });
     if (!company) throw new NotFoundException('Empresa nao encontrada');
@@ -87,9 +94,9 @@ export class FiscalCalendarService {
       // Comuns a todos os regimes
       itens.push({
         tipo: 'FGTS',
-        descricao: 'GFIP / FGTS - competencia ' + competencia,
+        descricao: 'FGTS Digital (Pix, guia no portal MTE) - competencia ' + competencia,
         competencia,
-        dataVencimento: new Date(vencAno, vencMes - 1, 7),
+        dataVencimento: new Date(vencAno, vencMes - 1, 20), // dia 20 desde o FGTS Digital (mar/2024)
         recorrencia: 'mensal',
         prioridade: 'alta',
       });
@@ -106,7 +113,7 @@ export class FiscalCalendarService {
       if (regime === 'SIMPLES_NACIONAL' || regime === 'SIMPLES') {
         itens.push({
           tipo: 'DAS',
-          descricao: 'DAS Simples Nacional - competencia ' + competencia,
+          descricao: 'DAS + PGDAS-D - competencia ' + competencia + ' (atraso na declaracao = multa 2%/mes desde 2026)',
           competencia,
           dataVencimento: new Date(vencAno, vencMes - 1, 20),
           recorrencia: 'mensal',
@@ -152,9 +159,9 @@ export class FiscalCalendarService {
         // DCTFWeb mensal
         itens.push({
           tipo: 'DCTFWeb',
-          descricao: 'DCTFWeb - competencia ' + competencia,
+          descricao: 'DCTFWeb + MIT (IRPJ/CSLL/PIS/COFINS) - competencia ' + competencia,
           competencia,
-          dataVencimento: new Date(vencAno, vencMes - 1, 15),
+          dataVencimento: this.ultimoDiaUtil(vencAno, vencMes - 1), // último dia útil desde a IN RFB 2.237/2024
           recorrencia: 'mensal',
           prioridade: 'critica',
         });

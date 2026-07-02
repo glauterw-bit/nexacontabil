@@ -315,6 +315,10 @@ export class PaineisService {
       where: { companyId: { in: companies.map((c) => c.id) }, extractedData: { not: null } },
       select: { companyId: true, totalValue: true, issueDate: true, extractedData: true },
     });
+    const ecfItens = await this.prisma.fiscalCalendarItem.findMany({
+      where: { tipo: { in: ['ECF', 'ECD'] } },
+      select: { companyId: true, tipo: true, status: true, dataVencimento: true },
+    });
 
     type C = { meses: Map<string, number>; mono: number; monoNotas: number; total: number };
     const byClient = new Map<string, C>();
@@ -376,7 +380,69 @@ export class PaineisService {
     const top5 = totais.slice(0, 5).reduce((s, x) => s + x.valor, 0);
     const top10 = totais.slice(0, 10).reduce((s, x) => s + x.valor, 0);
 
+    // 5) PRAZOS DA REFORMA — 2º semestre/2026 (datas com rejeição/obrigação)
+    const REGULAR = ['LUCRO_PRESUMIDO', 'PRESUMIDO', 'LUCRO_REAL', 'REAL'];
+    const SIMPLES = ['SIMPLES_NACIONAL', 'SIMPLES', 'MEI'];
+    const cnAtual = new Date().getFullYear() * 12 + (new Date().getMonth() + 1);
+
+    // 5a) ECF (vence 31/07/2026) — clientes de regime regular e o status do item no calendário
+    const ecfByCo = new Map<string, any>();
+    for (const e of ecfItens) if (e.tipo === 'ECF') ecfByCo.set(e.companyId, e);
+    const ecf = companies
+      .filter((c) => REGULAR.includes((c.taxRegime || '').toUpperCase()))
+      .map((c) => {
+        const item = ecfByCo.get(c.id);
+        const st = item?.status ?? 'sem_item';
+        return { companyId: c.id, nome: c.name, regime: c.taxRegime, status: st, entregue: st === 'paga' || st === 'entregue' };
+      })
+      .sort((a, b) => Number(a.entregue) - Number(b.entregue));
+
+    // 5b) IBS/CBS (rejeição a partir de 03/08/2026) — nas notas de SAÍDA de 2026
+    //     emitidas pelo próprio cliente, o grupo gIBSCBS/cClassTrib já aparece?
+    const ibsPorCliente = new Map<string, { com: number; sem: number }>();
+    for (const d of docs) {
+      const nf = safe(d.extractedData);
+      if (!d.issueDate || new Date(d.issueDate) < new Date(2026, 0, 1)) continue;
+      const dir = String(nf?.itens?.[0]?.cfop ?? '')[0];
+      if (!['5', '6', '7'].includes(dir)) continue; // só saídas (emitidas pelo cliente)
+      const co = coById.get(d.companyId);
+      if (!co || !REGULAR.includes((co.taxRegime || '').toUpperCase())) continue;
+      const acc = ibsPorCliente.get(d.companyId) ?? { com: 0, sem: 0 };
+      if (nf?.temIBSCBS) acc.com++; else acc.sem++;
+      ibsPorCliente.set(d.companyId, acc);
+    }
+    const ibscbs = companies
+      .filter((c) => REGULAR.includes((c.taxRegime || '').toUpperCase()))
+      .map((c) => {
+        const acc = ibsPorCliente.get(c.id);
+        const status = !acc ? 'sem_dados' : acc.com > 0 ? 'ok' : 'risco';
+        return { companyId: c.id, nome: c.name, regime: c.taxRegime, status, notas2026Com: acc?.com ?? 0, notas2026Sem: acc?.sem ?? 0 };
+      })
+      .sort((a, b) => ({ risco: 0, sem_dados: 1, ok: 2 } as any)[a.status] - ({ risco: 0, sem_dados: 1, ok: 2 } as any)[b.status]);
+
+    // 5c) NFS-e nacional (Res. CGSN 189/2026): ME/EPP do Simples obrigadas em 01/09/2026.
+    //     Prioriza quem já emite NFS-e (docs tipo nfse) e está ativo.
+    const emiteNfse = new Set<string>();
+    const ativos = new Set<string>();
+    for (const d of docs) {
+      const nf = safe(d.extractedData);
+      if (nf?.tipo === 'nfse') emiteNfse.add(d.companyId);
+      if (d.issueDate) {
+        const dt = new Date(d.issueDate);
+        if (dt.getFullYear() * 12 + (dt.getMonth() + 1) >= cnAtual - 3) ativos.add(d.companyId);
+      }
+    }
+    const nfseNacional = companies
+      .filter((c) => SIMPLES.includes((c.taxRegime || '').toUpperCase()))
+      .map((c) => ({ companyId: c.id, nome: c.name, regime: c.taxRegime, emiteNfse: emiteNfse.has(c.id), ativo: ativos.has(c.id) }))
+      .sort((a, b) => Number(b.emiteNfse) - Number(a.emiteNfse) || Number(b.ativo) - Number(a.ativo));
+
     return {
+      reforma2026: {
+        ecf: { prazo: '2026-07-31', pendentes: ecf.filter((x) => !x.entregue).length, total: ecf.length, clientes: ecf.slice(0, 30) },
+        ibscbs: { prazo: '2026-08-03', emRisco: ibscbs.filter((x) => x.status === 'risco').length, semDados: ibscbs.filter((x) => x.status === 'sem_dados').length, total: ibscbs.length, clientes: ibscbs.slice(0, 30) },
+        nfseNacional: { prazo: '2026-09-01', total: nfseNacional.length, prestadores: nfseNacional.filter((x) => x.emiteNfse).length, clientes: nfseNacional.slice(0, 40) },
+      },
       sublimiteSimples: { emRisco: sublimite.filter((s) => s.status !== 'verde').length, total: sublimite.length, clientes: sublimite.slice(0, 25) },
       quedaFaturamento: { emQueda: queda.length, clientes: queda.slice(0, 25) },
       monofasico: { valorTotal: r2(monoTotal), notas: monoNotas, clientesAfetados: mono.length, clientes: mono.slice(0, 20) },

@@ -257,7 +257,7 @@ export class AnaliseClienteService {
 // ─── Parser de NF-e (regex, sem dependência) ──────────────────
 function parseNfe(xml: string): null | {
   tipo: string; numero?: string; chave?: string; dataEmissao?: string; valorTotal?: number;
-  emitenteNome?: string; emitenteCnpj?: string; destNome?: string; destCnpj?: string; natOp?: string;
+  emitenteNome?: string; emitenteCnpj?: string; destNome?: string; destCnpj?: string; natOp?: string; temIBSCBS?: boolean;
   totais?: { produtos?: number; icms?: number; ipi?: number; pis?: number; cofins?: number; icmsSt?: number; frete?: number };
   itens: Array<{ ncm: string; descricao?: string; cfop?: string; valor?: number; cst?: string; icms?: number; ipi?: number; pis?: number; cofins?: number; vIcms?: number }>;
 } {
@@ -302,6 +302,9 @@ function parseNfe(xml: string): null | {
     emitenteCnpj: pick(emitBloco, 'CNPJ'),
     destNome: pick(destBloco, 'xNome'),
     destCnpj: pick(destBloco, 'CNPJ'),
+    // Reforma Tributária (NT 2025.002): grupo UB/gIBSCBS + cClassTrib.
+    // A partir de 03/08/2026 nota do regime regular SEM esses campos é rejeitada.
+    temIBSCBS: /<gIBSCBS|<IBSCBS|cClassTrib|<CST-?IBS/i.test(xml),
     itens,
   };
 }
