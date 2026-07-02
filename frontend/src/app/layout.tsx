@@ -8,10 +8,16 @@ export const metadata: Metadata = {
   description: 'Sistema de contabilidade com Inteligência Artificial de próxima geração',
 };
 
+// Aplica o tema salvo antes da hidratação para evitar flash. Light é o padrão.
+const themeInit = `(function(){try{if(localStorage.getItem('nexa_theme')==='dark'){document.documentElement.classList.add('dark')}}catch(e){}})()`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className="dark">
-      <body className="bg-[#0f1117] text-white antialiased font-sans">
+    <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+      </head>
+      <body className="bg-page text-tx antialiased font-sans">
         <Providers>
           <AppShell>
             {children}
