@@ -24,7 +24,13 @@ export default function OperacaoPage() {
   const [filtro, setFiltro] = useState<string>('');
   const [busca, setBusca] = useState('');
   const [sel, setSel] = useState<any>(null);
+  const [sync, setSync] = useState<any>(null);
   const { competencia, reportResolved } = useCompetencia();
+
+  useEffect(() => {
+    fetch(`${API}/api/v1/sync-drive/status`, { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : null)).then(setSync).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,7 +56,8 @@ export default function OperacaoPage() {
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
       <PageHeader icon={<Activity size={22} color={COLORS.acao} />} title="Central de Operação"
-        subtitle={`Situação da carteira em ${fmtCompetencia(d.competencia)} — clique num indicador para filtrar, num cliente para o detalhe.`} />
+        subtitle={`Situação da carteira em ${fmtCompetencia(d.competencia)} — clique num indicador para filtrar, num cliente para o detalhe.`}
+        action={<SyncBadge sync={sync} />} />
 
       {!d.mesProcessado && (
         <div style={{ marginBottom: 14, padding: '10px 14px', background: tint(COLORS.dotAtencao, 10), border: `1px solid ${tint(COLORS.dotAtencao, 35)}`, borderRadius: 10, fontSize: 13, color: COLORS.atencao, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -153,6 +160,25 @@ export default function OperacaoPage() {
         {sel && <DetalheCliente c={sel} competencia={d.competencia} />}
       </Drawer>
     </div>
+  );
+}
+
+/** Chip "drive sincronizado há X min" — alimentado pelo sync agendado do backend. */
+function SyncBadge({ sync }: { sync: any }) {
+  if (!sync?.enabled) return null;
+  const last = sync.ultimaExecucao?.finishedAt ? new Date(sync.ultimaExecucao.finishedAt) : null;
+  const min = last ? Math.max(0, Math.round((Date.now() - last.getTime()) / 60000)) : null;
+  const txt = sync.executandoAgora
+    ? 'sincronizando o drive agora…'
+    : min == null ? `sync automático a cada ${sync.intervaloMin} min`
+    : min < 1 ? 'drive sincronizado agora'
+    : `drive sincronizado há ${min} min`;
+  const cor = sync.executandoAgora ? COLORS.info : min != null && min <= sync.intervaloMin ? COLORS.ok : COLORS.faint;
+  return (
+    <span title={`Varredura automática a cada ${sync.intervaloMin} min: XMLs novos, recibos e obrigações vencidas.`}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 999, border: `1px solid ${tint(cor, 35)}`, background: tint(cor, 9), color: cor, fontSize: 12, whiteSpace: 'nowrap' }}>
+      <Dot cor={cor} size={7} /> {txt}
+    </span>
   );
 }
 

@@ -6,5 +6,6 @@ import { PrismaService } from '../../database/prisma.service';
 @Module({
   controllers: [FiscalCalendarController],
   providers: [FiscalCalendarService, PrismaService],
+  exports: [FiscalCalendarService],
 })
 export class FiscalCalendarModule {}

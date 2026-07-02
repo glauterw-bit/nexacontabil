@@ -129,6 +129,32 @@ export class AnaliseClienteService {
     };
   }
 
+  /**
+   * SYNC contínuo: re-varre os clientes há mais tempo sem varredura, pegando
+   * só XMLs NOVOS (dedup por nome de arquivo em analisarCliente). Pensado
+   * para o agendador — lote pequeno, rotação por sharepointAnalisadoEm asc.
+   */
+  async sincronizarCarteira(limit = 6, maxFilesPorCliente = 120) {
+    const lote = await this.prisma.company.findMany({
+      where: { active: true, sharepointItemId: { not: null }, sharepointAnalisadoEm: { not: null } },
+      orderBy: { sharepointAnalisadoEm: 'asc' },
+      take: limit,
+      select: { id: true, name: true },
+    });
+    const detalhes: any[] = [];
+    let novosDocs = 0;
+    for (const c of lote) {
+      try {
+        const r = await this.analisarCliente(c.id, maxFilesPorCliente);
+        novosDocs += r.analisados ?? 0;
+        if (r.analisados) detalhes.push({ cliente: c.name, novos: r.analisados });
+      } catch (e: any) {
+        detalhes.push({ cliente: c.name, erro: e?.message ?? 'erro' });
+      }
+    }
+    return { sincronizados: lote.length, novosDocs, detalhes };
+  }
+
   /** Progresso da análise da carteira (pra barra de progresso ao vivo). */
   async progresso() {
     const [total, analisados, ativos, ativosFeitos, documentos] = await Promise.all([

@@ -157,6 +157,27 @@ export class FluxoService {
     return { verificados: lote.length, recibosEncontrados: achados, restantes: pendentes.length - lote.length };
   }
 
+  /**
+   * Re-verifica clientes já checados mas SEM recibo encontrado (o recibo pode
+   * ter aparecido no drive depois). Só re-checa quem foi visto há mais de
+   * `minAgeMin` minutos, em lote pequeno — pensado para o sync agendado.
+   */
+  async reverificarRecibosPendentes(competencia: string, limit = 6, minAgeMin = 60) {
+    const cutoff = new Date(Date.now() - minAgeMin * 60_000);
+    const estados = await this.prisma.fluxoEstado.findMany({
+      where: { departamento: 'fiscal', competencia, reciboEncontrado: false, reciboCheckedAt: { not: null, lt: cutoff } },
+      orderBy: { reciboCheckedAt: 'asc' },
+      take: limit,
+      select: { companyId: true },
+    });
+    let achados = 0;
+    for (const e of estados) {
+      const r = await this.verificarRecibo(e.companyId, competencia, 'fiscal');
+      if (r.reciboEncontrado) achados++;
+    }
+    return { reverificados: estados.length, recibosEncontrados: achados };
+  }
+
   /** Meses (competências) com documentos — pra apurar retroativo. */
   async competencias() {
     const docs = await this.prisma.document.findMany({ where: { issueDate: { not: null } }, select: { issueDate: true } });
