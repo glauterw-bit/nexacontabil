@@ -3,14 +3,14 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@apollo/client';
 import { gql } from '@apollo/client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  LayoutDashboard, FileText, ArrowLeftRight, Bot,
-  Settings, ShieldCheck, Zap, Building2, ChevronDown, Plus, MessageCircle, Hash, LogOut,
-  Calendar, Users, Receipt, BarChart3, TrendingUp, Target,
-  Banknote, PenLine, ClipboardList, Landmark, Scale, Package, FileCode,
-  Briefcase, UserCheck, Award, Globe, DollarSign, Megaphone, Store,
-  Workflow, Boxes, FileDown, Gauge, Inbox, Search, FolderTree
+  Activity, Lightbulb, Sun, Briefcase, FolderTree, CalendarClock, MessageCircle,
+  LayoutDashboard, Building2, ChevronDown, ChevronRight, Plus, LogOut, Zap,
+  Settings, ShieldCheck, Users, Receipt, BarChart3, TrendingUp, Target,
+  Banknote, ClipboardList, Landmark, Scale, Package, FileCode, FileText,
+  UserCheck, Award, Globe, DollarSign, Megaphone, Store, Bot,
+  Workflow, Boxes, FileDown, Inbox, Search, ArrowLeftRight, Hash,
 } from 'lucide-react';
 import { useCompany, Company } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,78 +23,61 @@ const GET_COMPANIES = gql`
   }
 `;
 
-interface NavItem {
-  href: string;
-  icon: any;
-  label: string;
-  badge?: string;
-}
+interface NavItem { href: string; icon: any; label: string }
+interface NavGroup { label: string; items: NavItem[] }
 
-interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
+/* ── Navegação em eixos fixos (padrão dos líderes de practice management):
+   7 itens de topo respondem a "o que eu faço agora?";
+   o restante fica em grupos recolhíveis, fechados por padrão. ── */
 
-// ── GESTÃO — visão do gestor (topo, fixo, prioridade máxima) ──
-const NAV_MAIN: NavItem[] = [
-  { href: '/operacao',        icon: LayoutDashboard, label: 'Central de Operação', badge: 'Gestor' },
-  { href: '/gerencial',       icon: LayoutDashboard, label: 'Painel Gerencial' },
-  { href: '/meu-dia',         icon: Gauge,           label: 'Meu Dia',           badge: 'Hoje' },
-  { href: '/visao-geral',     icon: Building2,       label: 'Visão Geral',       badge: 'Admin' },
-  { href: '/dashboard',       icon: Building2,       label: 'Painel do Cliente' },
-  { href: '/farois',          icon: Target,          label: 'Faróis',            badge: 'Risco' },
-  { href: '/inconsistencias', icon: ShieldCheck,     label: 'Inconsistências',   badge: 'Malha' },
-  { href: '/insights',        icon: Boxes,           label: 'Insights de IA',    badge: 'IA' },
-  { href: '/organizacao',     icon: FolderTree,      label: 'Organização Docs',  badge: 'Novo' },
-  { href: '/apuracao',        icon: ClipboardList,   label: 'Apuração',          badge: 'Fiscal' },
-  { href: '/solicitacoes',    icon: Inbox,           label: 'Solicitar Clientes', badge: 'Pendências' },
-  { href: '/prazos',          icon: ClipboardList,   label: 'Prazos & SLA' },
-  { href: '/produtividade',   icon: Users,           label: 'Produtividade' },
-  { href: '/atribuir-responsavel', icon: UserCheck,  label: 'Atribuir Responsáveis' },
-  { href: '/fluxo',           icon: Workflow,        label: 'Fluxo de Trabalho', badge: 'Novo' },
+const CORE_GESTOR: NavItem[] = [
+  { href: '/operacao',     icon: Activity,      label: 'Operação' },
+  { href: '/farois',       icon: Lightbulb,     label: 'Faróis' },
+  { href: '/meu-dia',      icon: Sun,           label: 'Meu Dia' },
+  { href: '/carteira',     icon: Briefcase,     label: 'Clientes' },
+  { href: '/organizacao',  icon: FolderTree,    label: 'Documentos' },
+  { href: '/prazos',       icon: CalendarClock, label: 'Prazos' },
+  { href: '/atendimentos', icon: MessageCircle, label: 'Atendimento' },
 ];
 
-const NAV_GROUPS: NavGroup[] = [
+const GROUPS_GESTOR: NavGroup[] = [
   {
-    label: '⚡ Trabalho do Analista',
+    label: 'Gestão da carteira',
     items: [
-      { href: '/buscar-docs',     icon: Search,        label: 'Buscar Documentos', badge: 'IA' },
-      { href: '/captura-xml',     icon: Inbox,         label: 'Captura de XMLs',   badge: 'Fiscal' },
-      { href: '/esteira-fiscal',  icon: Workflow,      label: 'Esteira Fiscal',    badge: 'Auto' },
-      { href: '/ncm-inteligente', icon: Boxes,         label: 'Banco de NCM',      badge: 'IA' },
-      { href: '/exportar-dominio', icon: FileDown,     label: 'Exportar p/ Domínio' },
-      { href: '/copilot',         icon: Bot,           label: 'Copilot IA',        badge: 'AI' },
+      { href: '/gerencial',            icon: LayoutDashboard, label: 'Painel Gerencial' },
+      { href: '/visao-geral',          icon: Building2,       label: 'Visão Geral' },
+      { href: '/fluxo',                icon: Workflow,        label: 'Fluxo de Trabalho' },
+      { href: '/produtividade',        icon: Users,           label: 'Produtividade' },
+      { href: '/atribuir-responsavel', icon: UserCheck,       label: 'Atribuir Responsáveis' },
+      { href: '/gestao-equipe',        icon: Users,           label: 'Gestão de Equipe' },
     ],
   },
   {
-    label: 'Fiscal — Apuração & Entrega',
+    label: 'Inteligência & Análise',
     items: [
-      { href: '/simples-nacional',icon: Award,         label: 'Simples Nacional' },
-      { href: '/sped',            icon: FileCode,      label: 'SPED / EFD' },
-      { href: '/fiscal',          icon: Receipt,       label: 'NF-e / NFS-e' },
-      { href: '/onvio',           icon: Building2,     label: 'Onvio · Domínio', badge: 'TR' },
-      { href: '/certidoes',       icon: ShieldCheck,   label: 'Certidões' },
+      { href: '/insights',        icon: Boxes,          label: 'Insights de IA' },
+      { href: '/inconsistencias', icon: ShieldCheck,    label: 'Inconsistências' },
+      { href: '/apuracao',        icon: ClipboardList,  label: 'Apuração' },
+      { href: '/solicitacoes',    icon: Inbox,          label: 'Solicitar Clientes' },
+      { href: '/dashboard',       icon: Building2,      label: 'Painel do Cliente' },
+      { href: '/copilot',         icon: Bot,            label: 'Copilot IA' },
+      { href: '/benchmark',       icon: Target,         label: 'Benchmark' },
     ],
   },
   {
-    label: 'Carteira & Implantação',
+    label: 'Trabalho fiscal',
     items: [
-      { href: '/carteira',           icon: Briefcase,     label: 'Carteira',        badge: 'Live' },
-      { href: '/onboarding-cliente', icon: Building2,     label: 'Onboarding Cliente' },
-      { href: '/migracao',           icon: ArrowLeftRight,label: 'Migração em Massa' },
-      { href: '/drive-conectado',    icon: Globe,         label: 'Drives Conectados' },
-      { href: '/integracoes',        icon: Settings,      label: 'Integrações', badge: 'Setup' },
-    ],
-  },
-  {
-    label: 'Gestão & Relacionamento',
-    items: [
-      { href: '/audit',           icon: Hash,          label: 'Auditoria' },
-      { href: '/atendimentos',    icon: MessageCircle, label: 'Central de Atendimento', badge: 'MEGA' },
-      { href: '/whatsapp',        icon: MessageCircle, label: 'WhatsApp IA',  badge: 'WA' },
-      { href: '/comunicados',     icon: Megaphone,     label: 'Comunicados' },
-      { href: '/crm',             icon: Users,         label: 'CRM / Pipeline' },
-      { href: '/portal-cliente',  icon: Globe,         label: 'Portal do Cliente' },
+      { href: '/buscar-docs',      icon: Search,    label: 'Buscar Documentos' },
+      { href: '/captura-xml',      icon: Inbox,     label: 'Captura de XMLs' },
+      { href: '/esteira-fiscal',   icon: Workflow,  label: 'Esteira Fiscal' },
+      { href: '/ncm-inteligente',  icon: Boxes,     label: 'Banco de NCM' },
+      { href: '/exportar-dominio', icon: FileDown,  label: 'Exportar p/ Domínio' },
+      { href: '/simples-nacional', icon: Award,     label: 'Simples Nacional' },
+      { href: '/sped',             icon: FileCode,  label: 'SPED / EFD' },
+      { href: '/fiscal',           icon: Receipt,   label: 'NF-e / NFS-e' },
+      { href: '/onvio',            icon: Building2, label: 'Onvio · Domínio' },
+      { href: '/certidoes',        icon: ShieldCheck, label: 'Certidões' },
+      { href: '/mei',              icon: Award,     label: 'MEI — DAS / DASN' },
     ],
   },
   {
@@ -108,12 +91,12 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Contábil',
     items: [
-      { href: '/relatorios/dre',  icon: BarChart3,    label: 'DRE' },
-      { href: '/balanco',         icon: Scale,        label: 'Balanço Patrimonial' },
-      { href: '/transactions',    icon: ArrowLeftRight, label: 'Lançamentos' },
-      { href: '/cashflow',        icon: TrendingUp,   label: 'Fluxo de Caixa' },
-      { href: '/patrimonio',      icon: Package,      label: 'Patrimônio' },
-      { href: '/fechamento',      icon: ShieldCheck,  label: 'Fechamento Mensal' },
+      { href: '/relatorios/dre', icon: BarChart3,      label: 'DRE' },
+      { href: '/balanco',        icon: Scale,          label: 'Balanço Patrimonial' },
+      { href: '/transactions',   icon: ArrowLeftRight, label: 'Lançamentos' },
+      { href: '/cashflow',       icon: TrendingUp,     label: 'Fluxo de Caixa' },
+      { href: '/patrimonio',     icon: Package,        label: 'Patrimônio' },
+      { href: '/fechamento',     icon: ShieldCheck,    label: 'Fechamento Mensal' },
     ],
   },
   {
@@ -125,44 +108,53 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Consultoria & Tributário',
+    label: 'Relacionamento',
     items: [
-      { href: '/tributario',     icon: Scale,      label: 'Plan. Tributário' },
-      { href: '/reforma-tributaria', icon: Scale,  label: 'Reforma Tributária', badge: 'CBS/IBS' },
-      { href: '/benchmark',      icon: Target,     label: 'Benchmark' },
-      { href: '/abertura-empresa', icon: Store,    label: 'Abertura de Empresa' },
-      { href: '/mei',            icon: Award,      label: 'MEI — DAS / DASN' },
-      { href: '/guia',           icon: FileText,   label: 'Guia de Uso' },
-      { href: '/settings',       icon: Settings,   label: 'Configurações' },
+      { href: '/whatsapp',       icon: MessageCircle, label: 'WhatsApp IA' },
+      { href: '/comunicados',    icon: Megaphone,     label: 'Comunicados' },
+      { href: '/crm',            icon: Users,         label: 'CRM / Pipeline' },
+      { href: '/portal-cliente', icon: Globe,         label: 'Portal do Cliente' },
+    ],
+  },
+  {
+    label: 'Escritório & Setup',
+    items: [
+      { href: '/onboarding-cliente', icon: Plus,           label: 'Novo Cliente' },
+      { href: '/migracao',           icon: ArrowLeftRight, label: 'Migração em Massa' },
+      { href: '/drive-conectado',    icon: Globe,          label: 'Drives Conectados' },
+      { href: '/integracoes',        icon: Settings,       label: 'Integrações' },
+      { href: '/tributario',         icon: Scale,          label: 'Plan. Tributário' },
+      { href: '/reforma-tributaria', icon: Scale,          label: 'Reforma Tributária' },
+      { href: '/abertura-empresa',   icon: Store,          label: 'Abertura de Empresa' },
+      { href: '/audit',              icon: Hash,           label: 'Auditoria' },
+      { href: '/guia',               icon: FileText,       label: 'Guia de Uso' },
     ],
   },
 ];
 
-// ── Visão do ANALISTA — só o fluxo dele ──
-const NAV_MAIN_ANALISTA: NavItem[] = [
-  { href: '/meu-dia',       icon: Gauge,         label: 'Meu Dia',           badge: 'Hoje' },
-  { href: '/atendimentos',  icon: MessageCircle, label: 'Atendimentos',      badge: 'WA' },
-  { href: '/prazos',        icon: ClipboardList, label: 'Meus Prazos' },
-  { href: '/inconsistencias', icon: ShieldCheck, label: 'Inconsistências',   badge: 'Malha' },
-  { href: '/buscar-docs',   icon: Search,        label: 'Buscar Documentos', badge: 'IA' },
+const CORE_ANALISTA: NavItem[] = [
+  { href: '/meu-dia',         icon: Sun,           label: 'Meu Dia' },
+  { href: '/atendimentos',    icon: MessageCircle, label: 'Atendimentos' },
+  { href: '/prazos',          icon: CalendarClock, label: 'Meus Prazos' },
+  { href: '/inconsistencias', icon: ShieldCheck,   label: 'Inconsistências' },
+  { href: '/buscar-docs',     icon: Search,        label: 'Buscar Documentos' },
 ];
-const NAV_GROUPS_ANALISTA: NavGroup[] = [
+const GROUPS_ANALISTA: NavGroup[] = [
   {
-    label: 'Operação Fiscal',
+    label: 'Operação fiscal',
     items: [
-      { href: '/captura-xml',     icon: Inbox,     label: 'Captura de XMLs' },
-      { href: '/esteira-fiscal',  icon: Workflow,  label: 'Esteira Fiscal' },
+      { href: '/captura-xml',      icon: Inbox,    label: 'Captura de XMLs' },
+      { href: '/esteira-fiscal',   icon: Workflow, label: 'Esteira Fiscal' },
       { href: '/exportar-dominio', icon: FileDown, label: 'Exportar p/ Domínio' },
-      { href: '/ncm-inteligente', icon: Boxes,     label: 'Banco de NCM' },
+      { href: '/ncm-inteligente',  icon: Boxes,    label: 'Banco de NCM' },
     ],
   },
   {
     label: 'Apoio',
     items: [
-      { href: '/dashboard',  icon: Building2, label: 'Painel do Cliente' },
-      { href: '/copilot',    icon: Bot,       label: 'Copilot IA' },
-      { href: '/guia',       icon: FileText,  label: 'Guia de Uso' },
-      { href: '/settings',   icon: Settings,  label: 'Configurações' },
+      { href: '/dashboard', icon: Building2, label: 'Painel do Cliente' },
+      { href: '/copilot',   icon: Bot,       label: 'Copilot IA' },
+      { href: '/guia',      icon: FileText,  label: 'Guia de Uso' },
     ],
   },
 ];
@@ -172,21 +164,37 @@ function formatCnpj(cnpj: string) {
   return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
 }
 
+const OPEN_KEY = 'nexa_nav_open';
+
 export function Sidebar() {
   const path = usePathname();
   const router = useRouter();
   const { selectedCompany, setSelectedCompany } = useCompany();
   const { user, logout } = useAuth();
   const isAnalista = user?.role === 'analista';
-  const mainNav = isAnalista ? NAV_MAIN_ANALISTA : NAV_MAIN;
-  const groupsNav = isAnalista ? NAV_GROUPS_ANALISTA : NAV_GROUPS;
+  const coreNav = isAnalista ? CORE_ANALISTA : CORE_GESTOR;
+  const groupsNav = isAnalista ? GROUPS_ANALISTA : GROUPS_GESTOR;
+
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(OPEN_KEY) || '{}');
+      setOpen(saved);
+    } catch {}
+  }, []);
+  const toggleGroup = (label: string) => {
+    setOpen((prev) => {
+      const next = { ...prev, [label]: !prev[label] };
+      try { localStorage.setItem(OPEN_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   const handleLogout = () => {
     logout();
     router.replace('/login');
   };
   const { data } = useQuery(GET_COMPANIES);
-
   const companies: Company[] = data?.companies ?? [];
 
   useEffect(() => {
@@ -201,10 +209,7 @@ export function Sidebar() {
 
   const handleSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const company = companies.find(c => c.id === e.target.value);
-    if (company) {
-      setSelectedCompany(company);
-      router.push('/dashboard');
-    }
+    if (company) setSelectedCompany(company);
   };
 
   const isActive = (href: string) => {
@@ -212,35 +217,37 @@ export function Sidebar() {
     return path === href || (href !== '/dashboard' && path.startsWith(href + '/'));
   };
 
+  // Um grupo com item ativo abre automaticamente
+  const groupHasActive = (g: NavGroup) => g.items.some(i => isActive(i.href));
+
   const navItemClass = (href: string) =>
-    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+    `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
       isActive(href)
-        ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
-        : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
+        ? 'bg-brand-600/10 text-acao dark:bg-brand-500/15'
+        : 'text-tx-muted hover:text-tx-strong hover:bg-inset'
     }`;
 
   return (
-    <aside className="w-64 bg-[#161b2e] border-r border-[#1e2740] flex flex-col flex-shrink-0 h-screen">
+    <aside className="w-60 bg-card border-r border-line flex flex-col flex-shrink-0 h-screen">
       {/* Logo */}
-      <div className="h-16 flex items-center px-5 border-b border-[#1e2740] flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+      <div className="h-14 flex items-center px-4 border-b border-line flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-brand-600 flex items-center justify-center">
             <Zap className="h-4 w-4 text-white" />
           </div>
           <div>
-            <p className="text-white font-bold text-sm leading-none">Domo</p>
-            <p className="text-gray-500 text-xs">SYS</p>
+            <p className="text-tx-strong font-bold text-sm leading-none">Domo</p>
+            <p className="text-tx-faint text-[11px] leading-tight">SYS</p>
           </div>
         </div>
       </div>
 
-      {/* Company Selector */}
-      <div className="px-4 py-4 border-b border-[#1e2740] flex-shrink-0">
-        <p className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Cliente / Empresa</p>
+      {/* Seletor de cliente/empresa */}
+      <div className="px-3 py-3 border-b border-line flex-shrink-0">
         {companies.length === 0 ? (
           <Link
             href="/onboarding-cliente"
-            className="flex items-center gap-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors py-2"
+            className="flex items-center gap-2 text-[13px] text-acao hover:opacity-80 transition-opacity py-1.5 px-1"
           >
             <Plus className="h-4 w-4" />
             Cadastrar primeiro cliente
@@ -250,86 +257,89 @@ export function Sidebar() {
             <select
               value={selectedCompany?.id ?? ''}
               onChange={handleSelect}
-              className="w-full bg-[#0f1117] text-white text-sm border border-[#1e2740] rounded-lg px-3 py-2.5 pr-8 appearance-none cursor-pointer focus:outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-inset text-tx-strong text-[13px] border border-line rounded-lg pl-3 pr-8 py-2 appearance-none cursor-pointer focus:outline-none focus:border-acao transition-colors"
+              title="Cliente em foco nas telas de empresa"
             >
               {companies.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-tx-faint pointer-events-none" />
           </div>
         )}
-
         {selectedCompany && (
-          <div className="mt-2 px-1">
-            <p className="text-xs text-gray-500 font-mono">
-              {formatCnpj(selectedCompany.cnpj)}
-            </p>
-            <p className="text-xs text-gray-600 mt-0.5">{selectedCompany.taxRegime.replace('_', ' ')}</p>
-          </div>
+          <p className="mt-1.5 px-1 text-[11px] text-tx-faint font-mono">
+            {formatCnpj(selectedCompany.cnpj)} · {selectedCompany.taxRegime?.replace(/_/g, ' ')}
+          </p>
         )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-1">
-        {/* Main nav items */}
-        {mainNav.map(({ href, icon: Icon, label, badge }) => (
-          <Link key={href} href={href} className={navItemClass(href)}>
-            <Icon className="h-4 w-4 flex-shrink-0" />
-            {label}
-            {badge && (
-              <span className="ml-auto text-xs bg-indigo-600 text-white px-1.5 py-0.5 rounded-full">
-                {badge}
-              </span>
-            )}
-          </Link>
-        ))}
+      {/* Navegação */}
+      <nav className="flex-1 px-2.5 py-3 overflow-y-auto">
+        <div className="space-y-0.5">
+          {coreNav.map(({ href, icon: Icon, label }) => (
+            <Link key={href} href={href} className={navItemClass(href)}>
+              <Icon className="h-4 w-4 flex-shrink-0" />
+              {label}
+            </Link>
+          ))}
+        </div>
 
-        {/* Grouped nav items */}
-        {groupsNav.map(group => (
-          <div key={group.label} className="pt-3">
-            <p className="px-3 text-xs text-gray-600 font-medium uppercase tracking-wider mb-1">
-              {group.label}
-            </p>
-            {group.items.map(({ href, icon: Icon, label, badge }) => (
-              <Link key={href} href={href} className={navItemClass(href)}>
-                <Icon className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate">{label}</span>
-                {badge && (
-                  <span className="ml-auto text-xs bg-indigo-600 text-white px-1.5 py-0.5 rounded-full">
-                    {badge}
-                  </span>
+        <div className="mt-4 space-y-1">
+          {groupsNav.map(group => {
+            const expanded = open[group.label] || groupHasActive(group);
+            return (
+              <div key={group.label}>
+                <button
+                  onClick={() => toggleGroup(group.label)}
+                  className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-tx-faint font-semibold uppercase tracking-wider hover:text-tx-muted transition-colors"
+                >
+                  {expanded
+                    ? <ChevronDown className="h-3 w-3 flex-shrink-0" />
+                    : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
+                  <span className="truncate">{group.label}</span>
+                </button>
+                {expanded && (
+                  <div className="space-y-0.5 mb-2">
+                    {group.items.map(({ href, icon: Icon, label }) => (
+                      <Link key={href} href={href} className={navItemClass(href)}>
+                        <Icon className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">{label}</span>
+                      </Link>
+                    ))}
+                  </div>
                 )}
-              </Link>
-            ))}
-          </div>
-        ))}
+              </div>
+            );
+          })}
+        </div>
       </nav>
 
-      {/* Footer */}
-      <div className="px-4 py-4 border-t border-[#1e2740] space-y-3 flex-shrink-0">
+      {/* Rodapé */}
+      <div className="px-3 py-3 border-t border-line space-y-2 flex-shrink-0">
+        <Link href="/settings" className={navItemClass('/settings')}>
+          <Settings className="h-4 w-4 flex-shrink-0" />
+          Configurações
+        </Link>
         {user && (
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-white font-medium truncate max-w-[120px]">{user.name}</p>
-              <p className="text-xs text-gray-600 truncate max-w-[120px]">{user.email}</p>
+          <div className="flex items-center justify-between px-1">
+            <div className="min-w-0">
+              <p className="text-xs text-tx-strong font-medium truncate max-w-[150px]">{user.name}</p>
+              <p className="text-[11px] text-tx-faint truncate max-w-[150px]">{user.email}</p>
             </div>
             <button
               onClick={handleLogout}
               title="Sair"
-              className="text-gray-600 hover:text-red-400 transition-colors"
+              className="text-tx-faint hover:text-err transition-colors p-1"
             >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
         )}
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <ShieldCheck className="h-3.5 w-3.5 text-green-500" />
+        <div className="flex items-center gap-1.5 px-1 text-[11px] text-tx-faint">
+          <ShieldCheck className="h-3.5 w-3.5 text-ok" />
           Trilha de auditoria ativa
         </div>
-        <p className="text-xs text-gray-700">DomoSYS v1.0.0</p>
       </div>
     </aside>
   );

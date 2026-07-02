@@ -1,11 +1,32 @@
 'use client';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, Search, ChevronRight, Command, Building2, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
-import { useCompany } from '@/contexts/CompanyContext';
+import { Bell, Search, ChevronRight, Command, CalendarDays, AlertCircle, CheckCircle2, Clock, Sun, Moon } from 'lucide-react';
+import { useCompetencia, fmtCompetencia } from '@/contexts/CompetenciaContext';
 
 const ROUTE_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard',
+  operacao: 'Operação',
+  farois: 'Faróis',
+  'meu-dia': 'Meu Dia',
+  carteira: 'Clientes',
+  organizacao: 'Documentos',
+  prazos: 'Prazos',
+  atendimentos: 'Atendimento',
+  gerencial: 'Painel Gerencial',
+  'visao-geral': 'Visão Geral',
+  dashboard: 'Painel do Cliente',
+  inconsistencias: 'Inconsistências',
+  insights: 'Insights de IA',
+  apuracao: 'Apuração',
+  solicitacoes: 'Solicitar Clientes',
+  produtividade: 'Produtividade',
+  'atribuir-responsavel': 'Atribuir Responsáveis',
+  fluxo: 'Fluxo de Trabalho',
+  'buscar-docs': 'Buscar Documentos',
+  'captura-xml': 'Captura de XMLs',
+  'esteira-fiscal': 'Esteira Fiscal',
+  'ncm-inteligente': 'Banco de NCM',
+  'exportar-dominio': 'Exportar p/ Domínio',
   documents: 'Documentos',
   transactions: 'Lançamentos',
   copilot: 'Copilot IA',
@@ -29,7 +50,6 @@ const ROUTE_LABELS: Record<string, string> = {
   tributario: 'Planejamento Tributário',
   cashflow: 'Fluxo de Caixa',
   benchmark: 'Benchmark',
-  'saude-fiscal': 'Saúde Fiscal',
   honorarios: 'Honorários',
   crm: 'CRM',
   tarefas: 'Tarefas',
@@ -38,15 +58,22 @@ const ROUTE_LABELS: Record<string, string> = {
   mei: 'MEI',
   'portal-cliente': 'Portal do Cliente',
   banking: 'Open Finance',
-  'risco-fiscal': 'Risco Fiscal',
   companies: 'Empresas',
   audit: 'Auditoria',
   settings: 'Configurações',
+  'gestao-equipe': 'Gestão de Equipe',
+  'onboarding-cliente': 'Novo Cliente',
+  migracao: 'Migração',
+  'drive-conectado': 'Drives Conectados',
+  integracoes: 'Integrações',
+  'reforma-tributaria': 'Reforma Tributária',
+  fechamento: 'Fechamento Mensal',
+  'cliente-erros': 'Ficha do Cliente',
+  guia: 'Guia de Uso',
 };
 
 function humanizeSegment(seg: string): string {
   if (ROUTE_LABELS[seg]) return ROUTE_LABELS[seg];
-  // monthly slugs like 2026-01 -> "2026/01"
   if (/^\d{4}-\d{2}$/.test(seg)) return seg.replace('-', '/');
   return seg.charAt(0).toUpperCase() + seg.slice(1);
 }
@@ -61,12 +88,26 @@ interface NotificationItem {
   createdAt: string;
 }
 
+function useTheme() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains('dark'));
+  }, []);
+  const toggle = useCallback(() => {
+    const next = !document.documentElement.classList.contains('dark');
+    document.documentElement.classList.toggle('dark', next);
+    try { localStorage.setItem('nexa_theme', next ? 'dark' : 'light'); } catch {}
+    setDark(next);
+  }, []);
+  return { dark, toggle };
+}
+
 export function TopBar({ onOpenCommand }: { onOpenCommand?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { selectedCompany } = useCompany();
+  const { dark, toggle } = useTheme();
+  const { competencia, setCompetencia, meses, resolved } = useCompetencia();
   const [showNotif, setShowNotif] = useState(false);
-  // local placeholder until /notifications query is wired; show 0 unread cleanly
   const [notifications] = useState<NotificationItem[]>([]);
 
   const segments = useMemo(
@@ -75,7 +116,6 @@ export function TopBar({ onOpenCommand }: { onOpenCommand?: () => void }) {
   );
   const unread = notifications.filter((n) => !n.lida).length;
 
-  // Open command palette with Cmd/Ctrl+K
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -88,24 +128,24 @@ export function TopBar({ onOpenCommand }: { onOpenCommand?: () => void }) {
   }, [onOpenCommand]);
 
   return (
-    <header className="h-14 flex items-center justify-between px-6 border-b border-[#1e2740] bg-[#0f1117] flex-shrink-0 sticky top-0 z-30">
+    <header className="h-14 flex items-center justify-between px-5 border-b border-line bg-card flex-shrink-0 sticky top-0 z-30">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm overflow-x-auto" aria-label="Breadcrumb">
         {segments.length === 0 ? (
-          <span className="text-gray-400">Início</span>
+          <span className="text-tx-muted">Início</span>
         ) : (
           segments.map((seg, idx) => {
             const href = '/' + segments.slice(0, idx + 1).join('/');
             const isLast = idx === segments.length - 1;
             return (
               <span key={href} className="flex items-center gap-1.5">
-                {idx > 0 && <ChevronRight className="h-3.5 w-3.5 text-gray-600" />}
+                {idx > 0 && <ChevronRight className="h-3.5 w-3.5 text-tx-faint" />}
                 {isLast ? (
-                  <span className="text-white font-medium">{humanizeSegment(seg)}</span>
+                  <span className="text-tx-strong font-semibold">{humanizeSegment(seg)}</span>
                 ) : (
                   <button
                     onClick={() => router.push(href)}
-                    className="text-gray-400 hover:text-white transition-colors"
+                    className="text-tx-muted hover:text-tx-strong transition-colors"
                   >
                     {humanizeSegment(seg)}
                   </button>
@@ -116,56 +156,76 @@ export function TopBar({ onOpenCommand }: { onOpenCommand?: () => void }) {
         )}
       </nav>
 
-      {/* Right side: search + company chip + notifications */}
-      <div className="flex items-center gap-3">
-        {/* Cmd+K search trigger */}
+      {/* Direita: competência global · busca · tema · notificações */}
+      <div className="flex items-center gap-2.5">
+        {/* Competência — controle global, não filtro escondido */}
+        {meses.length > 0 && (
+          <div className="hidden sm:flex items-center gap-1.5 pl-2.5 pr-1 py-1 bg-inset border border-line rounded-lg"
+            title="Competência (mês fiscal) — rege todas as visões">
+            <CalendarDays className="h-3.5 w-3.5 text-acao" />
+            <select
+              value={competencia}
+              onChange={(e) => setCompetencia(e.target.value)}
+              className="bg-transparent text-[13px] font-medium text-tx-strong appearance-none cursor-pointer focus:outline-none py-0.5 pr-1"
+            >
+              <option value="">
+                {resolved ? `Auto (${fmtCompetencia(resolved)})` : 'Automático'}
+              </option>
+              {meses.map((m) => (
+                <option key={m.competencia} value={m.competencia}>
+                  {fmtCompetencia(m.competencia)}{m.docs ? ` · ${m.docs} docs` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Busca ⌘K */}
         <button
           onClick={() => onOpenCommand?.()}
-          className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm text-gray-400 bg-[#161b2e] border border-[#1e2740] rounded-lg hover:border-indigo-500/50 hover:text-gray-200 transition-colors"
+          className="hidden md:flex items-center gap-2 px-3 py-1.5 text-[13px] text-tx-muted bg-inset border border-line rounded-lg hover:border-acao hover:text-tx transition-colors"
           title="Buscar (Ctrl+K)"
         >
-          <Search className="h-4 w-4" />
+          <Search className="h-3.5 w-3.5" />
           <span>Buscar...</span>
-          <kbd className="ml-2 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono border border-[#2a3550] rounded text-gray-500">
+          <kbd className="ml-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono border border-line rounded text-tx-faint">
             <Command className="h-2.5 w-2.5" />K
           </kbd>
         </button>
 
-        {/* Company chip */}
-        {selectedCompany && (
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-[#161b2e] border border-[#1e2740] rounded-lg">
-            <Building2 className="h-3.5 w-3.5 text-indigo-400" />
-            <span className="text-xs text-gray-300 max-w-[200px] truncate">
-              {selectedCompany.name}
-            </span>
-            <span className="text-xs text-gray-600">·</span>
-            <span className="text-xs text-gray-500">{selectedCompany.taxRegime?.replace('_', ' ')}</span>
-          </div>
-        )}
+        {/* Tema claro/escuro */}
+        <button
+          onClick={toggle}
+          className="h-9 w-9 flex items-center justify-center rounded-lg text-tx-muted hover:text-tx-strong hover:bg-inset transition-colors"
+          title={dark ? 'Tema claro' : 'Tema escuro'}
+          aria-label="Alternar tema"
+        >
+          {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
 
-        {/* Notification bell */}
+        {/* Notificações */}
         <div className="relative">
           <button
             onClick={() => setShowNotif((v) => !v)}
-            className="relative h-9 w-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+            className="relative h-9 w-9 flex items-center justify-center rounded-lg text-tx-muted hover:text-tx-strong hover:bg-inset transition-colors"
             aria-label="Notificações"
           >
             <Bell className="h-4 w-4" />
             {unread > 0 && (
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full ring-2 ring-[#0f1117]" />
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-err rounded-full ring-2 ring-card" />
             )}
           </button>
           {showNotif && (
-            <div className="absolute right-0 top-11 w-80 bg-[#161b2e] border border-[#1e2740] rounded-xl shadow-xl py-2 z-40">
-              <div className="px-4 py-2 border-b border-[#1e2740] flex items-center justify-between">
-                <p className="text-sm font-medium text-white">Notificações</p>
-                <span className="text-xs text-gray-500">{unread} não lidas</span>
+            <div className="absolute right-0 top-11 w-80 bg-card border border-line rounded-xl shadow-pop py-2 z-40">
+              <div className="px-4 py-2 border-b border-line flex items-center justify-between">
+                <p className="text-sm font-medium text-tx-strong">Notificações</p>
+                <span className="text-xs text-tx-faint">{unread} não lidas</span>
               </div>
               {notifications.length === 0 ? (
                 <div className="px-4 py-8 text-center">
-                  <CheckCircle2 className="h-8 w-8 text-gray-600 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500">Você está em dia.</p>
-                  <p className="text-xs text-gray-600 mt-0.5">Nenhuma notificação no momento.</p>
+                  <CheckCircle2 className="h-8 w-8 text-tx-faint mx-auto mb-2" />
+                  <p className="text-xs text-tx-muted">Você está em dia.</p>
+                  <p className="text-xs text-tx-faint mt-0.5">Nenhuma notificação no momento.</p>
                 </div>
               ) : (
                 <div className="max-h-80 overflow-y-auto">
@@ -173,18 +233,18 @@ export function TopBar({ onOpenCommand }: { onOpenCommand?: () => void }) {
                     <button
                       key={n.id}
                       onClick={() => n.link && router.push(n.link)}
-                      className="w-full text-left px-4 py-2.5 hover:bg-white/5 transition-colors flex gap-3"
+                      className="w-full text-left px-4 py-2.5 hover:bg-inset transition-colors flex gap-3"
                     >
                       <div className="mt-0.5">
                         {n.tipo.includes('vencen') ? (
-                          <AlertCircle className="h-4 w-4 text-amber-400" />
+                          <AlertCircle className="h-4 w-4 text-warn" />
                         ) : (
-                          <Clock className="h-4 w-4 text-indigo-400" />
+                          <Clock className="h-4 w-4 text-acao" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-white truncate">{n.titulo}</p>
-                        <p className="text-xs text-gray-500 truncate">{n.corpo}</p>
+                        <p className="text-xs font-medium text-tx-strong truncate">{n.titulo}</p>
+                        <p className="text-xs text-tx-faint truncate">{n.corpo}</p>
                       </div>
                     </button>
                   ))}

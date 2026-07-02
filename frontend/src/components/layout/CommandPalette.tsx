@@ -126,35 +126,35 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   let flatIdx = -1;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-[rgba(13,17,25,0.45)] backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-xl bg-[#161b2e] border border-[#2a3550] rounded-xl shadow-2xl overflow-hidden"
+        className="w-full max-w-xl bg-card border border-line rounded-xl shadow-pop overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-[#1e2740]">
-          <Search className="h-4 w-4 text-gray-500" />
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-line">
+          <Search className="h-4 w-4 text-tx-muted" />
           <input
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Buscar páginas, ações, módulos..."
-            className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-gray-600"
+            className="flex-1 bg-transparent text-sm text-tx-strong outline-none placeholder:text-tx-faint"
           />
-          <button onClick={onClose} className="text-gray-500 hover:text-white">
+          <button onClick={onClose} className="text-tx-muted hover:text-tx-strong">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <div className="max-h-96 overflow-y-auto py-2">
           {filtered.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-gray-500">
-              Nenhum resultado para <span className="text-gray-300">"{q}"</span>
+            <div className="px-4 py-8 text-center text-sm text-tx-muted">
+              Nenhum resultado para <span className="text-tx">"{q}"</span>
             </div>
           ) : (
             groups.map((g) => (
               <div key={g.name} className="mb-2">
-                <p className="px-4 py-1 text-[10px] uppercase tracking-wider text-gray-600 font-semibold">
+                <p className="px-4 py-1 text-[10px] uppercase tracking-wider text-tx-faint font-semibold">
                   {g.name}
                 </p>
                 {g.items.map((item) => {
@@ -166,11 +166,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                       onMouseEnter={() => setActiveIdx(flatIdx)}
                       onClick={() => pick(item)}
                       className={`w-full flex items-center justify-between px-4 py-2 text-sm transition-colors ${
-                        active ? 'bg-indigo-600/20 text-white' : 'text-gray-300 hover:bg-white/5'
+                        active ? 'bg-indigo-600/20 text-tx-strong' : 'text-tx hover:bg-inset'
                       }`}
                     >
                       <span>{item.label}</span>
-                      {active && <ArrowRight className="h-3.5 w-3.5 text-indigo-400" />}
+                      {active && <ArrowRight className="h-3.5 w-3.5 text-acao" />}
                     </button>
                   );
                 })}
@@ -179,10 +179,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           )}
         </div>
 
-        <div className="px-4 py-2 border-t border-[#1e2740] text-xs text-gray-600 flex items-center gap-4">
-          <span><kbd className="text-gray-500">↑↓</kbd> navegar</span>
-          <span><kbd className="text-gray-500">Enter</kbd> abrir</span>
-          <span><kbd className="text-gray-500">Esc</kbd> fechar</span>
+        <div className="px-4 py-2 border-t border-line text-xs text-tx-faint flex items-center gap-4">
+          <span><kbd className="text-tx-muted">↑↓</kbd> navegar</span>
+          <span><kbd className="text-tx-muted">Enter</kbd> abrir</span>
+          <span><kbd className="text-tx-muted">Esc</kbd> fechar</span>
         </div>
       </div>
     </div>
