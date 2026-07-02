@@ -407,8 +407,10 @@ export class PaineisService {
       if (!['5', '6', '7'].includes(dir)) continue; // só saídas (emitidas pelo cliente)
       const co = coById.get(d.companyId);
       if (!co || !REGULAR.includes((co.taxRegime || '').toUpperCase())) continue;
+      // XMLs varridos antes do detector não têm o campo — não contam como risco (evita falso positivo)
+      if (typeof nf?.temIBSCBS !== 'boolean') continue;
       const acc = ibsPorCliente.get(d.companyId) ?? { com: 0, sem: 0 };
-      if (nf?.temIBSCBS) acc.com++; else acc.sem++;
+      if (nf.temIBSCBS) acc.com++; else acc.sem++;
       ibsPorCliente.set(d.companyId, acc);
     }
     const ibscbs = companies
