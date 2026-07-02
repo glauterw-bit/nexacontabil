@@ -54,13 +54,13 @@ const stageLabel: Record<string, string> = {
 };
 
 const stageColor: Record<string, string> = {
-  greeting: 'text-tx-muted',
-  identify: 'text-warn',
-  collect_docs: 'text-info',
-  ask_details: 'text-acao',
+  greeting: 'text-gray-400',
+  identify: 'text-yellow-400',
+  collect_docs: 'text-blue-400',
+  ask_details: 'text-indigo-400',
   process: 'text-purple-400',
   review: 'text-orange-400',
-  completed: 'text-ok',
+  completed: 'text-green-400',
 };
 
 export default function WhatsAppPage() {
@@ -207,8 +207,8 @@ export default function WhatsAppPage() {
   if (!selectedCompany) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa para gerenciar o WhatsApp.</p>
+        <Building2 className="h-12 w-12 text-gray-600" />
+        <p className="text-gray-400 text-sm">Selecione uma empresa para gerenciar o WhatsApp.</p>
         <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
       </div>
     );
@@ -219,8 +219,8 @@ export default function WhatsAppPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-tx-strong">WhatsApp IA</h1>
-          <p className="text-tx-muted text-sm mt-1">{selectedCompany.name} · Atendente contábil humanizado</p>
+          <h1 className="text-2xl font-bold text-white">WhatsApp IA</h1>
+          <p className="text-gray-400 text-sm mt-1">{selectedCompany.name} · Atendente contábil humanizado</p>
         </div>
         <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
           <Plus className="h-4 w-4" />
@@ -230,35 +230,35 @@ export default function WhatsAppPage() {
 
       {/* Create Instance Modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-[rgba(13,17,25,0.45)] backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-card border border-line rounded-2xl p-8 w-full max-w-md space-y-6 shadow-pop">
-            <h2 className="text-xl font-semibold text-tx-strong">Conectar WhatsApp</h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-[#0f1117] border border-[#1e2740] rounded-2xl p-8 w-full max-w-md space-y-6">
+            <h2 className="text-xl font-semibold text-white">Conectar WhatsApp</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-tx-muted mb-2">Nome da instância</label>
+                <label className="block text-sm text-gray-400 mb-2">Nome da instância</label>
                 <input
                   value={form.instance_name}
                   onChange={e => setForm(f => ({ ...f, instance_name: e.target.value }))}
                   placeholder="ex: contabilidade-cliente1"
-                  className="w-full bg-inset border border-line rounded-lg px-4 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500"
+                  className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-4 py-2.5 text-white text-sm outline-none focus:border-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-sm text-tx-muted mb-2">Número WhatsApp (com DDI e DDD)</label>
+                <label className="block text-sm text-gray-400 mb-2">Número WhatsApp (com DDI e DDD)</label>
                 <input
                   value={form.phone_number}
                   onChange={e => setForm(f => ({ ...f, phone_number: e.target.value.replace(/\D/g, '') }))}
                   placeholder="5511999998888"
-                  className="w-full bg-inset border border-line rounded-lg px-4 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500"
+                  className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-4 py-2.5 text-white text-sm outline-none focus:border-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-sm text-tx-muted mb-2">Nome do atendente IA</label>
+                <label className="block text-sm text-gray-400 mb-2">Nome do atendente IA</label>
                 <input
                   value={form.attendant_name}
                   onChange={e => setForm(f => ({ ...f, attendant_name: e.target.value }))}
                   placeholder="Ana"
-                  className="w-full bg-inset border border-line rounded-lg px-4 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500"
+                  className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-4 py-2.5 text-white text-sm outline-none focus:border-indigo-500"
                 />
               </div>
             </div>
@@ -279,12 +279,12 @@ export default function WhatsAppPage() {
 
       {/* QR Code Modal */}
       {qrcode && (
-        <div className="fixed inset-0 bg-[rgba(13,17,25,0.45)] backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-card border border-line rounded-2xl p-8 w-full max-w-sm space-y-6 text-center shadow-pop">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-[#0f1117] border border-[#1e2740] rounded-2xl p-8 w-full max-w-sm space-y-6 text-center">
             <div>
-              <QrCode className="h-8 w-8 text-acao mx-auto mb-2" />
-              <h2 className="text-xl font-semibold text-tx-strong">Escanear QR Code</h2>
-              <p className="text-tx-muted text-sm mt-1">Instância: {qrcode.instance}</p>
+              <QrCode className="h-8 w-8 text-indigo-400 mx-auto mb-2" />
+              <h2 className="text-xl font-semibold text-white">Escanear QR Code</h2>
+              <p className="text-gray-400 text-sm mt-1">Instância: {qrcode.instance}</p>
             </div>
             <div className="bg-white p-4 rounded-xl inline-block">
               {qrcode.data.startsWith('data:') ? (
@@ -293,7 +293,7 @@ export default function WhatsAppPage() {
                 <img src={`data:image/png;base64,${qrcode.data}`} alt="QR Code" className="w-48 h-48" />
               )}
             </div>
-            <p className="text-tx-muted text-xs">Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo</p>
+            <p className="text-gray-500 text-xs">Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo</p>
             <button onClick={() => setQrcode(null)} className="btn-ghost w-full">Fechar</button>
           </div>
         </div>
@@ -301,15 +301,15 @@ export default function WhatsAppPage() {
 
       {/* Instances Grid */}
       <div>
-        <h2 className="text-lg font-semibold text-tx-strong mb-4 flex items-center gap-2">
-          <Phone className="h-5 w-5 text-acao" />
+        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Phone className="h-5 w-5 text-indigo-400" />
           Instâncias Conectadas
         </h2>
         {instances.length === 0 ? (
           <div className="card-aura text-center py-12">
-            <Phone className="h-12 w-12 text-tx-faint mx-auto mb-3" />
-            <p className="text-tx-muted text-sm">Nenhuma instância cadastrada.</p>
-            <p className="text-tx-faint text-xs mt-1">Clique em "Nova Instância" para conectar um número.</p>
+            <Phone className="h-12 w-12 text-gray-600 mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">Nenhuma instância cadastrada.</p>
+            <p className="text-gray-600 text-xs mt-1">Clique em "Nova Instância" para conectar um número.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -324,32 +324,32 @@ export default function WhatsAppPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         {connected
-                          ? <Wifi className="h-4 w-4 text-ok" />
-                          : <WifiOff className="h-4 w-4 text-err" />}
-                        <span className="font-medium text-tx-strong text-sm">{inst.instance_name}</span>
+                          ? <Wifi className="h-4 w-4 text-green-400" />
+                          : <WifiOff className="h-4 w-4 text-red-400" />}
+                        <span className="font-medium text-white text-sm">{inst.instance_name}</span>
                       </div>
-                      <p className="text-tx-muted text-xs mt-1">{inst.phone_number || '—'}</p>
+                      <p className="text-gray-500 text-xs mt-1">{inst.phone_number || '—'}</p>
                     </div>
                     <span className={`text-xs px-2 py-0.5 rounded-full border ${
                       connected
-                        ? 'text-ok border-green-400/30 bg-green-400/10'
-                        : 'text-err border-red-400/30 bg-red-400/10'
+                        ? 'text-green-400 border-green-400/30 bg-green-400/10'
+                        : 'text-red-400 border-red-400/30 bg-red-400/10'
                     }`}>
                       {connected ? 'Online' : inst.status || 'Offline'}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs text-tx-muted">
-                    <Bot className="h-3.5 w-3.5 text-acao" />
-                    <span>Atendente: <strong className="text-acao">{inst.attendant_name}</strong></span>
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <Bot className="h-3.5 w-3.5 text-indigo-400" />
+                    <span>Atendente: <strong className="text-indigo-400">{inst.attendant_name}</strong></span>
                   </div>
 
                   {/* Toggle IA */}
-                  <div className="flex items-center justify-between bg-inset rounded-lg px-3 py-2">
+                  <div className="flex items-center justify-between bg-[#0f1117] rounded-lg px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <Bot className={`h-3.5 w-3.5 ${inst.ai_enabled ? 'text-ok' : 'text-tx-muted'}`} />
-                      <span className="text-xs text-tx-muted">
-                        IA: <span className={inst.ai_enabled ? 'text-ok font-medium' : 'text-tx-muted'}>
+                      <Bot className={`h-3.5 w-3.5 ${inst.ai_enabled ? 'text-green-400' : 'text-gray-500'}`} />
+                      <span className="text-xs text-gray-400">
+                        IA: <span className={inst.ai_enabled ? 'text-green-400 font-medium' : 'text-gray-500'}>
                           {inst.ai_enabled ? 'Ativada' : 'Desativada'}
                         </span>
                       </span>
@@ -368,10 +368,10 @@ export default function WhatsAppPage() {
                   </div>
 
                   {/* Toggle Voz */}
-                  <div className="flex items-center justify-between bg-inset rounded-lg px-3 py-2">
+                  <div className="flex items-center justify-between bg-[#0f1117] rounded-lg px-3 py-2">
                     <div className="flex items-center gap-2">
                       <Volume2 className="h-3.5 w-3.5 text-purple-400" />
-                      <span className="text-xs text-tx-muted">
+                      <span className="text-xs text-gray-400">
                         Voz: <span className="text-purple-300 font-medium">
                           {isFemale ? '♀ Feminina' : '♂ Masculina'}
                         </span>
@@ -409,7 +409,7 @@ export default function WhatsAppPage() {
                     </button>
                     <button
                       onClick={() => deleteInstance(inst.instance_name)}
-                      className="btn-ghost flex items-center gap-1.5 text-xs text-err hover:text-red-300 flex-1 justify-center"
+                      className="btn-ghost flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 flex-1 justify-center"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       Remover
@@ -425,20 +425,20 @@ export default function WhatsAppPage() {
       {/* Conversations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
-          <h2 className="text-lg font-semibold text-tx-strong mb-4 flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-acao" />
+          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-indigo-400" />
             Conversas Ativas
             {conversations.length > 0 && (
-              <span className="ml-auto text-xs bg-indigo-600/20 text-acao border border-indigo-500/30 px-2 py-0.5 rounded-full">
+              <span className="ml-auto text-xs bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full">
                 {conversations.length}
               </span>
             )}
           </h2>
           {conversations.length === 0 ? (
             <div className="card-aura text-center py-8">
-              <MessageSquare className="h-8 w-8 text-tx-faint mx-auto mb-2" />
-              <p className="text-tx-muted text-sm">Nenhuma conversa ativa.</p>
-              <p className="text-tx-faint text-xs mt-1">Aguardando mensagens no WhatsApp...</p>
+              <MessageSquare className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+              <p className="text-gray-500 text-sm">Nenhuma conversa ativa.</p>
+              <p className="text-gray-600 text-xs mt-1">Aguardando mensagens no WhatsApp...</p>
             </div>
           ) : (
             <div className="card-aura space-y-2">
@@ -446,21 +446,21 @@ export default function WhatsAppPage() {
                 <button
                   key={i}
                   onClick={() => loadConvDetail(conv)}
-                  className="w-full flex items-center gap-4 p-3 bg-inset rounded-lg border border-line hover:border-indigo-500/40 transition-colors text-left"
+                  className="w-full flex items-center gap-4 p-3 bg-[#0f1117] rounded-lg border border-[#1e2740] hover:border-indigo-500/40 transition-colors text-left"
                 >
                   <div className="h-10 w-10 rounded-full bg-indigo-600/20 flex items-center justify-center flex-shrink-0">
-                    <User className="h-5 w-5 text-acao" />
+                    <User className="h-5 w-5 text-indigo-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-tx-strong text-sm font-medium truncate">
+                    <p className="text-white text-sm font-medium truncate">
                       {conv.client_name || conv.phone}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-xs ${stageColor[conv.stage] || 'text-tx-muted'}`}>
+                      <span className={`text-xs ${stageColor[conv.stage] || 'text-gray-400'}`}>
                         {stageLabel[conv.stage] || conv.stage}
                       </span>
                       {conv.docs > 0 && (
-                        <span className="text-xs text-tx-muted flex items-center gap-1">
+                        <span className="text-xs text-gray-500 flex items-center gap-1">
                           <FileText className="h-3 w-3" />
                           {conv.docs} doc{conv.docs !== 1 ? 's' : ''}
                         </span>
@@ -468,8 +468,8 @@ export default function WhatsAppPage() {
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-xs text-tx-muted">{conv.messages} msgs</p>
-                    <ChevronRight className="h-4 w-4 text-tx-faint ml-auto mt-1" />
+                    <p className="text-xs text-gray-500">{conv.messages} msgs</p>
+                    <ChevronRight className="h-4 w-4 text-gray-600 ml-auto mt-1" />
                   </div>
                 </button>
               ))}
@@ -481,25 +481,25 @@ export default function WhatsAppPage() {
         {selectedConv && (
           <div className="space-y-4">
             {/* Header da conversa */}
-            <h2 className="text-lg font-semibold text-tx-strong flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-acao" />
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-indigo-400" />
               {selectedConv.client_name || selectedConv.phone}
             </h2>
 
             {/* Info resumida */}
             <div className="card-aura flex flex-wrap items-center gap-4 text-xs">
-              <span className="text-tx-muted">Etapa: <span className={stageColor[selectedConv.stage]}>{stageLabel[selectedConv.stage]}</span></span>
+              <span className="text-gray-400">Etapa: <span className={stageColor[selectedConv.stage]}>{stageLabel[selectedConv.stage]}</span></span>
               {selectedConv.client_cnpj && (
-                <span className="text-tx-muted">CNPJ: <span className="text-tx-strong font-mono">{selectedConv.client_cnpj}</span></span>
+                <span className="text-gray-400">CNPJ: <span className="text-white font-mono">{selectedConv.client_cnpj}</span></span>
               )}
-              <span className="text-tx-muted">{selectedConv.collected_docs.length} documento(s) · {selectedConv.messages.length} mensagem(ns)</span>
+              <span className="text-gray-400">{selectedConv.collected_docs.length} documento(s) · {selectedConv.messages.length} mensagem(ns)</span>
             </div>
 
             {/* Documentos analisados */}
             {selectedConv.collected_docs.length > 0 && (
               <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-tx-strong flex items-center gap-2">
-                  <Receipt className="h-4 w-4 text-ok" />
+                <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-green-400" />
                   Documentos Analisados pela IA
                 </h3>
                 {selectedConv.collected_docs.map((doc, i) => {
@@ -515,59 +515,59 @@ export default function WhatsAppPage() {
                     contrato: 'Contrato', recibo: 'Recibo', other: 'Outro',
                   };
                   return (
-                    <div key={i} className="bg-inset border border-line rounded-xl overflow-hidden">
+                    <div key={i} className="bg-[#0f1117] border border-[#1e2740] rounded-xl overflow-hidden">
                       {/* Cabeçalho clicável */}
                       <button
                         onClick={() => setExpandedDoc(isOpen ? null : i)}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-card transition-colors text-left"
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#161b2e] transition-colors text-left"
                       >
-                        <FileText className="h-4 w-4 text-acao flex-shrink-0" />
+                        <FileText className="h-4 w-4 text-indigo-400 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-tx-strong text-sm font-medium">
+                            <span className="text-white text-sm font-medium">
                               {typeLabel[d.document_type] || d.document_type || 'Documento'}
                               {d.number ? ` nº ${d.number}` : ''}
                             </span>
                             {d.confidence_score != null && (
                               <span className={`text-xs px-1.5 py-0.5 rounded-full border ${
-                                d.confidence_score >= 0.8 ? 'text-ok border-green-400/30 bg-green-400/10'
-                                : d.confidence_score >= 0.5 ? 'text-warn border-yellow-400/30 bg-yellow-400/10'
-                                : 'text-err border-red-400/30 bg-red-400/10'
+                                d.confidence_score >= 0.8 ? 'text-green-400 border-green-400/30 bg-green-400/10'
+                                : d.confidence_score >= 0.5 ? 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10'
+                                : 'text-red-400 border-red-400/30 bg-red-400/10'
                               }`}>
                                 {Math.round(d.confidence_score * 100)}%
                               </span>
                             )}
                           </div>
-                          <p className="text-tx-muted text-xs truncate">
+                          <p className="text-gray-500 text-xs truncate">
                             {d.issuer_name || '—'} {d.issue_date ? `· ${d.issue_date}` : ''}
                           </p>
                         </div>
                         <div className="text-right flex-shrink-0">
                           {d.total_value != null && (
-                            <p className="text-ok font-mono text-sm font-semibold">{fmt(d.total_value)}</p>
+                            <p className="text-green-400 font-mono text-sm font-semibold">{fmt(d.total_value)}</p>
                           )}
-                          <ChevronDown className={`h-4 w-4 text-tx-muted ml-auto mt-0.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                          <ChevronDown className={`h-4 w-4 text-gray-500 ml-auto mt-0.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                         </div>
                       </button>
 
                       {/* Detalhes expandidos */}
                       {isOpen && (
-                        <div className="border-t border-line px-4 py-4 space-y-4">
+                        <div className="border-t border-[#1e2740] px-4 py-4 space-y-4">
                           {/* Identificação */}
                           <div className="grid grid-cols-2 gap-3 text-xs">
                             {d.issuer_name && (
                               <div>
-                                <p className="text-tx-muted mb-0.5">Emitente</p>
-                                <p className="text-tx-strong font-medium">{d.issuer_name}</p>
-                                {d.issuer_cnpj && <p className="text-tx-muted font-mono">{d.issuer_cnpj}</p>}
-                                {d.issuer_address && <p className="text-tx-muted mt-0.5">{d.issuer_address}</p>}
+                                <p className="text-gray-500 mb-0.5">Emitente</p>
+                                <p className="text-white font-medium">{d.issuer_name}</p>
+                                {d.issuer_cnpj && <p className="text-gray-400 font-mono">{d.issuer_cnpj}</p>}
+                                {d.issuer_address && <p className="text-gray-500 mt-0.5">{d.issuer_address}</p>}
                               </div>
                             )}
                             {d.recipient_name && (
                               <div>
-                                <p className="text-tx-muted mb-0.5">Destinatário</p>
-                                <p className="text-tx-strong font-medium">{d.recipient_name}</p>
-                                {d.recipient_cnpj && <p className="text-tx-muted font-mono">{d.recipient_cnpj}</p>}
+                                <p className="text-gray-500 mb-0.5">Destinatário</p>
+                                <p className="text-white font-medium">{d.recipient_name}</p>
+                                {d.recipient_cnpj && <p className="text-gray-400 font-mono">{d.recipient_cnpj}</p>}
                               </div>
                             )}
                           </div>
@@ -576,42 +576,42 @@ export default function WhatsAppPage() {
                           <div className="grid grid-cols-3 gap-2 text-xs">
                             {d.total_value != null && (
                               <div className="bg-green-400/5 border border-green-400/20 rounded-lg px-3 py-2">
-                                <p className="text-tx-muted">Total</p>
-                                <p className="text-ok font-mono font-semibold">{fmt(d.total_value)}</p>
+                                <p className="text-gray-500">Total</p>
+                                <p className="text-green-400 font-mono font-semibold">{fmt(d.total_value)}</p>
                               </div>
                             )}
                             {d.net_value != null && (
-                              <div className="bg-card border border-line rounded-lg px-3 py-2">
-                                <p className="text-tx-muted">Líquido</p>
-                                <p className="text-tx-strong font-mono">{fmt(d.net_value)}</p>
+                              <div className="bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2">
+                                <p className="text-gray-500">Líquido</p>
+                                <p className="text-white font-mono">{fmt(d.net_value)}</p>
                               </div>
                             )}
                             {d.discount != null && d.discount > 0 && (
-                              <div className="bg-card border border-line rounded-lg px-3 py-2">
-                                <p className="text-tx-muted">Desconto</p>
+                              <div className="bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2">
+                                <p className="text-gray-500">Desconto</p>
                                 <p className="text-orange-400 font-mono">{fmt(d.discount)}</p>
                               </div>
                             )}
                             {d.freight != null && d.freight > 0 && (
-                              <div className="bg-card border border-line rounded-lg px-3 py-2">
-                                <p className="text-tx-muted">Frete</p>
-                                <p className="text-tx-strong font-mono">{fmt(d.freight)}</p>
+                              <div className="bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2">
+                                <p className="text-gray-500">Frete</p>
+                                <p className="text-white font-mono">{fmt(d.freight)}</p>
                               </div>
                             )}
                           </div>
 
                           {/* Datas e pagamento */}
                           <div className="flex flex-wrap gap-3 text-xs">
-                            {d.issue_date && <span className="text-tx-muted">Emissão: <strong className="text-tx-strong">{d.issue_date}</strong></span>}
-                            {d.due_date && <span className="text-tx-muted">Vencimento: <strong className="text-warn">{d.due_date}</strong></span>}
-                            {d.payment_method && <span className="text-tx-muted">Pagamento: <strong className="text-tx-strong capitalize">{d.payment_method}</strong></span>}
-                            {d.series && <span className="text-tx-muted">Série: <strong className="text-tx-strong">{d.series}</strong></span>}
+                            {d.issue_date && <span className="text-gray-400">Emissão: <strong className="text-white">{d.issue_date}</strong></span>}
+                            {d.due_date && <span className="text-gray-400">Vencimento: <strong className="text-yellow-400">{d.due_date}</strong></span>}
+                            {d.payment_method && <span className="text-gray-400">Pagamento: <strong className="text-white capitalize">{d.payment_method}</strong></span>}
+                            {d.series && <span className="text-gray-400">Série: <strong className="text-white">{d.series}</strong></span>}
                           </div>
 
                           {/* Impostos */}
                           {taxes.length > 0 && (
                             <div>
-                              <p className="text-xs text-tx-muted flex items-center gap-1 mb-2">
+                              <p className="text-xs text-gray-400 flex items-center gap-1 mb-2">
                                 <Percent className="h-3 w-3" /> Impostos
                               </p>
                               <div className="grid grid-cols-2 gap-1.5">
@@ -619,10 +619,10 @@ export default function WhatsAppPage() {
                                   <div key={ti} className="bg-purple-500/5 border border-purple-500/20 rounded-lg px-3 py-2 text-xs">
                                     <div className="flex justify-between">
                                       <span className="text-purple-300 font-semibold">{t.name}</span>
-                                      {t.rate != null && <span className="text-tx-muted">{t.rate}%</span>}
+                                      {t.rate != null && <span className="text-gray-500">{t.rate}%</span>}
                                     </div>
-                                    {t.value != null && <p className="text-tx-strong font-mono mt-0.5">{fmt(t.value)}</p>}
-                                    {t.base != null && <p className="text-tx-muted">Base: {fmt(t.base)}</p>}
+                                    {t.value != null && <p className="text-white font-mono mt-0.5">{fmt(t.value)}</p>}
+                                    {t.base != null && <p className="text-gray-500">Base: {fmt(t.base)}</p>}
                                   </div>
                                 ))}
                               </div>
@@ -632,17 +632,17 @@ export default function WhatsAppPage() {
                           {/* Itens/Serviços */}
                           {items.length > 0 && (
                             <div>
-                              <p className="text-xs text-tx-muted flex items-center gap-1 mb-2">
+                              <p className="text-xs text-gray-400 flex items-center gap-1 mb-2">
                                 <Package className="h-3 w-3" /> Itens / Serviços ({items.length})
                               </p>
                               <div className="space-y-1.5">
                                 {items.map((it, ii) => (
-                                  <div key={ii} className="bg-card border border-line rounded-lg px-3 py-2 text-xs">
+                                  <div key={ii} className="bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-xs">
                                     <div className="flex justify-between gap-2">
-                                      <span className="text-tx flex-1">{it.description}</span>
-                                      {it.total != null && <span className="text-ok font-mono flex-shrink-0">{fmt(it.total)}</span>}
+                                      <span className="text-gray-100 flex-1">{it.description}</span>
+                                      {it.total != null && <span className="text-green-400 font-mono flex-shrink-0">{fmt(it.total)}</span>}
                                     </div>
-                                    <div className="flex gap-3 mt-1 text-tx-muted">
+                                    <div className="flex gap-3 mt-1 text-gray-500">
                                       {it.quantity != null && <span>Qtd: {it.quantity}</span>}
                                       {it.unit_price != null && <span>Unit: {fmt(it.unit_price)}</span>}
                                       {it.ncm && <span>NCM: {it.ncm}</span>}
@@ -657,30 +657,30 @@ export default function WhatsAppPage() {
                           {/* Alertas */}
                           {alerts.length > 0 && (
                             <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg px-3 py-2">
-                              <p className="text-warn text-xs font-medium flex items-center gap-1 mb-1">
+                              <p className="text-yellow-400 text-xs font-medium flex items-center gap-1 mb-1">
                                 <AlertTriangle className="h-3 w-3" /> Alertas
                               </p>
-                              {alerts.map((a, ai) => <p key={ai} className="text-warn text-xs">• {a}</p>)}
+                              {alerts.map((a, ai) => <p key={ai} className="text-yellow-300/80 text-xs">• {a}</p>)}
                             </div>
                           )}
 
                           {/* Sugestões */}
                           {suggestions.length > 0 && (
                             <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-lg px-3 py-2">
-                              <p className="text-acao text-xs font-medium flex items-center gap-1 mb-1">
+                              <p className="text-indigo-400 text-xs font-medium flex items-center gap-1 mb-1">
                                 <Lightbulb className="h-3 w-3" /> Sugestões contábeis
                               </p>
-                              {suggestions.map((s, si) => <p key={si} className="text-acao text-xs">• {s}</p>)}
+                              {suggestions.map((s, si) => <p key={si} className="text-indigo-300/80 text-xs">• {s}</p>)}
                             </div>
                           )}
 
                           {d.description && (
-                            <p className="text-xs text-tx-muted">Histórico: <span className="text-tx-muted">{d.description}</span></p>
+                            <p className="text-xs text-gray-500">Histórico: <span className="text-gray-400">{d.description}</span></p>
                           )}
                           {d.bar_code && (
-                            <p className="text-xs text-tx-muted font-mono break-all">Cód. barras: {d.bar_code}</p>
+                            <p className="text-xs text-gray-500 font-mono break-all">Cód. barras: {d.bar_code}</p>
                           )}
-                          <p className="text-xs text-tx-faint">Recebido: {doc.processed_at ? new Date(doc.processed_at).toLocaleString('pt-BR') : '—'}</p>
+                          <p className="text-xs text-gray-600">Recebido: {doc.processed_at ? new Date(doc.processed_at).toLocaleString('pt-BR') : '—'}</p>
                         </div>
                       )}
                     </div>
@@ -691,21 +691,21 @@ export default function WhatsAppPage() {
 
             {/* Chat */}
             <div className="card-aura space-y-3">
-              <p className="text-xs text-tx-muted font-medium">Histórico da conversa</p>
+              <p className="text-xs text-gray-400 font-medium">Histórico da conversa</p>
               <div className="space-y-3 max-h-80 overflow-y-auto">
                 {selectedConv.messages.map((msg, i) => (
                   <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                     <div className={`h-7 w-7 rounded-full flex-shrink-0 flex items-center justify-center ${
-                      msg.role === 'user' ? 'bg-indigo-600' : 'bg-card border border-line'
+                      msg.role === 'user' ? 'bg-indigo-600' : 'bg-[#161b2e] border border-[#1e2740]'
                     }`}>
                       {msg.role === 'user'
                         ? <User className="h-3.5 w-3.5 text-white" />
-                        : <Bot className="h-3.5 w-3.5 text-acao" />}
+                        : <Bot className="h-3.5 w-3.5 text-indigo-400" />}
                     </div>
                     <div className={`max-w-xs rounded-xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap ${
                       msg.role === 'user'
                         ? 'bg-indigo-600 text-white rounded-tr-sm'
-                        : 'bg-card border border-line text-tx rounded-tl-sm'
+                        : 'bg-[#161b2e] border border-[#1e2740] text-gray-100 rounded-tl-sm'
                     }`}>
                       {msg.type === 'audio' && <Mic className="h-3 w-3 inline mr-1 text-indigo-300" />}
                       {(msg.type === 'image' || msg.type === 'document') && <FileText className="h-3 w-3 inline mr-1 text-indigo-300" />}
@@ -721,11 +721,11 @@ export default function WhatsAppPage() {
 
       {/* Info Banner */}
       <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-xl p-5">
-        <h3 className="text-acao font-medium mb-2 flex items-center gap-2">
+        <h3 className="text-indigo-400 font-medium mb-2 flex items-center gap-2">
           <Bot className="h-4 w-4" />
           Como funciona o Atendente IA
         </h3>
-        <ul className="text-tx-muted text-sm space-y-1">
+        <ul className="text-gray-400 text-sm space-y-1">
           <li>• O atendente responde como especialista contábil humanizado via Claude Sonnet</li>
           <li>• Aceita fotos de notas fiscais, boletos, PDFs — extrai dados automaticamente</li>
           <li>• Use o toggle para ativar/desativar a IA por instância a qualquer momento</li>

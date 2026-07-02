@@ -102,8 +102,8 @@ export default function ColaboradoresPage() {
   if (!selectedCompany) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa para gerenciar colaboradores.</p>
+        <Building2 className="h-12 w-12 text-gray-600" />
+        <p className="text-gray-400 text-sm">Selecione uma empresa para gerenciar colaboradores.</p>
         <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
       </div>
     );
@@ -113,14 +113,14 @@ export default function ColaboradoresPage() {
     <div className="p-8 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-tx-strong flex items-center gap-2">
-            <Users className="h-6 w-6 text-acao" />
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <Users className="h-6 w-6 text-indigo-400" />
             Gestão de Colaboradores
           </h1>
-          <p className="text-tx-muted text-sm mt-1">{selectedCompany.name} · {employees.filter(c => c.active).length} ativos</p>
+          <p className="text-gray-400 text-sm mt-1">{selectedCompany.name} · {employees.filter(c => c.active).length} ativos</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/folha" className="btn-ghost text-sm border border-line">← Folha de Pagamento</Link>
+          <Link href="/folha" className="btn-ghost text-sm border border-[#1e2740]">← Folha de Pagamento</Link>
           <button onClick={openNew} className="btn-primary">
             <Plus className="h-4 w-4" />
             Novo Colaborador
@@ -129,23 +129,23 @@ export default function ColaboradoresPage() {
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tx-muted" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por nome, CPF, cargo ou departamento..."
-          className="w-full bg-card border border-line rounded-lg pl-10 pr-4 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500 placeholder:text-tx-faint"
+          className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg pl-10 pr-4 py-2.5 text-white text-sm outline-none focus:border-indigo-500 placeholder-gray-600"
         />
       </div>
 
       {loading && employees.length === 0 ? (
-        <div className="text-center py-20 text-sm text-tx-muted flex items-center justify-center gap-2">
+        <div className="text-center py-20 text-sm text-gray-500 flex items-center justify-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando colaboradores…
         </div>
       ) : employees.length === 0 ? (
         <div className="card-aura p-12 text-center">
-          <Users className="h-12 w-12 text-tx-faint mx-auto mb-3" />
-          <p className="text-tx-muted text-sm">Nenhum colaborador cadastrado ainda.</p>
+          <Users className="h-12 w-12 text-gray-600 mx-auto mb-3" />
+          <p className="text-gray-400 text-sm">Nenhum colaborador cadastrado ainda.</p>
           <button onClick={openNew} className="btn-primary mt-4 inline-flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Cadastrar primeiro
@@ -155,7 +155,7 @@ export default function ColaboradoresPage() {
         <div className="card-aura overflow-x-auto">
           <table className="w-full min-w-[800px]">
             <thead>
-              <tr className="text-left text-xs text-tx-muted border-b border-line">
+              <tr className="text-left text-xs text-gray-500 border-b border-[#1e2740]">
                 <th className="pb-3 font-medium">Nome</th>
                 <th className="pb-3 font-medium">CPF</th>
                 <th className="pb-3 font-medium">Cargo</th>
@@ -165,24 +165,24 @@ export default function ColaboradoresPage() {
                 <th className="pb-3 font-medium text-center">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody className="divide-y divide-[#1e2740]">
               {filtered.map(c => (
-                <tr key={c.id} className={`hover:bg-inset transition-colors ${!c.active ? 'opacity-50' : ''}`}>
+                <tr key={c.id} className={`hover:bg-white/5 transition-colors ${!c.active ? 'opacity-50' : ''}`}>
                   <td className="py-3">
-                    <p className="text-tx-strong text-sm font-medium">{c.name}</p>
-                    <p className="text-tx-muted text-xs">{c.pis || '—'}</p>
+                    <p className="text-white text-sm font-medium">{c.name}</p>
+                    <p className="text-gray-500 text-xs">{c.pis || '—'}</p>
                   </td>
-                  <td className="py-3 text-sm text-tx-muted font-mono">{c.cpf}</td>
-                  <td className="py-3 text-sm text-tx-strong">{c.role}</td>
+                  <td className="py-3 text-sm text-gray-400 font-mono">{c.cpf}</td>
+                  <td className="py-3 text-sm text-white">{c.role}</td>
                   <td className="py-3">
                     {c.department && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-600/20 text-acao">{c.department}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-600/20 text-indigo-400">{c.department}</span>
                     )}
                   </td>
-                  <td className="py-3 text-sm text-tx-muted">{new Date(c.admissionDate).toLocaleDateString('pt-BR')}</td>
-                  <td className="py-3 text-sm text-right font-mono text-tx-strong">{Number(c.baseSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                  <td className="py-3 text-sm text-gray-400">{new Date(c.admissionDate).toLocaleDateString('pt-BR')}</td>
+                  <td className="py-3 text-sm text-right font-mono text-white">{Number(c.baseSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                   <td className="py-3 text-center">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${c.active ? 'bg-green-400/10 text-ok' : 'bg-gray-400/10 text-tx-muted'}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${c.active ? 'bg-green-400/10 text-green-400' : 'bg-gray-400/10 text-gray-400'}`}>
                       {c.active ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
@@ -194,63 +194,63 @@ export default function ColaboradoresPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-[rgba(13,17,25,0.45)] backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-inset border border-line rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-5">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#0f1117] border border-[#1e2740] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-tx-strong">Novo Colaborador</h2>
+              <h2 className="text-xl font-semibold text-white">Novo Colaborador</h2>
               <button onClick={() => setShowModal(false)} className="btn-ghost p-1.5"><X className="h-5 w-5" /></button>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="block text-sm text-tx-muted mb-1.5">Nome Completo *</label>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full bg-card border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="João da Silva" />
+                <label className="block text-sm text-gray-400 mb-1.5">Nome Completo *</label>
+                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="João da Silva" />
               </div>
               <div>
-                <label className="block text-sm text-tx-muted mb-1.5">CPF *</label>
-                <input value={form.cpf} onChange={e => setForm(f => ({ ...f, cpf: e.target.value }))} className="w-full bg-card border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="000.000.000-00" />
+                <label className="block text-sm text-gray-400 mb-1.5">CPF *</label>
+                <input value={form.cpf} onChange={e => setForm(f => ({ ...f, cpf: e.target.value }))} className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="000.000.000-00" />
               </div>
               <div>
-                <label className="block text-sm text-tx-muted mb-1.5">CTPS</label>
-                <input value={form.ctps} onChange={e => setForm(f => ({ ...f, ctps: e.target.value }))} className="w-full bg-card border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="000000/001-SP" />
+                <label className="block text-sm text-gray-400 mb-1.5">CTPS</label>
+                <input value={form.ctps} onChange={e => setForm(f => ({ ...f, ctps: e.target.value }))} className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="000000/001-SP" />
               </div>
               <div>
-                <label className="block text-sm text-tx-muted mb-1.5">PIS/PASEP</label>
-                <input value={form.pis} onChange={e => setForm(f => ({ ...f, pis: e.target.value }))} className="w-full bg-card border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="000.00000.00-0" />
+                <label className="block text-sm text-gray-400 mb-1.5">PIS/PASEP</label>
+                <input value={form.pis} onChange={e => setForm(f => ({ ...f, pis: e.target.value }))} className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="000.00000.00-0" />
               </div>
               <div>
-                <label className="block text-sm text-tx-muted mb-1.5">Cargo *</label>
-                <input value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className="w-full bg-card border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="Analista Contábil" />
+                <label className="block text-sm text-gray-400 mb-1.5">Cargo *</label>
+                <input value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="Analista Contábil" />
               </div>
               <div>
-                <label className="block text-sm text-tx-muted mb-1.5">Departamento</label>
-                <input value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} className="w-full bg-card border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="Contabilidade" />
+                <label className="block text-sm text-gray-400 mb-1.5">Departamento</label>
+                <input value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="Contabilidade" />
               </div>
               <div>
-                <label className="block text-sm text-tx-muted mb-1.5">Admissão *</label>
-                <input type="date" value={form.admissionDate} onChange={e => setForm(f => ({ ...f, admissionDate: e.target.value }))} className="w-full bg-card border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" />
+                <label className="block text-sm text-gray-400 mb-1.5">Admissão *</label>
+                <input type="date" value={form.admissionDate} onChange={e => setForm(f => ({ ...f, admissionDate: e.target.value }))} className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" />
               </div>
               <div>
-                <label className="block text-sm text-tx-muted mb-1.5">Salário Base (R$) *</label>
-                <input type="number" value={form.baseSalary} onChange={e => setForm(f => ({ ...f, baseSalary: e.target.value }))} className="w-full bg-card border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="3000.00" />
+                <label className="block text-sm text-gray-400 mb-1.5">Salário Base (R$) *</label>
+                <input type="number" value={form.baseSalary} onChange={e => setForm(f => ({ ...f, baseSalary: e.target.value }))} className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="3000.00" />
               </div>
               <div>
-                <label className="block text-sm text-tx-muted mb-1.5">Dependentes</label>
-                <input type="number" min="0" value={form.dependents} onChange={e => setForm(f => ({ ...f, dependents: e.target.value }))} className="w-full bg-card border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" />
+                <label className="block text-sm text-gray-400 mb-1.5">Dependentes</label>
+                <input type="number" min="0" value={form.dependents} onChange={e => setForm(f => ({ ...f, dependents: e.target.value }))} className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" />
               </div>
-              <div className="col-span-2 border-t border-line pt-3">
-                <p className="text-sm text-tx-muted font-medium mb-3">Dados Bancários</p>
-              </div>
-              <div>
-                <label className="block text-sm text-tx-muted mb-1.5">Banco</label>
-                <input value={form.bank} onChange={e => setForm(f => ({ ...f, bank: e.target.value }))} className="w-full bg-card border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="Itaú" />
+              <div className="col-span-2 border-t border-[#1e2740] pt-3">
+                <p className="text-sm text-gray-400 font-medium mb-3">Dados Bancários</p>
               </div>
               <div>
-                <label className="block text-sm text-tx-muted mb-1.5">Agência</label>
-                <input value={form.bankAgency} onChange={e => setForm(f => ({ ...f, bankAgency: e.target.value }))} className="w-full bg-card border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="0001" />
+                <label className="block text-sm text-gray-400 mb-1.5">Banco</label>
+                <input value={form.bank} onChange={e => setForm(f => ({ ...f, bank: e.target.value }))} className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="Itaú" />
               </div>
               <div>
-                <label className="block text-sm text-tx-muted mb-1.5">Conta</label>
-                <input value={form.bankAccount} onChange={e => setForm(f => ({ ...f, bankAccount: e.target.value }))} className="w-full bg-card border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="12345-6" />
+                <label className="block text-sm text-gray-400 mb-1.5">Agência</label>
+                <input value={form.bankAgency} onChange={e => setForm(f => ({ ...f, bankAgency: e.target.value }))} className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="0001" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1.5">Conta</label>
+                <input value={form.bankAccount} onChange={e => setForm(f => ({ ...f, bankAccount: e.target.value }))} className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500" placeholder="12345-6" />
               </div>
             </div>
             <div className="flex gap-3 pt-2">

@@ -40,25 +40,25 @@ export function WelcomeOnboarding() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(13,17,25,0.45)] backdrop-blur-sm p-4" onClick={dismiss}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={dismiss}>
       <div
-        className="w-full max-w-lg bg-card border border-line rounded-2xl shadow-pop overflow-hidden"
+        className="w-full max-w-lg bg-[#161b2e] border border-[#2a3550] rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative px-6 pt-6 pb-4">
-          <button onClick={dismiss} className="absolute top-4 right-4 text-tx-muted hover:text-tx-strong">
+          <button onClick={dismiss} className="absolute top-4 right-4 text-gray-500 hover:text-white">
             <X className="h-4 w-4" />
           </button>
           <div className="flex items-center gap-2.5 mb-1">
             <div className="h-9 w-9 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-acao" />
+              <Sparkles className="h-4 w-4 text-indigo-400" />
             </div>
             <div>
-              <p className="text-xs text-acao font-medium">Bem-vindo</p>
-              <h2 className="text-base font-semibold text-tx-strong">Vamos configurar o escritório em 3 passos</h2>
+              <p className="text-xs text-indigo-400 font-medium">Bem-vindo</p>
+              <h2 className="text-base font-semibold text-white">Vamos configurar o escritório em 3 passos</h2>
             </div>
           </div>
-          <p className="text-xs text-tx-muted mt-2">
+          <p className="text-xs text-gray-500 mt-2">
             Em ~5 minutos você tem um cliente operando com plano de contas, calendário fiscal e dashboard ativos.
           </p>
         </div>
@@ -101,8 +101,8 @@ export function WelcomeOnboarding() {
           />
         </div>
 
-        <div className="px-6 py-4 border-t border-line flex items-center justify-between">
-          <button onClick={dismiss} className="text-xs text-tx-muted hover:text-tx">
+        <div className="px-6 py-4 border-t border-[#1e2740] flex items-center justify-between">
+          <button onClick={dismiss} className="text-xs text-gray-500 hover:text-gray-300">
             Pular tutorial
           </button>
           <button
@@ -143,20 +143,20 @@ function Step({
       disabled={disabled}
       className={`w-full text-left flex items-start gap-3 p-3 rounded-lg border transition-all ${
         disabled
-          ? 'border-line opacity-60 cursor-not-allowed'
-          : 'border-line hover:border-indigo-500/50 hover:bg-inset'
+          ? 'border-[#1e2740] opacity-60 cursor-not-allowed'
+          : 'border-[#1e2740] hover:border-indigo-500/50 hover:bg-white/[0.02]'
       }`}
     >
-      <div className="h-7 w-7 rounded-full bg-inset border border-line flex items-center justify-center text-xs text-acao font-mono flex-shrink-0">
+      <div className="h-7 w-7 rounded-full bg-[#0f1117] border border-[#2a3550] flex items-center justify-center text-xs text-indigo-400 font-mono flex-shrink-0">
         {n}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <Icon className="h-3.5 w-3.5 text-acao" />
-          <p className="text-sm font-medium text-tx-strong">{title}</p>
+          <Icon className="h-3.5 w-3.5 text-indigo-400" />
+          <p className="text-sm font-medium text-white">{title}</p>
         </div>
-        <p className="text-xs text-tx-muted mt-0.5">{description}</p>
-        <p className="text-xs text-acao mt-1.5">{cta} →</p>
+        <p className="text-xs text-gray-500 mt-0.5">{description}</p>
+        <p className="text-xs text-indigo-400 mt-1.5">{cta} →</p>
       </div>
     </button>
   );

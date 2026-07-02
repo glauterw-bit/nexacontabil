@@ -3,7 +3,6 @@ import { ApolloClient, InMemoryCache, ApolloProvider, HttpLink } from '@apollo/c
 import { setContext } from '@apollo/client/link/context';
 import { CompanyProvider } from '@/contexts/CompanyContext';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { CompetenciaProvider } from '@/contexts/CompetenciaContext';
 
 const httpLink = new HttpLink({
   uri: `${process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app'}/graphql`,
@@ -47,18 +46,16 @@ const client = new ApolloClient({
       errorPolicy: 'all',
     },
   },
-  devtools: { enabled: process.env.NODE_ENV === 'development' },
+  connectToDevTools: process.env.NODE_ENV === 'development',
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <CompanyProvider>
-        <CompetenciaProvider>
-          <ApolloProvider client={client}>
-            {children}
-          </ApolloProvider>
-        </CompetenciaProvider>
+        <ApolloProvider client={client}>
+          {children}
+        </ApolloProvider>
       </CompanyProvider>
     </AuthProvider>
   );

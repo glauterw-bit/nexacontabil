@@ -1,12 +1,12 @@
 export function Skeleton({ className = '' }: { className?: string }) {
   return (
-    <div className={`animate-pulse rounded-lg bg-inset ${className}`} />
+    <div className={`animate-pulse rounded-lg bg-[#1e2740] ${className}`} />
   );
 }
 
 export function SkeletonCard() {
   return (
-    <div className="bg-card border border-line rounded-xl p-5 space-y-3">
+    <div className="bg-[#161b2e] border border-[#1e2740] rounded-xl p-5 space-y-3">
       <Skeleton className="h-4 w-1/3" />
       <Skeleton className="h-8 w-1/2" />
       <Skeleton className="h-3 w-2/3" />
@@ -16,11 +16,11 @@ export function SkeletonCard() {
 
 export function SkeletonTable({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="bg-card border border-line rounded-xl overflow-hidden">
-      <div className="px-5 py-3 border-b border-line">
+    <div className="bg-[#161b2e] border border-[#1e2740] rounded-xl overflow-hidden">
+      <div className="px-5 py-3 border-b border-[#1e2740]">
         <Skeleton className="h-4 w-40" />
       </div>
-      <div className="divide-y divide-line">
+      <div className="divide-y divide-[#1e2740]">
         {Array.from({ length: rows }).map((_, i) => (
           <div key={i} className="px-5 py-3 flex gap-4">
             <Skeleton className="h-4 w-1/4" />

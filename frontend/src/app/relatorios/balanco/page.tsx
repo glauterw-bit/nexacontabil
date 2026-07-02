@@ -67,8 +67,8 @@ export default function BalancoPage() {
   if (!selectedCompany) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa para ver o Balanço Patrimonial.</p>
+        <Building2 className="h-12 w-12 text-gray-600" />
+        <p className="text-gray-400 text-sm">Selecione uma empresa para ver o Balanço Patrimonial.</p>
         <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">
           Gerenciar Empresas
         </Link>
@@ -86,12 +86,12 @@ export default function BalancoPage() {
     <div className="p-6 md:p-8 space-y-6 max-w-6xl">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-tx-strong">Balanço Patrimonial</h1>
-          <p className="text-tx-muted text-sm mt-0.5">{selectedCompany.name}</p>
+          <h1 className="text-xl font-semibold text-white">Balanço Patrimonial</h1>
+          <p className="text-gray-400 text-sm mt-0.5">{selectedCompany.name}</p>
         </div>
         <button
           disabled
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-tx-muted bg-inset border border-line rounded-lg cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 bg-[#1e2740] rounded-lg cursor-not-allowed"
           title="Em breve"
         >
           <Download className="h-3.5 w-3.5" />
@@ -103,13 +103,13 @@ export default function BalancoPage() {
       {s ? (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <KPI label="Lançamentos" value={String(s.total)} />
-          <KPI label="Aprovados" value={String(s.approved)} color="text-ok" />
-          <KPI label="Pendentes" value={String(s.pending)} color={s.pending > 0 ? 'text-warn' : 'text-tx'} />
+          <KPI label="Aprovados" value={String(s.approved)} color="text-emerald-400" />
+          <KPI label="Pendentes" value={String(s.pending)} color={s.pending > 0 ? 'text-amber-400' : 'text-gray-300'} />
           <KPI label="Total Débito" value={brl(s.totalDebit)} />
           <KPI label="Total Crédito" value={brl(s.totalCredit)} />
         </div>
       ) : loading ? (
-        <div className="text-sm text-tx-muted flex items-center gap-2">
+        <div className="text-sm text-gray-500 flex items-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando totais…
         </div>
       ) : null}
@@ -118,10 +118,10 @@ export default function BalancoPage() {
       {!loadingTree && tree.length === 0 && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
           <div className="flex gap-3">
-            <AlertCircle className="h-4 w-4 text-warn flex-shrink-0 mt-0.5" />
+            <AlertCircle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
             <div className="text-sm">
-              <p className="font-medium text-tx-strong">Plano de contas vazio</p>
-              <p className="text-xs text-tx mt-1">
+              <p className="font-medium text-white">Plano de contas vazio</p>
+              <p className="text-xs text-gray-300 mt-1">
                 Para gerar o Balanço Patrimonial é necessário primeiro popular o plano de contas
                 desta empresa. Use o seed PCASP (~95 contas brasileiras padrão).
               </p>
@@ -147,24 +147,24 @@ export default function BalancoPage() {
       {/* Saldos: tree do plano de contas com saldos zerados (saldos vêm de Transactions futuro) */}
       {tree.length > 0 && (
         <div className="grid md:grid-cols-2 gap-4">
-          <div className="rounded-xl border border-line bg-card p-5">
-            <h2 className="text-sm font-medium text-tx-strong mb-3">ATIVO</h2>
+          <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5">
+            <h2 className="text-sm font-medium text-white mb-3">ATIVO</h2>
             <Tree nodes={ativos} expanded={expanded} onToggle={toggle} />
           </div>
-          <div className="rounded-xl border border-line bg-card p-5 space-y-4">
+          <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5 space-y-4">
             <div>
-              <h2 className="text-sm font-medium text-tx-strong mb-3">PASSIVO</h2>
+              <h2 className="text-sm font-medium text-white mb-3">PASSIVO</h2>
               <Tree nodes={passivos} expanded={expanded} onToggle={toggle} />
             </div>
-            <div className="pt-3 border-t border-line">
-              <h2 className="text-sm font-medium text-tx-strong mb-3">PATRIMÔNIO LÍQUIDO</h2>
+            <div className="pt-3 border-t border-[#1e2740]">
+              <h2 className="text-sm font-medium text-white mb-3">PATRIMÔNIO LÍQUIDO</h2>
               <Tree nodes={patrimonio} expanded={expanded} onToggle={toggle} />
             </div>
           </div>
         </div>
       )}
 
-      <p className="text-xs text-tx-faint">
+      <p className="text-xs text-gray-600">
         Os saldos analíticos por conta serão exibidos quando houver lançamentos contábeis (Transactions) com débitos/créditos vinculados ao plano de contas. Hoje
         o sistema gera DRE direto pelos Transactions; o Balanço analítico depende do fechamento contábil com vínculo conta-lançamento.
       </p>
@@ -189,21 +189,21 @@ function Tree({
           <li key={n.id}>
             <button
               onClick={() => hasChildren && onToggle(n.id)}
-              className={`w-full flex items-center justify-between py-1 text-left ${hasChildren ? 'hover:bg-inset rounded' : ''}`}
+              className={`w-full flex items-center justify-between py-1 text-left ${hasChildren ? 'hover:bg-white/5 rounded' : ''}`}
               style={{ paddingLeft: depth * 12 + 4 }}
             >
               <span className="flex items-center gap-1.5">
                 {hasChildren ? (
-                  isExpanded ? <ChevronDown className="h-3 w-3 text-tx-muted" /> : <ChevronRight className="h-3 w-3 text-tx-muted" />
+                  isExpanded ? <ChevronDown className="h-3 w-3 text-gray-500" /> : <ChevronRight className="h-3 w-3 text-gray-500" />
                 ) : (
                   <span className="w-3" />
                 )}
-                <span className="text-xs font-mono text-tx-faint">{n.codigo}</span>
-                <span className={`text-xs ${depth === 0 ? 'font-semibold text-tx-strong' : 'text-tx'}`}>
+                <span className="text-xs font-mono text-gray-600">{n.codigo}</span>
+                <span className={`text-xs ${depth === 0 ? 'font-semibold text-white' : 'text-gray-300'}`}>
                   {n.nome}
                 </span>
               </span>
-              <span className="text-xs text-tx-faint font-mono">{brl(0)}</span>
+              <span className="text-xs text-gray-600 font-mono">{brl(0)}</span>
             </button>
             {hasChildren && isExpanded && (
               <Tree
@@ -222,9 +222,9 @@ function Tree({
 
 function KPI({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="rounded-xl border border-line bg-card p-3">
-      <p className="text-xs text-tx-muted">{label}</p>
-      <p className={`text-base font-bold ${color || 'text-tx-strong'}`}>{value}</p>
+    <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-3">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className={`text-base font-bold ${color || 'text-white'}`}>{value}</p>
     </div>
   );
 }

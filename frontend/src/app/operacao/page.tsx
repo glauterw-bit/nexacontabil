@@ -1,9 +1,8 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Activity, FileText, FileCheck, AlertTriangle, ClipboardList, ChevronRight, Search, ExternalLink, FolderOpen, Inbox } from 'lucide-react';
-import { PageHeader, Card, COLORS, Kpi, StatusChip, Dot, Drawer, Btn, Spinner, EmptyState, THead, tint, StatusTone } from '@/components/ui/kit';
-import { useCompetencia, fmtCompetencia } from '@/contexts/CompetenciaContext';
+import { Activity, Loader2, FileText, FileCheck, AlertTriangle, ClipboardList, ChevronRight, Search } from 'lucide-react';
+import { PageHeader, Card, COLORS } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -11,11 +10,10 @@ function authHeaders(): Record<string, string> {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 const BRL = (n: number) => (n ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
-
-const SEM: Record<string, { dot: string; cor: string; label: string; tone: StatusTone }> = {
-  verde:    { dot: COLORS.dotOk,      cor: COLORS.ok,      label: 'Em dia',  tone: 'ok' },
-  amarelo:  { dot: COLORS.dotAtencao, cor: COLORS.atencao, label: 'Atenção', tone: 'atencao' },
-  vermelho: { dot: COLORS.dotErro,    cor: COLORS.erro,    label: 'Crítico', tone: 'critico' },
+const SEM: Record<string, { cor: string; label: string }> = {
+  verde: { cor: '#10b981', label: 'Em dia' },
+  amarelo: { cor: '#f59e0b', label: 'Atenção' },
+  vermelho: { cor: '#ef4444', label: 'Crítico' },
 };
 
 export default function OperacaoPage() {
@@ -23,196 +21,120 @@ export default function OperacaoPage() {
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<string>('');
   const [busca, setBusca] = useState('');
-  const [sel, setSel] = useState<any>(null);
-  const { competencia, reportResolved } = useCompetencia();
+  const [comp, setComp] = useState('');
+  const [meses, setMeses] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch(`${API}/api/v1/fluxo/competencias`, { headers: authHeaders() })
+      .then((r) => r.ok ? r.json() : null).then((m) => m && setMeses(m)).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/v1/paineis/operacao${competencia ? `?competencia=${competencia}` : ''}`, { headers: authHeaders() });
-      if (r.ok) {
-        const j = await r.json();
-        setD(j);
-        if (j.competencia) reportResolved(j.competencia);
-      }
+      const r = await fetch(`${API}/api/v1/paineis/operacao${comp ? `?competencia=${comp}` : ''}`, { headers: authHeaders() });
+      if (r.ok) { const j = await r.json(); setD(j); if (!comp) setComp(j.competencia); }
     } catch {} finally { setLoading(false); }
-  }, [competencia, reportResolved]);
+  }, [comp]);
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <Spinner />;
-  if (!d) return <EmptyState icon={<Inbox size={32} />} title="Sem dados de operação" sub="Verifique a conexão com o backend ou cadastre clientes." />;
+  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: COLORS.muted }}><Loader2 size={32} className="animate-spin" /></div>;
+  if (!d) return <div style={{ padding: 40, textAlign: 'center', color: COLORS.faint }}>Sem dados.</div>;
 
-  const s = d.semaforo ?? { verdes: 0, amarelos: 0, vermelhos: 0 };
+  const s = d.semaforo;
   const lista = (d.clientes ?? [])
     .filter((c: any) => !filtro || c.status === filtro)
     .filter((c: any) => !busca || (c.cliente || '').toLowerCase().includes(busca.toLowerCase()));
 
+  const Bloco = ({ icon, titulo, principal, sub, href, cor }: any) => (
+    <Link href={href} style={{ textDecoration: 'none', flex: '1 1 220px' }}>
+      <Card accent={cor} style={{ cursor: 'pointer', height: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: COLORS.muted, fontSize: 13 }}>{icon} {titulo} <ChevronRight size={14} style={{ marginLeft: 'auto' }} /></div>
+        <div style={{ fontSize: 26, fontWeight: 700, color: cor, marginTop: 6 }}>{principal}</div>
+        <div style={{ fontSize: 12, color: COLORS.faint, marginTop: 2 }}>{sub}</div>
+      </Card>
+    </Link>
+  );
+
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
-      <PageHeader icon={<Activity size={22} color={COLORS.acao} />} title="Central de Operação"
-        subtitle={`Situação da carteira em ${fmtCompetencia(d.competencia)} — clique num indicador para filtrar, num cliente para o detalhe.`} />
+    <div style={{ maxWidth: 1150, margin: '0 auto', padding: 24 }}>
+      <PageHeader icon={<Activity size={24} color={COLORS.acao} />} title="Central de Operação"
+        subtitle="Situação total da carteira — documentos, declarações, pendências e inconsistências."
+        action={meses.length > 0 && (
+          <select value={comp} onChange={(e) => setComp(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 13 }}>
+            {meses.map((m) => <option key={m.competencia} value={m.competencia}>{m.competencia} ({m.docs} docs)</option>)}
+          </select>
+        )} />
 
       {!d.mesProcessado && (
-        <div style={{ marginBottom: 14, padding: '10px 14px', background: tint(COLORS.dotAtencao, 10), border: `1px solid ${tint(COLORS.dotAtencao, 35)}`, borderRadius: 10, fontSize: 13, color: COLORS.atencao, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <AlertTriangle size={15} style={{ flexShrink: 0 }} />
-          <span>
-            Este mês ainda não teve os recibos verificados no drive — a coluna &quot;Declaração&quot; aparece em branco.{' '}
-            <Link href="/fluxo" style={{ color: COLORS.atencao, fontWeight: 600 }}>Validar recibos no Fluxo →</Link>
-          </span>
+        <div style={{ marginBottom: 14, padding: 10, background: '#1a1f10', border: '1px solid #3a3215', borderRadius: 8, fontSize: 13, color: '#fcd34d' }}>
+          Este mês ainda não teve os recibos verificados no drive — por isso a coluna "Declaração" aparece em branco. Use o <Link href="/fluxo" style={{ color: COLORS.atencao }}>Fluxo</Link> para validar os recibos.
         </div>
       )}
 
-      {/* Indicadores da competência — todos clicáveis (drill-down, nunca dead-end) */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
-        {(['verde', 'amarelo', 'vermelho'] as const).map((k) => (
-          <Kpi key={k} label={SEM[k].label} value={s[k + 's'] ?? 0} cor={SEM[k].cor}
-            onClick={() => setFiltro(filtro === k ? '' : k)} active={filtro === k}
-            sub={filtro === k ? 'filtrando — clique p/ limpar' : 'clique para filtrar'} />
-        ))}
-        <Kpi label="Declarações entregues" value={`${d.declaracoes?.entregues ?? 0}/${d.totalClientes ?? 0}`} cor={COLORS.ok}
-          sub={`${d.declaracoes?.pendentes ?? 0} pendentes (recibo no drive)`} />
-        <Kpi label="Inconsistências" value={d.inconsistencias?.notas ?? 0} cor={COLORS.erro}
-          sub={`${d.inconsistencias?.clientes ?? 0} clientes · ${BRL(d.inconsistencias?.valor)}`} />
+      {/* Semáforo-herói */}
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 0, alignItems: 'stretch', flexWrap: 'wrap' }}>
+          {(['verde', 'amarelo', 'vermelho'] as const).map((k) => (
+            <button key={k} onClick={() => setFiltro(filtro === k ? '' : k)}
+              style={{ flex: 1, minWidth: 120, padding: '14px 16px', background: filtro === k ? `${SEM[k].cor}22` : 'transparent', border: 'none', borderBottom: `3px solid ${SEM[k].cor}`, cursor: 'pointer', textAlign: 'left' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 12, height: 12, borderRadius: '50%', background: SEM[k].cor }} />
+                <span style={{ fontSize: 28, fontWeight: 800, color: SEM[k].cor }}>{s[k + 's']}</span>
+              </div>
+              <div style={{ fontSize: 13, color: COLORS.muted, marginTop: 2 }}>{SEM[k].label}</div>
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      {/* 4 dimensões */}
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 8 }}>
+        <Bloco icon={<FileText size={15} />} titulo="Documentos" cor={COLORS.acao} href="/organizacao"
+          principal={d.documentos.total.toLocaleString('pt-BR')} sub={`${d.documentos.clientesComDocs} clientes · ${d.documentos.clientesSemDocs} sem docs`} />
+        <Bloco icon={<FileCheck size={15} />} titulo="Declarações entregues" cor={COLORS.ok} href="/fluxo"
+          principal={`${d.declaracoes.entregues}/${d.totalClientes}`} sub={`${d.declaracoes.pendentes} pendentes (recibo no drive)`} />
+        <Bloco icon={<ClipboardList size={15} />} titulo="Pendências" cor={COLORS.atencao} href="/solicitacoes"
+          principal={d.pendencias.clientes} sub={`${d.pendencias.semDocumentos} sem docs · ${d.pendencias.semEntradas} sem entradas`} />
+        <Bloco icon={<AlertTriangle size={15} />} titulo="Inconsistências" cor={COLORS.erro} href="/inconsistencias"
+          principal={d.inconsistencias.notas} sub={`${d.inconsistencias.clientes} clientes · ${BRL(d.inconsistencias.valor)}`} />
       </div>
 
-      {/* Acessos por dimensão */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
-        <Atalho icon={<FileText size={14} />} href="/organizacao"
-          txt={`${(d.documentos?.total ?? 0).toLocaleString('pt-BR')} documentos · ${d.documentos?.clientesSemDocs ?? 0} clientes sem docs`} />
-        <Atalho icon={<FileCheck size={14} />} href="/fluxo" txt="Quadro de trabalho e recibos" />
-        <Atalho icon={<ClipboardList size={14} />} href="/solicitacoes"
-          txt={`${d.pendencias?.clientes ?? 0} clientes com pendências a solicitar`} />
-        <Atalho icon={<AlertTriangle size={14} />} href="/inconsistencias" txt="Malha fina completa" />
-      </div>
-
-      {/* Tabela por cliente */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0 10px', gap: 12, flexWrap: 'wrap' }}>
-        <h2 style={{ fontSize: 15, fontWeight: 600, color: COLORS.strong, margin: 0 }}>
-          Situação por cliente
-          <span style={{ fontWeight: 400, color: COLORS.faint, marginLeft: 8, fontSize: 13 }}>
-            {lista.length} de {d.totalClientes ?? lista.length}{filtro ? ` · ${SEM[filtro].label}` : ''}
-          </span>
-        </h2>
+      {/* Tabela por cliente (semáforo) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0 10px', gap: 12, flexWrap: 'wrap' }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Situação por cliente {filtro && `· ${SEM[filtro].label}`}</h2>
         <div style={{ position: 'relative' }}>
-          <Search size={14} style={{ position: 'absolute', left: 10, top: 9, color: COLORS.faint }} />
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente…" className="input-aura"
-            style={{ padding: '7px 10px 7px 30px', fontSize: 13 }} />
+          <Search size={15} style={{ position: 'absolute', left: 10, top: 9, color: COLORS.faint }} />
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente…"
+            style={{ padding: '7px 10px 7px 32px', borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 13 }} />
         </div>
       </div>
 
       <Card style={{ padding: 0, overflow: 'hidden' }}>
-        <THead cols={[
-          { label: 'Cliente' },
-          { label: 'Docs', width: 60, align: 'right' },
-          { label: 'Declaração', width: 110, align: 'center' },
-          { label: 'Inconsist.', width: 80, align: 'right' },
-          { label: 'Pendências', width: 170 },
-          { label: '', width: 24 },
-        ]} />
-        {lista.length === 0 && <EmptyState icon={<Search size={26} />} title="Nenhum cliente encontrado" sub="Ajuste a busca ou o filtro de status." />}
-        {lista.slice(0, 200).map((c: any) => {
-          const st = SEM[c.status] ?? SEM.verde;
-          return (
-            <div key={c.companyId} onClick={() => setSel(c)}
-              onMouseEnter={(e) => (e.currentTarget.style.background = COLORS.surface2)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-              style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', borderBottom: `1px solid ${COLORS.borderSoft}`, cursor: 'pointer', fontSize: 13, transition: 'background .1s' }}>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                <Dot cor={st.dot} />
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, color: COLORS.strong, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.cliente}</div>
-                  <div style={{ fontSize: 11, color: COLORS.faint }}>{c.regime}{c.responsavel ? ` · ${c.responsavel}` : ''}</div>
-                </div>
+        <div style={{ display: 'flex', fontSize: 11, color: COLORS.faint, padding: '8px 14px', textTransform: 'uppercase', borderBottom: `1px solid ${COLORS.border}` }}>
+          <div style={{ width: 14 }} /><div style={{ flex: 1, paddingLeft: 8 }}>Cliente</div>
+          <div style={{ width: 60, textAlign: 'right' }}>Docs</div>
+          <div style={{ width: 90, textAlign: 'center' }}>Declaração</div>
+          <div style={{ width: 90, textAlign: 'right' }}>Inconsist.</div>
+          <div style={{ width: 130 }}>Pendências</div>
+        </div>
+        {lista.slice(0, 200).map((c: any) => (
+          <Link key={c.companyId} href={`/cliente-erros?companyId=${c.companyId}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', borderBottom: `1px solid #141925`, cursor: 'pointer', fontSize: 13 }}>
+              <span style={{ width: 14, height: 10, display: 'flex', alignItems: 'center' }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: SEM[c.status].cor }} /></span>
+              <div style={{ flex: 1, paddingLeft: 8 }}>
+                <div style={{ fontWeight: 600 }}>{c.cliente}</div>
+                <div style={{ fontSize: 11, color: COLORS.faint }}>{c.regime}{c.responsavel ? ` · ${c.responsavel}` : ''}</div>
               </div>
-              <div className="num" style={{ width: 60, textAlign: 'right', paddingLeft: 8 }}>{c.docs}</div>
-              <div style={{ width: 110, textAlign: 'center', paddingLeft: 8 }}>
-                {c.declaracaoEntregue
-                  ? <StatusChip tone="entregue" size="sm" />
-                  : <span style={{ color: COLORS.faint }}>—</span>}
-              </div>
-              <div className="num" style={{ width: 80, textAlign: 'right', paddingLeft: 8, color: c.inconsistencias ? COLORS.erro : COLORS.faint, fontWeight: c.inconsistencias ? 700 : 400 }}>
-                {c.inconsistencias || '—'}
-              </div>
-              <div style={{ width: 170, paddingLeft: 8, fontSize: 11.5, color: COLORS.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {(c.pendencias ?? []).slice(0, 2).join(' · ') || '—'}
-              </div>
-              <ChevronRight size={14} color={COLORS.faint} style={{ width: 24, flexShrink: 0 }} />
+              <div style={{ width: 60, textAlign: 'right' }}>{c.docs}</div>
+              <div style={{ width: 90, textAlign: 'center', color: c.declaracaoEntregue ? COLORS.ok : COLORS.faint }}>{c.declaracaoEntregue ? '✓ entregue' : '—'}</div>
+              <div style={{ width: 90, textAlign: 'right', color: c.inconsistencias ? COLORS.erro : COLORS.faint, fontWeight: c.inconsistencias ? 600 : 400 }}>{c.inconsistencias || '—'}</div>
+              <div style={{ width: 130, fontSize: 11, color: COLORS.muted }}>{c.pendencias.slice(0, 2).join(' · ') || '—'}</div>
             </div>
-          );
-        })}
-      </Card>
-
-      {/* Drill-down em drawer — mantém o contexto da lista */}
-      <Drawer open={!!sel} onClose={() => setSel(null)}
-        title={sel && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Dot cor={(SEM[sel.status] ?? SEM.verde).dot} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sel.cliente}</span>
-          </div>
-        )}>
-        {sel && <DetalheCliente c={sel} competencia={d.competencia} />}
-      </Drawer>
-    </div>
-  );
-}
-
-function Atalho({ icon, txt, href }: { icon: any; txt: string; href: string }) {
-  return (
-    <Link href={href} style={{ textDecoration: 'none' }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.muted, fontSize: 12.5, transition: 'border-color .15s' }}>
-        {icon}{txt}<ChevronRight size={12} />
-      </span>
-    </Link>
-  );
-}
-
-/** Detalhe do cliente no drawer: por que o semáforo está nessa cor + próximas ações. */
-function DetalheCliente({ c, competencia }: { c: any; competencia: string }) {
-  const st = SEM[c.status] ?? SEM.verde;
-  const motivos: { ok: boolean; txt: string }[] = [
-    { ok: (c.docs ?? 0) > 0, txt: (c.docs ?? 0) > 0 ? `${c.docs} documentos recebidos na competência` : 'Nenhum documento recebido na competência' },
-    { ok: !!c.declaracaoEntregue, txt: c.declaracaoEntregue ? 'Declaração entregue (recibo encontrado no drive)' : 'Declaração ainda sem recibo no drive' },
-    { ok: !(c.inconsistencias > 0), txt: c.inconsistencias > 0 ? `${c.inconsistencias} inconsistências fiscais em notas` : 'Sem inconsistências fiscais' },
-    { ok: !(c.pendencias?.length > 0), txt: c.pendencias?.length > 0 ? `${c.pendencias.length} pendências documentais` : 'Sem pendências documentais' },
-  ];
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <StatusChip tone={st.tone} />
-        <span style={{ fontSize: 12.5, color: COLORS.faint }}>{c.regime}{c.responsavel ? ` · resp.: ${c.responsavel}` : ''} · {fmtCompetencia(competencia)}</span>
-      </div>
-
-      <h3 style={{ fontSize: 13, fontWeight: 600, color: COLORS.strong, margin: '18px 0 8px' }}>Por que este status</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {motivos.map((m, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: m.ok ? COLORS.muted : COLORS.erro, padding: '7px 10px', background: m.ok ? 'transparent' : tint(COLORS.dotErro, 7), borderRadius: 8 }}>
-            <Dot cor={m.ok ? COLORS.dotOk : COLORS.dotErro} size={7} />
-            {m.txt}
-          </div>
+          </Link>
         ))}
-      </div>
-
-      {c.pendencias?.length > 0 && (
-        <>
-          <h3 style={{ fontSize: 13, fontWeight: 600, color: COLORS.strong, margin: '18px 0 8px' }}>Pendências</h3>
-          <ul style={{ margin: 0, paddingLeft: 18, color: COLORS.muted, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {c.pendencias.map((p: string, i: number) => <li key={i}>{p}</li>)}
-          </ul>
-        </>
-      )}
-
-      <h3 style={{ fontSize: 13, fontWeight: 600, color: COLORS.strong, margin: '20px 0 8px' }}>Ações</h3>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Btn href={`/cliente-erros?companyId=${c.companyId}`} size="sm">
-          <ExternalLink size={13} /> Ficha completa e erros
-        </Btn>
-        <Btn href="/solicitacoes" variant="outline" size="sm">
-          <ClipboardList size={13} /> Solicitar documentos
-        </Btn>
-        <Btn href="/organizacao" variant="outline" size="sm">
-          <FolderOpen size={13} /> Ver documentos
-        </Btn>
-      </div>
+      </Card>
     </div>
   );
 }

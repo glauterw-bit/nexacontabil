@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { Brain, Loader2, Sparkles, TrendingUp, AlertTriangle, Lightbulb, X, Play } from 'lucide-react';
-import { PageHeader, Kpi, Card, SectionTitle, COLORS, tint } from '@/components/ui/kit';
+import { PageHeader, Kpi, Card, SectionTitle, COLORS } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -118,19 +118,19 @@ function InsightDrawer({ companyId, onClose }: { companyId: string; onClose: () 
   const Lista = ({ titulo, itens, cor, icon }: any) => (itens?.length ? (
     <div style={{ marginTop: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: cor, fontSize: 13 }}>{icon} {titulo}</div>
-      <ul style={{ margin: '6px 0 0', paddingLeft: 20, fontSize: 13, color: 'var(--tx)', lineHeight: 1.7 }}>
+      <ul style={{ margin: '6px 0 0', paddingLeft: 20, fontSize: 13, color: '#cbd5e1', lineHeight: 1.7 }}>
         {itens.map((s: string, i: number) => <li key={i}>{s}</li>)}
       </ul>
     </div>
   ) : null);
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,17,25,0.45)', display: 'flex', justifyContent: 'flex-end', zIndex: 50 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 540, maxWidth: '96vw', height: '100%', background: COLORS.surface, borderLeft: `1px solid ${COLORS.border}`, overflowY: 'auto', padding: 22 }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: '#0009', display: 'flex', justifyContent: 'flex-end', zIndex: 50 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 540, maxWidth: '96vw', height: '100%', background: '#0f1420', borderLeft: `1px solid ${COLORS.border}`, overflowY: 'auto', padding: 22 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: COLORS.acao }}>
             <Sparkles size={18} /> Insight
-            {p.fonte && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: p.fonte === 'ia' ? tint(COLORS.acao, 13) : tint(COLORS.atencao, 13), color: p.fonte === 'ia' ? COLORS.acao : COLORS.atencao }}>{p.fonte === 'ia' ? 'IA avançada' : 'por regras'}</span>}
+            {p.fonte && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: p.fonte === 'ia' ? `${COLORS.acao}22` : `${COLORS.atencao}22`, color: p.fonte === 'ia' ? COLORS.acao : COLORS.atencao }}>{p.fonte === 'ia' ? 'IA avançada' : 'por regras'}</span>}
           </div>
           <X size={18} style={{ cursor: 'pointer', color: COLORS.faint }} onClick={onClose} />
         </div>
@@ -138,8 +138,8 @@ function InsightDrawer({ companyId, onClose }: { companyId: string; onClose: () 
           !d ? <div style={{ color: COLORS.faint }}>Sem insight gerado para este cliente.</div> : (
             <>
               {d.scoreSaude != null && <div style={{ fontSize: 34, fontWeight: 800, color: scoreCor(d.scoreSaude) }}>{d.scoreSaude}<span style={{ fontSize: 14, color: COLORS.muted, fontWeight: 400 }}> / 100 saúde</span></div>}
-              <p style={{ color: 'var(--tx)', fontSize: 14, lineHeight: 1.7, marginTop: 8 }}>{p.resumoExecutivo}</p>
-              <Card style={{ marginTop: 8, padding: 12, background: tint(COLORS.acao, 8) }}>
+              <p style={{ color: '#e2e8f0', fontSize: 14, lineHeight: 1.7, marginTop: 8 }}>{p.resumoExecutivo}</p>
+              <Card style={{ marginTop: 8, padding: 12, background: '#13182a' }}>
                 <div style={{ fontSize: 12, color: COLORS.faint }}>Economia potencial</div>
                 <div style={{ fontSize: 13, color: COLORS.ok, marginTop: 2 }}>{p.economiaPotencial}</div>
               </Card>

@@ -12,11 +12,11 @@ const VENCIMENTOS = gql`query Vencimentos($companyId: ID!) { verificarVencimento
 const SOLICITAR = gql`mutation Solicitar($companyId: ID!, $tipo: String!) { solicitarCertidao(companyId: $companyId, tipo: $tipo) { id tipo status orgaoEmissor numeroControle } }`;
 
 const STATUS_COLORS: Record<string, string> = {
-  negativa: 'text-ok bg-green-400/10 border-green-400/20',
-  positiva: 'text-err bg-red-400/10 border-red-400/20',
-  positiva_efeito_negativa: 'text-warn bg-yellow-400/10 border-yellow-400/20',
-  nao_consultado: 'text-tx-muted bg-gray-400/10 border-gray-400/20',
-  erro: 'text-err bg-red-400/10 border-red-400/20',
+  negativa: 'text-green-400 bg-green-400/10 border-green-400/20',
+  positiva: 'text-red-400 bg-red-400/10 border-red-400/20',
+  positiva_efeito_negativa: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
+  nao_consultado: 'text-gray-400 bg-gray-400/10 border-gray-400/20',
+  erro: 'text-red-400 bg-red-400/10 border-red-400/20',
 };
 
 const TIPOS_CERTIDAO = [
@@ -53,9 +53,9 @@ export default function CertidoesPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <Building2 className="h-12 w-12 text-tx-faint mx-auto mb-4" />
-          <p className="text-tx-muted">Selecione uma empresa no menu lateral</p>
-          <Link href="/carteira" className="mt-4 inline-block text-acao hover:underline">Cadastrar empresa</Link>
+          <Building2 className="h-12 w-12 text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-400">Selecione uma empresa no menu lateral</p>
+          <Link href="/carteira" className="mt-4 inline-block text-indigo-400 hover:underline">Cadastrar empresa</Link>
         </div>
       </div>
     );
@@ -65,19 +65,19 @@ export default function CertidoesPage() {
     <div className="flex-1 p-6 space-y-6 overflow-auto">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <ShieldCheck className="h-7 w-7 text-acao" />
+          <ShieldCheck className="h-7 w-7 text-indigo-400" />
           <div>
-            <h1 className="text-2xl font-bold text-tx-strong">Certidões Negativas</h1>
-            <p className="text-tx-muted text-sm">Consulta e monitoramento automático</p>
+            <h1 className="text-2xl font-bold text-white">Certidões Negativas</h1>
+            <p className="text-gray-400 text-sm">Consulta e monitoramento automático</p>
           </div>
         </div>
-        <button onClick={() => refetch()} className="text-tx-muted hover:text-tx-strong">
+        <button onClick={() => refetch()} className="text-gray-400 hover:text-white">
           <RefreshCw className="h-5 w-5" />
         </button>
       </div>
 
       {msg && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-ok text-sm flex items-center gap-2">
+        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-green-400 text-sm flex items-center gap-2">
           <CheckCircle className="h-4 w-4" /> {msg} <button onClick={() => setMsg('')} className="ml-auto">✕</button>
         </div>
       )}
@@ -88,11 +88,11 @@ export default function CertidoesPage() {
           {vencidas.length > 0 && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="h-5 w-5 text-err" />
-                <span className="text-err font-semibold">{vencidas.length} Certidão(ões) Vencida(s)</span>
+                <AlertTriangle className="h-5 w-5 text-red-400" />
+                <span className="text-red-400 font-semibold">{vencidas.length} Certidão(ões) Vencida(s)</span>
               </div>
               {vencidas.map((c: any) => (
-                <div key={c.id} className="text-sm text-err flex justify-between">
+                <div key={c.id} className="text-sm text-red-300 flex justify-between">
                   <span>{c.tipo} — {c.orgaoEmissor}</span>
                   <span>{fmtDate(c.dataValidade)}</span>
                 </div>
@@ -102,11 +102,11 @@ export default function CertidoesPage() {
           {vencendo.length > 0 && (
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="h-5 w-5 text-warn" />
-                <span className="text-warn font-semibold">{vencendo.length} Vencendo em 30 dias</span>
+                <AlertTriangle className="h-5 w-5 text-yellow-400" />
+                <span className="text-yellow-400 font-semibold">{vencendo.length} Vencendo em 30 dias</span>
               </div>
               {vencendo.map((c: any) => (
-                <div key={c.id} className="text-sm text-warn flex justify-between">
+                <div key={c.id} className="text-sm text-yellow-300 flex justify-between">
                   <span>{c.tipo} — {c.orgaoEmissor}</span>
                   <span>{diasParaVencer(c.dataValidade)} dias</span>
                 </div>
@@ -117,22 +117,22 @@ export default function CertidoesPage() {
       )}
 
       {/* Solicit buttons */}
-      <div className="bg-card border border-line rounded-xl p-5 space-y-3">
-        <h2 className="text-tx-strong font-semibold">Solicitar Certidão</h2>
+      <div className="bg-[#161b2e] border border-[#1e2740] rounded-xl p-5 space-y-3">
+        <h2 className="text-white font-semibold">Solicitar Certidão</h2>
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
           {TIPOS_CERTIDAO.map(({ key, label, icon }) => (
             <button
               key={key}
               disabled={loading === key}
               onClick={() => { setLoading(key); solicitar({ variables: { companyId, tipo: key } }); }}
-              className="flex items-center gap-3 bg-inset hover:bg-card border border-line hover:border-indigo-500/50 text-tx-strong px-4 py-3 rounded-lg text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-3 bg-[#0f1117] hover:bg-[#1a2035] border border-[#1e2740] hover:border-indigo-500/50 text-white px-4 py-3 rounded-lg text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="text-lg">{icon}</span>
               <span className="text-left flex-1">{label}</span>
               {loading === key ? (
-                <RefreshCw className="h-4 w-4 animate-spin text-acao" />
+                <RefreshCw className="h-4 w-4 animate-spin text-indigo-400" />
               ) : (
-                <Plus className="h-4 w-4 text-tx-muted" />
+                <Plus className="h-4 w-4 text-gray-500" />
               )}
             </button>
           ))}
@@ -140,13 +140,13 @@ export default function CertidoesPage() {
       </div>
 
       {/* List */}
-      <div className="bg-card border border-line rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-line">
-          <h2 className="text-tx-strong font-semibold">Histórico ({certidoes.length})</h2>
+      <div className="bg-[#161b2e] border border-[#1e2740] rounded-xl overflow-hidden">
+        <div className="p-4 border-b border-[#1e2740]">
+          <h2 className="text-white font-semibold">Histórico ({certidoes.length})</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="border-b border-line text-tx-muted">
+            <thead><tr className="border-b border-[#1e2740] text-gray-400">
               <th className="px-4 py-3 text-left">Tipo</th>
               <th className="px-4 py-3 text-left">Órgão Emissor</th>
               <th className="px-4 py-3 text-left">CNPJ</th>
@@ -157,27 +157,27 @@ export default function CertidoesPage() {
             </tr></thead>
             <tbody>
               {certidoes.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-tx-muted">Nenhuma certidão solicitada ainda.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">Nenhuma certidão solicitada ainda.</td></tr>
               ) : certidoes.map((c: any) => {
                 const venceu = c.dataValidade && new Date(c.dataValidade) < new Date();
                 const dias = c.dataValidade ? diasParaVencer(c.dataValidade) : null;
                 return (
-                  <tr key={c.id} className="border-b border-line hover:bg-inset">
-                    <td className="px-4 py-3 text-tx-strong font-medium">{c.tipo.toUpperCase()}</td>
-                    <td className="px-4 py-3 text-tx-muted text-xs">{c.orgaoEmissor}</td>
-                    <td className="px-4 py-3 text-tx-muted font-mono text-xs">{c.cnpj}</td>
+                  <tr key={c.id} className="border-b border-[#1e2740] hover:bg-white/5">
+                    <td className="px-4 py-3 text-white font-medium">{c.tipo.toUpperCase()}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{c.orgaoEmissor}</td>
+                    <td className="px-4 py-3 text-gray-400 font-mono text-xs">{c.cnpj}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium border ${STATUS_COLORS[c.status] || STATUS_COLORS.nao_consultado}`}>
                         {c.status === 'negativa' ? '✓ Negativa' : c.status === 'positiva' ? '✗ Positiva' : c.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-tx-muted">{fmtDate(c.dataEmissao)}</td>
+                    <td className="px-4 py-3 text-gray-400">{fmtDate(c.dataEmissao)}</td>
                     <td className="px-4 py-3">
-                      <span className={venceu ? 'text-err' : dias && dias <= 30 ? 'text-warn' : 'text-tx-muted'}>
+                      <span className={venceu ? 'text-red-400' : dias && dias <= 30 ? 'text-yellow-400' : 'text-gray-400'}>
                         {fmtDate(c.dataValidade)} {dias !== null && !venceu ? `(${dias}d)` : venceu ? '(VENCIDA)' : ''}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-tx-faint font-mono text-xs">{c.numeroControle?.substring(0, 20) || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600 font-mono text-xs">{c.numeroControle?.substring(0, 20) || '—'}</td>
                   </tr>
                 );
               })}

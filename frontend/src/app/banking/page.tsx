@@ -95,8 +95,8 @@ export default function BankingPage() {
   if (!selectedCompany) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa para acessar o Open Finance.</p>
+        <Building2 className="h-12 w-12 text-gray-600" />
+        <p className="text-gray-400 text-sm">Selecione uma empresa para acessar o Open Finance.</p>
         <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">
           Gerenciar Empresas
         </Link>
@@ -108,8 +108,8 @@ export default function BankingPage() {
     <div className="p-6 md:p-8 space-y-6 max-w-7xl">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-tx-strong">Open Finance</h1>
-          <p className="text-tx-muted text-sm mt-0.5">{selectedCompany.name}</p>
+          <h1 className="text-xl font-semibold text-white">Open Finance</h1>
+          <p className="text-gray-400 text-sm mt-0.5">{selectedCompany.name}</p>
         </div>
         <button
           onClick={() => setShowConectar(true)}
@@ -124,7 +124,7 @@ export default function BankingPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <SummaryCard label="Contas conectadas" value={String(conexoes.length)} />
         <SummaryCard label="Saldo consolidado" value={brl(saldoTotal)} highlight />
-        <SummaryCard label="Lançamentos pendentes" value={String(pendentesRec)} color={pendentesRec > 0 ? 'text-warn' : 'text-ok'} />
+        <SummaryCard label="Lançamentos pendentes" value={String(pendentesRec)} color={pendentesRec > 0 ? 'text-amber-400' : 'text-emerald-400'} />
         <SummaryCard
           label="Última sincronização"
           value={
@@ -137,14 +137,14 @@ export default function BankingPage() {
       </div>
 
       {loading && conexoes.length === 0 ? (
-        <div className="text-center py-12 text-sm text-tx-muted flex items-center justify-center gap-2">
+        <div className="text-center py-12 text-sm text-gray-500 flex items-center justify-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
         </div>
       ) : conexoes.length === 0 ? (
-        <div className="rounded-xl border border-line bg-card p-10 text-center">
-          <Landmark className="h-10 w-10 text-tx-faint mx-auto mb-3" />
-          <p className="text-sm font-medium text-tx-strong">Nenhuma conta bancária conectada</p>
-          <p className="text-xs text-tx-muted mt-1 max-w-md mx-auto">
+        <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-10 text-center">
+          <Landmark className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+          <p className="text-sm font-medium text-white">Nenhuma conta bancária conectada</p>
+          <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
             Conecte a primeira conta para que o sistema importe extratos automaticamente. Quando o
             Pluggy estiver configurado em Integrações, a importação roda diariamente.
           </p>
@@ -166,31 +166,31 @@ export default function BankingPage() {
                 onClick={() => setContaSel(c.id)}
                 className={`px-3 py-2 text-xs font-medium border rounded-lg whitespace-nowrap transition-colors ${
                   conexaoAtual?.id === c.id
-                    ? 'bg-indigo-600/20 text-acao border-indigo-500/40'
-                    : 'bg-card text-tx border-line hover:border-indigo-500/30'
+                    ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
+                    : 'bg-[#161b2e] text-gray-300 border-[#1e2740] hover:border-indigo-500/30'
                 }`}
               >
                 <Landmark className="h-3.5 w-3.5 inline mr-1.5" />
                 {c.bankName}
-                <span className="ml-2 text-[10px] text-tx-muted">{c.bankCode}</span>
+                <span className="ml-2 text-[10px] text-gray-500">{c.bankCode}</span>
               </button>
             ))}
           </div>
 
           {/* Header da conta selecionada */}
           {conexaoAtual && (
-            <div className="rounded-xl border border-line bg-card p-5">
+            <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <p className="text-sm font-medium text-tx-strong">{conexaoAtual.bankName}</p>
-                  <p className="text-xs text-tx-muted">
+                  <p className="text-sm font-medium text-white">{conexaoAtual.bankName}</p>
+                  <p className="text-xs text-gray-500">
                     {conexaoAtual.accountType || 'Conta corrente'} · status: {conexaoAtual.status}
                   </p>
                 </div>
                 <button
                   onClick={() => sincronizar(conexaoAtual.id)}
                   disabled={syncingId === conexaoAtual.id}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-inset hover:bg-card border border-line text-tx-strong rounded-lg disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#1e2740] hover:bg-[#2a3550] text-white rounded-lg disabled:opacity-50"
                 >
                   {syncingId === conexaoAtual.id ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -202,7 +202,7 @@ export default function BankingPage() {
               </div>
 
               {statements.length === 0 ? (
-                <div className="text-center py-8 text-sm text-tx-muted">
+                <div className="text-center py-8 text-sm text-gray-500">
                   Nenhum extrato sincronizado ainda. Clique em <strong>Sincronizar</strong> para
                   buscar os últimos lançamentos.
                 </div>
@@ -210,7 +210,7 @@ export default function BankingPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-left text-xs text-tx-muted border-b border-line">
+                      <tr className="text-left text-xs text-gray-500 border-b border-[#1e2740]">
                         <th className="pb-3 font-medium">Data</th>
                         <th className="pb-3 font-medium">Descrição</th>
                         <th className="pb-3 font-medium text-right">Valor</th>
@@ -218,26 +218,26 @@ export default function BankingPage() {
                         <th className="pb-3 font-medium text-center">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-line">
+                    <tbody className="divide-y divide-[#1e2740]">
                       {[...statements].reverse().map((t) => (
-                        <tr key={t.id} className="hover:bg-inset">
-                          <td className="py-2.5 text-xs text-tx-muted">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
-                          <td className="py-2.5 text-tx">{t.description}</td>
+                        <tr key={t.id} className="hover:bg-white/5">
+                          <td className="py-2.5 text-xs text-gray-400">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
+                          <td className="py-2.5 text-gray-200">{t.description}</td>
                           <td className="py-2.5 text-right font-mono">
-                            <span className={t.amount >= 0 ? 'text-ok' : 'text-err'}>
+                            <span className={t.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}>
                               {t.amount >= 0 ? '+' : ''}{brl(t.amount)}
                             </span>
                           </td>
-                          <td className="py-2.5 text-right font-mono text-tx-muted">
+                          <td className="py-2.5 text-right font-mono text-gray-400">
                             {t.balance != null ? brl(t.balance) : '—'}
                           </td>
                           <td className="py-2.5 text-center">
                             {t.reconciled ? (
-                              <span className="inline-flex items-center gap-1 text-xs text-ok">
+                              <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
                                 <CheckCircle className="h-3 w-3" /> Conciliado
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-xs text-warn">
+                              <span className="inline-flex items-center gap-1 text-xs text-amber-400">
                                 <Clock className="h-3 w-3" /> Pendente
                               </span>
                             )}
@@ -271,12 +271,12 @@ function SummaryCard({
   label: string; value: string; hint?: string; highlight?: boolean; color?: string; small?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-card p-4">
-      <p className="text-xs text-tx-muted">{label}</p>
-      <p className={`font-bold ${small ? 'text-base' : 'text-lg'} ${color ?? (highlight ? 'text-ok' : 'text-tx-strong')}`}>
+    <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className={`font-bold ${small ? 'text-base' : 'text-lg'} ${color ?? (highlight ? 'text-emerald-400' : 'text-white')}`}>
         {value}
       </p>
-      {hint && <p className="text-xs text-tx-faint mt-0.5">{hint}</p>}
+      {hint && <p className="text-xs text-gray-600 mt-0.5">{hint}</p>}
     </div>
   );
 }
@@ -307,24 +307,24 @@ function ConnectModal({
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <form
         onSubmit={submit}
-        className="w-full max-w-md bg-card border border-line rounded-2xl p-6 space-y-4"
+        className="w-full max-w-md bg-[#0f1117] border border-[#1e2740] rounded-2xl p-6 space-y-4"
       >
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-tx-strong">Conectar conta bancária</h2>
-            <p className="text-xs text-tx-muted mt-1">Para sincronização automática real, configure Pluggy em Integrações.</p>
+            <h2 className="text-lg font-semibold text-white">Conectar conta bancária</h2>
+            <p className="text-xs text-gray-500 mt-1">Para sincronização automática real, configure Pluggy em Integrações.</p>
           </div>
-          <button type="button" onClick={onClose} className="text-tx-muted hover:text-tx-strong">
+          <button type="button" onClick={onClose} className="text-gray-500 hover:text-white">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <label className="block">
-          <span className="block text-xs text-tx-muted mb-1">Banco</span>
+          <span className="block text-xs text-gray-400 mb-1">Banco</span>
           <select
             value={bankCode}
             onChange={(e) => setBankCode(e.target.value)}
-            className="w-full px-3 py-2 bg-inset border border-line rounded-lg text-sm text-tx-strong outline-none focus:border-indigo-500/50"
+            className="w-full px-3 py-2 bg-[#161b2e] border border-[#1e2740] rounded-lg text-sm text-white outline-none focus:border-indigo-500/50"
           >
             {BANCOS.map((b) => (
               <option key={b.code} value={b.code}>{b.code} — {b.name}</option>
@@ -333,11 +333,11 @@ function ConnectModal({
         </label>
 
         <label className="block">
-          <span className="block text-xs text-tx-muted mb-1">Tipo de conta</span>
+          <span className="block text-xs text-gray-400 mb-1">Tipo de conta</span>
           <select
             value={accountType}
             onChange={(e) => setAccountType(e.target.value)}
-            className="w-full px-3 py-2 bg-inset border border-line rounded-lg text-sm text-tx-strong outline-none focus:border-indigo-500/50"
+            className="w-full px-3 py-2 bg-[#161b2e] border border-[#1e2740] rounded-lg text-sm text-white outline-none focus:border-indigo-500/50"
           >
             <option>Conta Corrente</option>
             <option>Conta Poupança</option>
@@ -349,7 +349,7 @@ function ConnectModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2 text-sm text-tx hover:text-tx-strong bg-inset border border-line rounded-lg"
+            className="flex-1 px-4 py-2 text-sm text-gray-300 bg-[#1e2740] hover:bg-[#2a3550] rounded-lg"
           >
             Cancelar
           </button>

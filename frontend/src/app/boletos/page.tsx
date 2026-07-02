@@ -51,14 +51,14 @@ interface Boleto {
 }
 
 const STATUS_MAP: Record<string, { label: string; classes: string }> = {
-  pending: { label: 'Pendente', classes: 'text-warn bg-amber-500/10 border-amber-500/30' },
-  pendente: { label: 'Pendente', classes: 'text-warn bg-amber-500/10 border-amber-500/30' },
-  paid: { label: 'Pago', classes: 'text-ok bg-emerald-500/10 border-emerald-500/30' },
-  pago: { label: 'Pago', classes: 'text-ok bg-emerald-500/10 border-emerald-500/30' },
-  overdue: { label: 'Vencido', classes: 'text-err bg-red-500/10 border-red-500/30' },
-  vencido: { label: 'Vencido', classes: 'text-err bg-red-500/10 border-red-500/30' },
-  cancelled: { label: 'Cancelado', classes: 'text-tx-muted bg-gray-500/10 border-gray-500/30' },
-  cancelado: { label: 'Cancelado', classes: 'text-tx-muted bg-gray-500/10 border-gray-500/30' },
+  pending: { label: 'Pendente', classes: 'text-amber-300 bg-amber-500/10 border-amber-500/30' },
+  pendente: { label: 'Pendente', classes: 'text-amber-300 bg-amber-500/10 border-amber-500/30' },
+  paid: { label: 'Pago', classes: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30' },
+  pago: { label: 'Pago', classes: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30' },
+  overdue: { label: 'Vencido', classes: 'text-red-300 bg-red-500/10 border-red-500/30' },
+  vencido: { label: 'Vencido', classes: 'text-red-300 bg-red-500/10 border-red-500/30' },
+  cancelled: { label: 'Cancelado', classes: 'text-gray-400 bg-gray-500/10 border-gray-500/30' },
+  cancelado: { label: 'Cancelado', classes: 'text-gray-400 bg-gray-500/10 border-gray-500/30' },
 };
 
 function brl(n: number) {
@@ -117,8 +117,8 @@ export default function BoletosPage() {
   if (!selectedCompany) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa.</p>
+        <Building2 className="h-12 w-12 text-gray-600" />
+        <p className="text-gray-400 text-sm">Selecione uma empresa.</p>
         <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">Gerenciar Empresas</Link>
       </div>
     );
@@ -129,10 +129,10 @@ export default function BoletosPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2 mb-0.5">
-            <Banknote className="h-5 w-5 text-acao" />
-            <h1 className="text-xl font-semibold text-tx-strong">Boletos</h1>
+            <Banknote className="h-5 w-5 text-indigo-400" />
+            <h1 className="text-xl font-semibold text-white">Boletos</h1>
           </div>
-          <p className="text-sm text-tx-muted">{selectedCompany.name} · {boletos.length} boleto(s)</p>
+          <p className="text-sm text-gray-400">{selectedCompany.name} · {boletos.length} boleto(s)</p>
         </div>
         <button
           onClick={() => setShowNew(true)}
@@ -143,25 +143,25 @@ export default function BoletosPage() {
       </div>
 
       <div className="grid md:grid-cols-3 gap-3">
-        <KPI label="Pendentes" value={brl(totals.pendentes)} color="text-warn" />
-        <KPI label="Vencidos" value={brl(totals.vencidos)} color="text-err" />
-        <KPI label="Pagos" value={brl(totals.pagos)} color="text-ok" />
+        <KPI label="Pendentes" value={brl(totals.pendentes)} color="text-amber-400" />
+        <KPI label="Vencidos" value={brl(totals.vencidos)} color="text-red-400" />
+        <KPI label="Pagos" value={brl(totals.pagos)} color="text-emerald-400" />
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex-1 min-w-[200px] relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tx-muted" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por pagador ou CNPJ/CPF"
-            className="w-full pl-9 pr-3 py-1.5 bg-card border border-line rounded text-sm text-tx-strong outline-none"
+            className="w-full pl-9 pr-3 py-1.5 bg-[#161b2e] border border-[#1e2740] rounded text-sm text-white outline-none"
           />
         </div>
         <select
           value={statusFiltro}
           onChange={(e) => setStatusFiltro(e.target.value)}
-          className="px-3 py-1.5 bg-card border border-line rounded text-sm text-tx-strong outline-none"
+          className="px-3 py-1.5 bg-[#161b2e] border border-[#1e2740] rounded text-sm text-white outline-none"
         >
           <option value="todos">Todos status</option>
           <option value="pending">Pendentes</option>
@@ -172,37 +172,37 @@ export default function BoletosPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-10 text-sm text-tx-muted flex items-center justify-center gap-2">
+        <div className="text-center py-10 text-sm text-gray-500 flex items-center justify-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-line bg-card p-10 text-center">
-          <Banknote className="h-10 w-10 text-tx-faint mx-auto mb-3" />
-          <p className="text-sm font-medium text-tx-strong">Nenhum boleto encontrado</p>
-          <p className="text-xs text-tx-muted mt-1">
+        <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-10 text-center">
+          <Banknote className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+          <p className="text-sm font-medium text-white">Nenhum boleto encontrado</p>
+          <p className="text-xs text-gray-500 mt-1">
             Crie um boleto manual ou configure o Banco Inter API em /integracoes para emissão automática.
           </p>
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map((b) => {
-            const sc = STATUS_MAP[b.status] ?? { label: b.status, classes: 'text-tx-muted' };
+            const sc = STATUS_MAP[b.status] ?? { label: b.status, classes: 'text-gray-400' };
             const isVencido = (b.status === 'pending' || b.status === 'pendente') && new Date(b.dueDate) < new Date();
             const venc = new Date(b.dueDate).toLocaleDateString('pt-BR');
             return (
-              <div key={b.id} className="rounded-lg border border-line bg-card p-3 hover:border-indigo-500/40 transition-colors">
+              <div key={b.id} className="rounded-lg border border-[#1e2740] bg-[#161b2e] p-3 hover:border-indigo-500/40 transition-colors">
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex-1 min-w-[200px]">
-                    <p className="text-sm font-medium text-tx-strong truncate">{b.payerName}</p>
-                    <p className="text-[11px] text-tx-muted font-mono">{b.payerCnpjCpf} · vence {venc}</p>
+                    <p className="text-sm font-medium text-white truncate">{b.payerName}</p>
+                    <p className="text-[11px] text-gray-500 font-mono">{b.payerCnpjCpf} · vence {venc}</p>
                   </div>
-                  <span className="text-lg font-bold text-ok font-mono">{brl(b.amount)}</span>
+                  <span className="text-lg font-bold text-emerald-300 font-mono">{brl(b.amount)}</span>
                   <span className={`px-2 py-0.5 text-[10px] border rounded ${sc.classes}`}>
                     {isVencido ? 'Vencido' : sc.label}
                   </span>
                   <div className="flex gap-1">
                     {b.digitableLine && (
-                      <button onClick={() => copyLine(b.digitableLine!)} className="p-1.5 text-tx-muted hover:text-tx-strong" title="Copiar linha">
+                      <button onClick={() => copyLine(b.digitableLine!)} className="p-1.5 text-gray-400 hover:text-white" title="Copiar linha">
                         <Copy className="h-3.5 w-3.5" />
                       </button>
                     )}
@@ -211,7 +211,7 @@ export default function BoletosPage() {
                         <button onClick={() => markPaid({ variables: { id: b.id } })} className="px-2 py-1 text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white rounded">
                           Marcar pago
                         </button>
-                        <button onClick={() => confirm('Cancelar boleto?') && cancelBoleto({ variables: { id: b.id } })} className="px-2 py-1 text-[10px] bg-red-600/30 hover:bg-red-600/50 text-err rounded">
+                        <button onClick={() => confirm('Cancelar boleto?') && cancelBoleto({ variables: { id: b.id } })} className="px-2 py-1 text-[10px] bg-red-600/30 hover:bg-red-600/50 text-red-300 rounded">
                           Cancelar
                         </button>
                       </>
@@ -219,7 +219,7 @@ export default function BoletosPage() {
                   </div>
                 </div>
                 {b.digitableLine && (
-                  <p className="text-[10px] font-mono text-tx-muted mt-1 truncate">{b.digitableLine}</p>
+                  <p className="text-[10px] font-mono text-gray-500 mt-1 truncate">{b.digitableLine}</p>
                 )}
               </div>
             );
@@ -234,8 +234,8 @@ export default function BoletosPage() {
 
 function KPI({ label, value, color }: any) {
   return (
-    <div className="rounded-xl border border-line bg-card p-4">
-      <p className="text-xs text-tx-muted">{label}</p>
+    <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4">
+      <p className="text-xs text-gray-500">{label}</p>
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
     </div>
   );
@@ -248,10 +248,10 @@ function NewBoletoModal({ companyId, onClose, onCreate, loading }: any) {
   });
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-card border border-line rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-line flex justify-between">
-          <p className="text-sm font-medium text-tx-strong">Novo boleto</p>
-          <button onClick={onClose}><X className="h-4 w-4 text-tx-muted" /></button>
+      <div className="w-full max-w-md bg-[#161b2e] border border-[#2a3550] rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-[#1e2740] flex justify-between">
+          <p className="text-sm font-medium text-white">Novo boleto</p>
+          <button onClick={onClose}><X className="h-4 w-4 text-gray-500" /></button>
         </div>
         <div className="p-5 space-y-3">
           {[
@@ -264,12 +264,12 @@ function NewBoletoModal({ companyId, onClose, onCreate, loading }: any) {
             { k: 'instructions', label: 'Descrição (opcional)', type: 'text' },
           ].map((f) => (
             <div key={f.k}>
-              <label className="text-[10px] uppercase text-tx-muted tracking-wider block mb-1">{f.label}</label>
+              <label className="text-[10px] uppercase text-gray-500 tracking-wider block mb-1">{f.label}</label>
               <input
                 type={f.type}
                 value={(form as any)[f.k]}
                 onChange={(e) => setForm({ ...form, [f.k]: f.type === 'number' ? Number(e.target.value) : e.target.value })}
-                className="w-full px-3 py-1.5 bg-inset border border-line rounded text-sm text-tx-strong outline-none"
+                className="w-full px-3 py-1.5 bg-[#0f1117] border border-[#1e2740] rounded text-sm text-white outline-none"
               />
             </div>
           ))}

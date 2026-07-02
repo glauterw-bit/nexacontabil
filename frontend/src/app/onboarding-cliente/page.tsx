@@ -173,8 +173,8 @@ export default function OnboardingClientePage() {
   return (
     <div className="p-6 md:p-10 max-w-3xl">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-tx-strong">Onboarding de novo cliente</h1>
-        <p className="text-sm text-tx-muted mt-1">5 passos rápidos. O sistema cria a empresa, popula o plano de contas e gera o calendário fiscal automaticamente.</p>
+        <h1 className="text-xl font-semibold text-white">Onboarding de novo cliente</h1>
+        <p className="text-sm text-gray-400 mt-1">5 passos rápidos. O sistema cria a empresa, popula o plano de contas e gera o calendário fiscal automaticamente.</p>
       </div>
 
       {/* Stepper */}
@@ -188,29 +188,29 @@ export default function OnboardingClientePage() {
               <div
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
                   current
-                    ? 'bg-indigo-600/20 border-indigo-500/50 text-acao'
+                    ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300'
                     : done
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-ok'
-                    : 'bg-card border-line text-tx-muted'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    : 'bg-[#161b2e] border-[#1e2740] text-gray-500'
                 }`}
               >
                 {done ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                 <div>
                   <p className="text-xs font-medium leading-none">{s.title}</p>
-                  <p className="text-[10px] text-tx-muted mt-0.5">Passo {s.id}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Passo {s.id}</p>
                 </div>
               </div>
-              {i < STEPS.length - 1 && <ChevronRight className="h-3 w-3 text-tx-faint" />}
+              {i < STEPS.length - 1 && <ChevronRight className="h-3 w-3 text-gray-600" />}
             </div>
           );
         })}
       </div>
 
-      <div className="rounded-xl border border-line bg-card p-6 space-y-4">
+      <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-6 space-y-4">
         {step === 1 && (
           <>
-            <h2 className="text-sm font-medium text-tx-strong">Dados da empresa</h2>
-            <p className="text-xs text-tx-muted">Digite o CNPJ — o resto é puxado da Receita.</p>
+            <h2 className="text-sm font-medium text-white">Dados da empresa</h2>
+            <p className="text-xs text-gray-500">Digite o CNPJ — o resto é puxado da Receita.</p>
             <Field label="CNPJ">
               <div className="relative">
                 <input
@@ -218,10 +218,10 @@ export default function OnboardingClientePage() {
                   value={maskCnpj(s1.cnpj)}
                   onChange={(e) => setS1({ ...s1, cnpj: e.target.value })}
                   placeholder="00.000.000/0000-00"
-                  className="w-full px-3 py-2 bg-page border border-line rounded-lg text-sm text-tx-strong outline-none focus:border-indigo-500/50 font-mono"
+                  className="w-full px-3 py-2 bg-[#0f1117] border border-[#1e2740] rounded-lg text-sm text-white outline-none focus:border-indigo-500/50 font-mono"
                 />
                 {lookingUp && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-acao animate-spin" />
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-400 animate-spin" />
                 )}
               </div>
             </Field>
@@ -229,7 +229,7 @@ export default function OnboardingClientePage() {
               <input
                 value={s1.name}
                 onChange={(e) => setS1({ ...s1, name: e.target.value })}
-                className="w-full px-3 py-2 bg-page border border-line rounded-lg text-sm text-tx-strong outline-none focus:border-indigo-500/50"
+                className="w-full px-3 py-2 bg-[#0f1117] border border-[#1e2740] rounded-lg text-sm text-white outline-none focus:border-indigo-500/50"
               />
             </Field>
             <div className="grid grid-cols-2 gap-3">
@@ -238,14 +238,14 @@ export default function OnboardingClientePage() {
                   type="email"
                   value={s1.email}
                   onChange={(e) => setS1({ ...s1, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-page border border-line rounded-lg text-sm text-tx-strong outline-none focus:border-indigo-500/50"
+                  className="w-full px-3 py-2 bg-[#0f1117] border border-[#1e2740] rounded-lg text-sm text-white outline-none focus:border-indigo-500/50"
                 />
               </Field>
               <Field label="Telefone">
                 <input
                   value={s1.phone}
                   onChange={(e) => setS1({ ...s1, phone: e.target.value })}
-                  className="w-full px-3 py-2 bg-page border border-line rounded-lg text-sm text-tx-strong outline-none focus:border-indigo-500/50"
+                  className="w-full px-3 py-2 bg-[#0f1117] border border-[#1e2740] rounded-lg text-sm text-white outline-none focus:border-indigo-500/50"
                 />
               </Field>
             </div>
@@ -253,7 +253,7 @@ export default function OnboardingClientePage() {
               <input
                 value={s1.address}
                 onChange={(e) => setS1({ ...s1, address: e.target.value })}
-                className="w-full px-3 py-2 bg-page border border-line rounded-lg text-sm text-tx-strong outline-none focus:border-indigo-500/50"
+                className="w-full px-3 py-2 bg-[#0f1117] border border-[#1e2740] rounded-lg text-sm text-white outline-none focus:border-indigo-500/50"
               />
             </Field>
           </>
@@ -261,8 +261,8 @@ export default function OnboardingClientePage() {
 
         {step === 2 && (
           <>
-            <h2 className="text-sm font-medium text-tx-strong">Regime tributário</h2>
-            <p className="text-xs text-tx-muted">Define o calendário fiscal automático que o sistema vai gerar.</p>
+            <h2 className="text-sm font-medium text-white">Regime tributário</h2>
+            <p className="text-xs text-gray-500">Define o calendário fiscal automático que o sistema vai gerar.</p>
             <div className="grid grid-cols-2 gap-2">
               {(['MEI', 'SIMPLES_NACIONAL', 'LUCRO_PRESUMIDO', 'LUCRO_REAL'] as Regime[]).map((r) => (
                 <button
@@ -270,12 +270,12 @@ export default function OnboardingClientePage() {
                   onClick={() => setS2({ ...s2, taxRegime: r })}
                   className={`text-left p-3 rounded-lg border transition-colors ${
                     s2.taxRegime === r
-                      ? 'border-indigo-500/50 bg-indigo-600/15 text-tx-strong'
-                      : 'border-line bg-page text-tx hover:border-indigo-500/30'
+                      ? 'border-indigo-500/50 bg-indigo-600/15 text-white'
+                      : 'border-[#1e2740] bg-[#0f1117] text-gray-300 hover:border-indigo-500/30'
                   }`}
                 >
                   <p className="text-sm font-medium">{r.replace('_', ' ')}</p>
-                  <p className="text-xs text-tx-muted mt-1">{
+                  <p className="text-xs text-gray-500 mt-1">{
                     r === 'MEI' ? 'Até R$ 81.000/ano · 1 funcionário'
                     : r === 'SIMPLES_NACIONAL' ? 'Até R$ 4.8M/ano · DAS unificado'
                     : r === 'LUCRO_PRESUMIDO' ? 'Até R$ 78M/ano · base presumida'
@@ -285,10 +285,10 @@ export default function OnboardingClientePage() {
               ))}
             </div>
             {s2.cnae && (
-              <div className="p-3 bg-page border border-line rounded-lg">
-                <p className="text-xs text-tx-muted">CNAE principal (da Receita)</p>
-                <p className="text-sm text-tx font-mono">{s2.cnae}</p>
-                {s2.atividade && <p className="text-xs text-tx-muted mt-1">{s2.atividade}</p>}
+              <div className="p-3 bg-[#0f1117] border border-[#1e2740] rounded-lg">
+                <p className="text-xs text-gray-500">CNAE principal (da Receita)</p>
+                <p className="text-sm text-gray-200 font-mono">{s2.cnae}</p>
+                {s2.atividade && <p className="text-xs text-gray-400 mt-1">{s2.atividade}</p>}
               </div>
             )}
           </>
@@ -296,8 +296,8 @@ export default function OnboardingClientePage() {
 
         {step === 3 && (
           <>
-            <h2 className="text-sm font-medium text-tx-strong">Quadro societário</h2>
-            <p className="text-xs text-tx-muted">Sócios e percentuais — usado em distribuição de lucros e pro-labore.</p>
+            <h2 className="text-sm font-medium text-white">Quadro societário</h2>
+            <p className="text-xs text-gray-500">Sócios e percentuais — usado em distribuição de lucros e pro-labore.</p>
             {s3.socios.map((so, i) => (
               <div key={i} className="grid grid-cols-12 gap-2 items-start">
                 <div className="col-span-5">
@@ -309,7 +309,7 @@ export default function OnboardingClientePage() {
                       copy[i] = { ...so, nome: e.target.value };
                       setS3({ socios: copy });
                     }}
-                    className="w-full px-3 py-2 bg-page border border-line rounded-lg text-xs text-tx-strong outline-none focus:border-indigo-500/50"
+                    className="w-full px-3 py-2 bg-[#0f1117] border border-[#1e2740] rounded-lg text-xs text-white outline-none focus:border-indigo-500/50"
                   />
                 </div>
                 <div className="col-span-3">
@@ -321,7 +321,7 @@ export default function OnboardingClientePage() {
                       copy[i] = { ...so, cpf: e.target.value };
                       setS3({ socios: copy });
                     }}
-                    className="w-full px-3 py-2 bg-page border border-line rounded-lg text-xs text-tx-strong outline-none focus:border-indigo-500/50 font-mono"
+                    className="w-full px-3 py-2 bg-[#0f1117] border border-[#1e2740] rounded-lg text-xs text-white outline-none focus:border-indigo-500/50 font-mono"
                   />
                 </div>
                 <div className="col-span-2">
@@ -336,7 +336,7 @@ export default function OnboardingClientePage() {
                       copy[i] = { ...so, percentual: Number(e.target.value) };
                       setS3({ socios: copy });
                     }}
-                    className="w-full px-3 py-2 bg-page border border-line rounded-lg text-xs text-tx-strong outline-none focus:border-indigo-500/50 font-mono text-right"
+                    className="w-full px-3 py-2 bg-[#0f1117] border border-[#1e2740] rounded-lg text-xs text-white outline-none focus:border-indigo-500/50 font-mono text-right"
                   />
                 </div>
                 <div className="col-span-2 flex items-center gap-1">
@@ -347,7 +347,7 @@ export default function OnboardingClientePage() {
                       copy[i] = { ...so, funcao: e.target.value };
                       setS3({ socios: copy });
                     }}
-                    className="w-full px-2 py-2 bg-page border border-line rounded-lg text-xs text-tx-strong outline-none focus:border-indigo-500/50"
+                    className="w-full px-2 py-2 bg-[#0f1117] border border-[#1e2740] rounded-lg text-xs text-white outline-none focus:border-indigo-500/50"
                   >
                     <option>Administrador</option>
                     <option>Sócio</option>
@@ -356,7 +356,7 @@ export default function OnboardingClientePage() {
                   {s3.socios.length > 1 && (
                     <button
                       onClick={() => setS3({ socios: s3.socios.filter((_, j) => j !== i) })}
-                      className="text-err hover:opacity-80 text-xs"
+                      className="text-red-400 hover:text-red-300 text-xs"
                     >
                       ✕
                     </button>
@@ -366,11 +366,11 @@ export default function OnboardingClientePage() {
             ))}
             <button
               onClick={() => setS3({ socios: [...s3.socios, { nome: '', cpf: '', percentual: 0, funcao: 'Sócio' }] })}
-              className="text-xs text-acao hover:opacity-80"
+              className="text-xs text-indigo-400 hover:text-indigo-300"
             >
               + Adicionar sócio
             </button>
-            <p className="text-xs text-tx-faint mt-2">
+            <p className="text-xs text-gray-600 mt-2">
               Total de participação: {s3.socios.reduce((a, b) => a + b.percentual, 0)}%
             </p>
           </>
@@ -378,9 +378,9 @@ export default function OnboardingClientePage() {
 
         {step === 4 && (
           <>
-            <h2 className="text-sm font-medium text-tx-strong">Acessos e certificados</h2>
+            <h2 className="text-sm font-medium text-white">Acessos e certificados</h2>
             <div className="space-y-3">
-              <label className="flex items-start gap-3 p-3 bg-page border border-line rounded-lg cursor-pointer">
+              <label className="flex items-start gap-3 p-3 bg-[#0f1117] border border-[#1e2740] rounded-lg cursor-pointer">
                 <input
                   type="checkbox"
                   checked={s4.hasA1}
@@ -388,15 +388,15 @@ export default function OnboardingClientePage() {
                   className="mt-0.5"
                 />
                 <div>
-                  <p className="text-sm text-tx-strong">Cliente já tem certificado digital A1</p>
-                  <p className="text-xs text-tx-muted mt-0.5">
+                  <p className="text-sm text-white">Cliente já tem certificado digital A1</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
                     Marca se o cliente já comprou A1 (Soluti, Certisign, etc). Você sobe o .pfx depois em Empresas → Certificado.
                   </p>
                 </div>
               </label>
 
               <div>
-                <p className="text-xs text-tx-muted mb-2">Bancos do cliente (vai criar conexões em /banking):</p>
+                <p className="text-xs text-gray-400 mb-2">Bancos do cliente (vai criar conexões em /banking):</p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { code: '341', name: 'Itaú' },
@@ -425,11 +425,11 @@ export default function OnboardingClientePage() {
                         }
                         className={`text-left p-2 rounded-lg border text-xs ${
                           sel
-                            ? 'border-indigo-500/50 bg-indigo-600/15 text-tx-strong'
-                            : 'border-line bg-page text-tx hover:border-indigo-500/30'
+                            ? 'border-indigo-500/50 bg-indigo-600/15 text-white'
+                            : 'border-[#1e2740] bg-[#0f1117] text-gray-300 hover:border-indigo-500/30'
                         }`}
                       >
-                        <span className="font-mono text-tx-muted mr-2">{b.code}</span>
+                        <span className="font-mono text-gray-500 mr-2">{b.code}</span>
                         {b.name}
                       </button>
                     );
@@ -442,7 +442,7 @@ export default function OnboardingClientePage() {
 
         {step === 5 && (
           <>
-            <h2 className="text-sm font-medium text-tx-strong">Revisão final</h2>
+            <h2 className="text-sm font-medium text-white">Revisão final</h2>
             <div className="space-y-3">
               <Review label="CNPJ" value={maskCnpj(s1.cnpj)} />
               <Review label="Razão social" value={s1.name} />
@@ -453,24 +453,24 @@ export default function OnboardingClientePage() {
             </div>
 
             <div className="p-4 bg-indigo-500/5 border border-indigo-500/30 rounded-lg mt-4">
-              <p className="text-xs font-medium text-acao mb-2">O sistema vai executar:</p>
-              <ul className="text-xs text-tx space-y-1">
+              <p className="text-xs font-medium text-indigo-300 mb-2">O sistema vai executar:</p>
+              <ul className="text-xs text-gray-300 space-y-1">
                 <li>✓ Criar registro da empresa</li>
                 <li>✓ Popular plano de contas (~95 contas brasileiras PCASP)</li>
                 <li>✓ Gerar calendário fiscal {new Date().getFullYear()} ({s2.taxRegime === 'MEI' ? '37' : s2.taxRegime === 'SIMPLES_NACIONAL' ? '37' : '94'} obrigações)</li>
                 {s4.bancos.length > 0 && <li>✓ Cadastrar {s4.bancos.length} conexão(ões) bancária(s)</li>}
-                <li className="text-tx-muted">○ Você pode subir o A1 e configurar portal do cliente depois</li>
+                <li className="text-gray-500">○ Você pode subir o A1 e configurar portal do cliente depois</li>
               </ul>
             </div>
 
             {progress.length > 0 && (
               <div className="mt-4 space-y-1.5">
                 {progress.map((p, i) => (
-                  <div key={i} className="text-xs text-tx font-mono flex items-center gap-2">
+                  <div key={i} className="text-xs text-gray-300 font-mono flex items-center gap-2">
                     {i === progress.length - 1 && creating ? (
-                      <Loader2 className="h-3 w-3 animate-spin text-acao" />
+                      <Loader2 className="h-3 w-3 animate-spin text-indigo-400" />
                     ) : (
-                      <CheckCircle2 className="h-3 w-3 text-ok" />
+                      <CheckCircle2 className="h-3 w-3 text-emerald-400" />
                     )}
                     {p}
                   </div>
@@ -486,7 +486,7 @@ export default function OnboardingClientePage() {
         <button
           onClick={() => setStep((s) => Math.max(1, s - 1))}
           disabled={step === 1 || creating}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-inset hover:bg-card disabled:opacity-50 text-tx-strong rounded-lg"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#1e2740] hover:bg-[#2a3550] disabled:opacity-50 text-white rounded-lg"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
           Voltar
@@ -518,7 +518,7 @@ export default function OnboardingClientePage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-xs text-tx-muted mb-1">{label}</span>
+      <span className="block text-xs text-gray-400 mb-1">{label}</span>
       {children}
     </label>
   );
@@ -527,8 +527,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Review({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between text-xs">
-      <span className="text-tx-muted">{label}</span>
-      <span className="text-tx font-medium">{value || '—'}</span>
+      <span className="text-gray-500">{label}</span>
+      <span className="text-gray-200 font-medium">{value || '—'}</span>
     </div>
   );
 }

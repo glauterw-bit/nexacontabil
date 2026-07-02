@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { Workflow, Loader2, FileCheck, RefreshCw, ChevronRight, ChevronLeft, CheckCircle2, AlertCircle } from 'lucide-react';
-import { PageHeader, COLORS, tint } from '@/components/ui/kit';
+import { PageHeader, COLORS } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -83,17 +83,17 @@ export default function FluxoPage() {
           </button>
         )}
       </div>
-      {msg && <div style={{ marginBottom: 12, padding: 10, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontSize: 13, color: 'var(--tx)' }}>{msg}</div>}
+      {msg && <div style={{ marginBottom: 12, padding: 10, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontSize: 13, color: '#cbd5e1' }}>{msg}</div>}
 
       {loading ? <div style={{ textAlign: 'center', padding: 60 }}><Loader2 size={32} className="animate-spin" /></div> : (
         <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 12 }}>
           {colunas.map((col: any, ci: number) => (
             <div key={col.key} style={{ minWidth: 260, flex: '0 0 260px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: '8px 8px 0 0', background: tint(col.cor, 13), borderTop: `2px solid ${col.cor}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: '8px 8px 0 0', background: `${col.cor}22`, borderTop: `2px solid ${col.cor}` }}>
                 <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{col.label}</span>
                 <span style={{ fontSize: 12, color: COLORS.muted, background: COLORS.surface2, borderRadius: 10, padding: '1px 8px' }}>{col.cards.length}</span>
               </div>
-              <div style={{ background: COLORS.surface2, minHeight: 120, padding: 6, borderRadius: '0 0 8px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ background: '#0d1119', minHeight: 120, padding: 6, borderRadius: '0 0 8px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {col.cards.map((c: any) => (
                   <div key={c.companyId} style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: '8px 10px' }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{c.nome}</div>
@@ -105,9 +105,9 @@ export default function FluxoPage() {
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
                       <button onClick={() => ci > 0 && mover(c.companyId, colunas[ci - 1].key)} disabled={ci === 0}
-                        style={{ padding: 2, border: 'none', background: 'transparent', color: ci === 0 ? COLORS.faint : COLORS.muted, cursor: ci === 0 ? 'default' : 'pointer' }}><ChevronLeft size={16} /></button>
+                        style={{ padding: 2, border: 'none', background: 'transparent', color: ci === 0 ? '#334155' : COLORS.muted, cursor: ci === 0 ? 'default' : 'pointer' }}><ChevronLeft size={16} /></button>
                       <button onClick={() => ci < colunas.length - 1 && mover(c.companyId, colunas[ci + 1].key)} disabled={ci === colunas.length - 1}
-                        style={{ padding: 2, border: 'none', background: 'transparent', color: ci === colunas.length - 1 ? COLORS.faint : COLORS.acao, cursor: ci === colunas.length - 1 ? 'default' : 'pointer' }}><ChevronRight size={16} /></button>
+                        style={{ padding: 2, border: 'none', background: 'transparent', color: ci === colunas.length - 1 ? '#334155' : COLORS.acao, cursor: ci === colunas.length - 1 ? 'default' : 'pointer' }}><ChevronRight size={16} /></button>
                     </div>
                   </div>
                 ))}
