@@ -70,8 +70,8 @@ export default function ExportarDominioPage() {
   if (!selectedCompany) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-gray-600" />
-        <p className="text-gray-400 text-sm">Selecione uma empresa.</p>
+        <Building2 className="h-12 w-12 text-tx-faint" />
+        <p className="text-tx-muted text-sm">Selecione uma empresa.</p>
         <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">Gerenciar</Link>
       </div>
     );
@@ -81,25 +81,25 @@ export default function ExportarDominioPage() {
     <div className="p-6 md:p-8 max-w-4xl space-y-5">
       <div>
         <div className="flex items-center gap-2 mb-0.5">
-          <FileDown className="h-5 w-5 text-indigo-400" />
-          <h1 className="text-xl font-semibold text-white">Exportar para o Domínio</h1>
-          <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded">Sem API</span>
+          <FileDown className="h-5 w-5 text-acao" />
+          <h1 className="text-xl font-semibold text-tx-strong">Exportar para o Domínio</h1>
+          <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-amber-500/15 text-warn border border-amber-500/30 rounded">Sem API</span>
         </div>
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-tx-muted">
           Gera o arquivo de importação de lançamentos contábeis do {selectedCompany.name}. No Domínio:
-          <span className="text-gray-300"> Utilitários → Importar → Lançamentos</span> e selecione o arquivo baixado.
+          <span className="text-tx"> Utilitários → Importar → Lançamentos</span> e selecione o arquivo baixado.
         </p>
       </div>
 
-      <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5 space-y-4">
+      <div className="rounded-xl border border-line bg-card p-5 space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1.5 uppercase tracking-wider">Competência</label>
+            <label className="block text-xs text-tx-muted mb-1.5 uppercase tracking-wider">Competência</label>
             <input type="month" value={mesAno} onChange={(e) => setMesAno(e.target.value)} disabled={todos}
-              className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2.5 text-white text-sm outline-none focus:border-indigo-500 disabled:opacity-40" />
+              className="w-full bg-inset border border-line rounded-lg px-3 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500 disabled:opacity-40" />
           </div>
           <div className="flex items-end">
-            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-tx cursor-pointer">
               <input type="checkbox" checked={todos} onChange={(e) => setTodos(e.target.checked)} className="accent-indigo-500" />
               Exportar todos os lançamentos aprovados
             </label>
@@ -107,29 +107,29 @@ export default function ExportarDominioPage() {
         </div>
 
         <details className="group">
-          <summary className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-white">
+          <summary className="flex items-center gap-2 text-xs text-tx-muted cursor-pointer hover:text-tx-strong">
             <Settings2 className="h-3.5 w-3.5" /> Layout do arquivo (ajuste se o seu Domínio usar outro formato)
           </summary>
           <div className="grid grid-cols-3 gap-3 mt-3 pl-1">
             <div>
-              <label className="block text-[11px] text-gray-500 mb-1">Separador</label>
-              <select value={separator} onChange={(e) => setSeparator(e.target.value)} className="w-full bg-[#0f1117] border border-[#1e2740] rounded px-2 py-1.5 text-white text-sm">
+              <label className="block text-[11px] text-tx-muted mb-1">Separador</label>
+              <select value={separator} onChange={(e) => setSeparator(e.target.value)} className="w-full bg-inset border border-line rounded px-2 py-1.5 text-tx-strong text-sm">
                 <option value=";">; (ponto-vírgula)</option>
                 <option value="|">| (pipe)</option>
                 <option value={'\t'}>Tab</option>
               </select>
             </div>
             <div>
-              <label className="block text-[11px] text-gray-500 mb-1">Data</label>
-              <select value={dateFormat} onChange={(e) => setDateFormat(e.target.value as any)} className="w-full bg-[#0f1117] border border-[#1e2740] rounded px-2 py-1.5 text-white text-sm">
+              <label className="block text-[11px] text-tx-muted mb-1">Data</label>
+              <select value={dateFormat} onChange={(e) => setDateFormat(e.target.value as any)} className="w-full bg-inset border border-line rounded px-2 py-1.5 text-tx-strong text-sm">
                 <option value="DD/MM/YYYY">DD/MM/AAAA</option>
                 <option value="DDMMYYYY">DDMMAAAA</option>
                 <option value="YYYY-MM-DD">AAAA-MM-DD</option>
               </select>
             </div>
             <div>
-              <label className="block text-[11px] text-gray-500 mb-1">Decimal</label>
-              <select value={decimalSep} onChange={(e) => setDecimalSep(e.target.value as any)} className="w-full bg-[#0f1117] border border-[#1e2740] rounded px-2 py-1.5 text-white text-sm">
+              <label className="block text-[11px] text-tx-muted mb-1">Decimal</label>
+              <select value={decimalSep} onChange={(e) => setDecimalSep(e.target.value as any)} className="w-full bg-inset border border-line rounded px-2 py-1.5 text-tx-strong text-sm">
                 <option value=",">vírgula (1234,56)</option>
                 <option value=".">ponto (1234.56)</option>
               </select>
@@ -145,12 +145,12 @@ export default function ExportarDominioPage() {
       </div>
 
       {result && (
-        <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5 space-y-4">
+        <div className="rounded-xl border border-line bg-card p-5 space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Stat label="Lançamentos" value={result.totalTransacoes} />
-            <Stat label="Exportados" value={result.transacoesExportadas} color="text-emerald-400" />
-            <Stat label="Linhas geradas" value={result.totalLinhas} color="text-indigo-400" />
-            <Stat label="Avisos" value={result.avisos?.length ?? 0} color={result.avisos?.length ? 'text-amber-400' : 'text-gray-400'} />
+            <Stat label="Exportados" value={result.transacoesExportadas} color="text-ok" />
+            <Stat label="Linhas geradas" value={result.totalLinhas} color="text-acao" />
+            <Stat label="Avisos" value={result.avisos?.length ?? 0} color={result.avisos?.length ? 'text-warn' : 'text-tx-muted'} />
           </div>
 
           {result.totalLinhas > 0 && (
@@ -161,8 +161,8 @@ export default function ExportarDominioPage() {
 
           {result.conteudo && (
             <div>
-              <p className="text-xs text-gray-500 mb-1.5">Prévia (primeiras linhas)</p>
-              <pre className="bg-[#0f1117] border border-[#1e2740] rounded-lg p-3 text-[11px] text-gray-300 overflow-x-auto max-h-48">
+              <p className="text-xs text-tx-muted mb-1.5">Prévia (primeiras linhas)</p>
+              <pre className="bg-inset border border-line rounded-lg p-3 text-[11px] text-tx overflow-x-auto max-h-48">
 {result.conteudo.split('\n').slice(0, 15).join('\n')}
               </pre>
             </div>
@@ -170,17 +170,17 @@ export default function ExportarDominioPage() {
 
           {result.avisos?.length > 0 && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-              <p className="text-xs font-medium text-amber-300 mb-1.5 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5" /> Avisos ({result.avisos.length})</p>
+              <p className="text-xs font-medium text-warn mb-1.5 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5" /> Avisos ({result.avisos.length})</p>
               <ul className="space-y-0.5">
-                {result.avisos.slice(0, 8).map((a: string, i: number) => <li key={i} className="text-[11px] text-amber-200/80">• {a}</li>)}
+                {result.avisos.slice(0, 8).map((a: string, i: number) => <li key={i} className="text-[11px] text-warn">• {a}</li>)}
               </ul>
             </div>
           )}
 
           {result.totalLinhas > 0 && (
-            <div className="flex items-start gap-2 text-xs text-gray-400 border-t border-[#1e2740] pt-3">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-              <span>Arquivo em ANSI (Windows-1252), pronto pro Domínio. Importe em <span className="text-gray-300">Utilitários → Importar → Lançamentos</span>.</span>
+            <div className="flex items-start gap-2 text-xs text-tx-muted border-t border-line pt-3">
+              <CheckCircle2 className="h-4 w-4 text-ok flex-shrink-0 mt-0.5" />
+              <span>Arquivo em ANSI (Windows-1252), pronto pro Domínio. Importe em <span className="text-tx">Utilitários → Importar → Lançamentos</span>.</span>
             </div>
           )}
         </div>
@@ -189,10 +189,10 @@ export default function ExportarDominioPage() {
   );
 }
 
-function Stat({ label, value, color = 'text-white' }: { label: string; value: number; color?: string }) {
+function Stat({ label, value, color = 'text-tx-strong' }: { label: string; value: number; color?: string }) {
   return (
-    <div className="rounded-lg border border-[#1e2740] bg-[#0f1117] p-3 text-center">
-      <p className="text-[11px] text-gray-500 mb-0.5">{label}</p>
+    <div className="rounded-lg border border-line bg-inset p-3 text-center">
+      <p className="text-[11px] text-tx-muted mb-0.5">{label}</p>
       <p className={`text-xl font-bold ${color}`}>{value}</p>
     </div>
   );

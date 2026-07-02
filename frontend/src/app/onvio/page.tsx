@@ -93,19 +93,19 @@ export default function OnvioPage() {
     <div className="p-6 md:p-8 max-w-4xl space-y-6">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <Cloud className="h-5 w-5 text-indigo-400" />
-          <h1 className="text-xl font-semibold text-white">Integração Onvio</h1>
-          <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 rounded">
+          <Cloud className="h-5 w-5 text-acao" />
+          <h1 className="text-xl font-semibold text-tx-strong">Integração Onvio</h1>
+          <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-indigo-500/15 text-acao border border-indigo-500/30 rounded">
             Thomson Reuters
           </span>
         </div>
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-tx-muted">
           Envio automático de NF, baixas de parcelas e rubricas de folha para o Domínio via Onvio.
         </p>
       </div>
 
       {loading && !status ? (
-        <div className="text-center py-20 text-sm text-gray-500 flex items-center justify-center gap-2">
+        <div className="text-center py-20 text-sm text-tx-muted flex items-center justify-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando status…
         </div>
       ) : status?.connected ? (
@@ -121,10 +121,10 @@ function NotConnectedView({ onConnect, connecting }: { onConnect: () => void; co
   return (
     <>
       <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 flex gap-3">
-        <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+        <AlertTriangle className="h-4 w-4 text-warn flex-shrink-0 mt-0.5" />
         <div className="flex-1">
-          <p className="text-sm font-medium text-white">Onvio ainda não conectado</p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-sm font-medium text-tx-strong">Onvio ainda não conectado</p>
+          <p className="text-xs text-tx-muted mt-1">
             Para integrar com o Domínio do escritório, conecte sua conta Onvio. As funcionalidades
             disponíveis dependem do que está habilitado no painel Onvio do escritório (ex: "Nota fiscal
             e Baixa de parcelas — Envio e consulta", "Lançamentos de Rubricas — Envio").
@@ -132,22 +132,22 @@ function NotConnectedView({ onConnect, connecting }: { onConnect: () => void; co
         </div>
       </div>
 
-      <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5">
-        <h2 className="text-sm font-medium text-white mb-3">Pré-requisitos</h2>
-        <ol className="space-y-2 text-sm text-gray-300">
+      <div className="rounded-xl border border-line bg-card p-5">
+        <h2 className="text-sm font-medium text-tx-strong mb-3">Pré-requisitos</h2>
+        <ol className="space-y-2 text-sm text-tx">
           <li className="flex gap-2">
-            <span className="text-indigo-400 font-mono text-xs">1.</span>
-            Ter conta ativa no <span className="font-medium text-white">Onvio</span> (Thomson Reuters).
+            <span className="text-acao font-mono text-xs">1.</span>
+            Ter conta ativa no <span className="font-medium text-tx-strong">Onvio</span> (Thomson Reuters).
           </li>
           <li className="flex gap-2">
-            <span className="text-indigo-400 font-mono text-xs">2.</span>
+            <span className="text-acao font-mono text-xs">2.</span>
             Solicitar credenciais OAuth no Portal Onvio → "Plataforma de Integração" — variáveis
-            <code className="mx-1 px-1.5 py-0.5 bg-[#0f1117] rounded text-xs">ONVIO_CLIENT_ID</code>
-            e <code className="mx-1 px-1.5 py-0.5 bg-[#0f1117] rounded text-xs">ONVIO_CLIENT_SECRET</code>
+            <code className="mx-1 px-1.5 py-0.5 bg-inset rounded text-xs">ONVIO_CLIENT_ID</code>
+            e <code className="mx-1 px-1.5 py-0.5 bg-inset rounded text-xs">ONVIO_CLIENT_SECRET</code>
             configuradas no servidor.
           </li>
           <li className="flex gap-2">
-            <span className="text-indigo-400 font-mono text-xs">3.</span>
+            <span className="text-acao font-mono text-xs">3.</span>
             Habilitar no painel Onvio as funcionalidades que deseja usar (NF/Baixas/Rubricas).
           </li>
         </ol>
@@ -177,15 +177,15 @@ function ConnectedView({ status, onDisconnect, onRefresh }: {
       <div className={`rounded-xl border p-4 flex gap-3 ${
         expirado ? 'border-amber-500/30 bg-amber-500/5' : 'border-emerald-500/30 bg-emerald-500/5'
       }`}>
-        <CheckCircle2 className={`h-5 w-5 flex-shrink-0 mt-0.5 ${expirado ? 'text-amber-400' : 'text-emerald-400'}`} />
+        <CheckCircle2 className={`h-5 w-5 flex-shrink-0 mt-0.5 ${expirado ? 'text-warn' : 'text-ok'}`} />
         <div className="flex-1">
-          <p className="text-sm font-medium text-white">Onvio conectado</p>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-sm font-medium text-tx-strong">Onvio conectado</p>
+          <p className="text-xs text-tx-muted mt-0.5">
             {status.onvioEmail ?? 'conta sem e-mail identificado'}
             {status.onvioTenantId && ` · tenant ${status.onvioTenantId}`}
           </p>
           {expira && (
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-tx-muted mt-1">
               Token {expirado ? 'expirou' : `expira em`} {expira.toLocaleString('pt-BR')}
               {!expirado && ' (será renovado automaticamente)'}
             </p>
@@ -194,13 +194,13 @@ function ConnectedView({ status, onDisconnect, onRefresh }: {
         <div className="flex gap-2">
           <button
             onClick={onRefresh}
-            className="px-2.5 py-1.5 text-xs bg-[#1e2740] hover:bg-[#2a3550] text-white rounded inline-flex items-center gap-1.5"
+            className="px-2.5 py-1.5 text-xs bg-inset hover:bg-card border border-line text-tx-strong rounded inline-flex items-center gap-1.5"
           >
             <RefreshCw className="h-3.5 w-3.5" /> Atualizar
           </button>
           <button
             onClick={onDisconnect}
-            className="px-2.5 py-1.5 text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded inline-flex items-center gap-1.5"
+            className="px-2.5 py-1.5 text-xs bg-rose-500/10 hover:bg-rose-500/20 text-err border border-rose-500/30 rounded inline-flex items-center gap-1.5"
           >
             <Unplug className="h-3.5 w-3.5" /> Desconectar
           </button>
@@ -229,11 +229,11 @@ function ConnectedView({ status, onDisconnect, onRefresh }: {
       </div>
 
       {status.scopes && (
-        <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4">
-          <p className="text-xs uppercase tracking-wider text-gray-500 font-medium mb-2">Scopes autorizados</p>
+        <div className="rounded-xl border border-line bg-card p-4">
+          <p className="text-xs uppercase tracking-wider text-tx-muted font-medium mb-2">Scopes autorizados</p>
           <div className="flex flex-wrap gap-1.5">
             {status.scopes.split(/\s+/).filter(Boolean).map(s => (
-              <span key={s} className="px-2 py-0.5 text-xs bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 rounded">
+              <span key={s} className="px-2 py-0.5 text-xs bg-indigo-500/15 text-acao border border-indigo-500/30 rounded">
                 {s}
               </span>
             ))}
@@ -242,34 +242,34 @@ function ConnectedView({ status, onDisconnect, onRefresh }: {
       )}
 
       {status.lastSyncAt && (
-        <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4">
-          <p className="text-xs uppercase tracking-wider text-gray-500 font-medium mb-2">Último envio</p>
+        <div className="rounded-xl border border-line bg-card p-4">
+          <p className="text-xs uppercase tracking-wider text-tx-muted font-medium mb-2">Último envio</p>
           <div className="flex items-center justify-between text-sm">
             <div>
-              <p className="text-white">{new Date(status.lastSyncAt).toLocaleString('pt-BR')}</p>
+              <p className="text-tx-strong">{new Date(status.lastSyncAt).toLocaleString('pt-BR')}</p>
               {status.syncStats && (
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-tx-muted mt-0.5">
                   {Object.entries(status.syncStats).map(([k, v]) => `${k}: ${v}`).join(' · ')}
                 </p>
               )}
             </div>
             <span className={`text-xs px-2 py-0.5 rounded-full ${
-              status.lastSyncStatus === 'ok' ? 'bg-emerald-400/10 text-emerald-400'
-              : status.lastSyncStatus === 'partial' ? 'bg-amber-400/10 text-amber-400'
-              : 'bg-rose-400/10 text-rose-400'
+              status.lastSyncStatus === 'ok' ? 'bg-emerald-400/10 text-ok'
+              : status.lastSyncStatus === 'partial' ? 'bg-amber-400/10 text-warn'
+              : 'bg-rose-400/10 text-err'
             }`}>
               {status.lastSyncStatus}
             </span>
           </div>
           {status.lastSyncError && (
-            <p className="text-xs text-rose-400 mt-2 font-mono">{status.lastSyncError}</p>
+            <p className="text-xs text-err mt-2 font-mono">{status.lastSyncError}</p>
           )}
         </div>
       )}
 
       <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4 flex gap-2">
-        <Info className="h-4 w-4 text-indigo-400 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-gray-300 leading-relaxed">
+        <Info className="h-4 w-4 text-acao flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-tx leading-relaxed">
           O envio automático acontece quando NF/boletos/holerites são criados ou marcados como pagos.
           Também é possível disparar manualmente em cada tela. O Domínio é a fonte oficial — Onvio é o
           canal de entrega.
@@ -281,13 +281,13 @@ function ConnectedView({ status, onDisconnect, onRefresh }: {
 
 function FeatureCard({ icon: Icon, title, desc, endpoint }: any) {
   return (
-    <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4 hover:border-indigo-500/30 transition-colors">
+    <div className="rounded-xl border border-line bg-card p-4 hover:border-indigo-500/30 transition-colors">
       <div className="flex items-center gap-2 mb-2">
-        <Icon className="h-4 w-4 text-indigo-400" />
-        <h3 className="text-sm font-medium text-white">{title}</h3>
+        <Icon className="h-4 w-4 text-acao" />
+        <h3 className="text-sm font-medium text-tx-strong">{title}</h3>
       </div>
-      <p className="text-xs text-gray-400 leading-relaxed mb-2">{desc}</p>
-      <code className="text-[10px] text-gray-500 font-mono break-all">{endpoint}</code>
+      <p className="text-xs text-tx-muted leading-relaxed mb-2">{desc}</p>
+      <code className="text-[10px] text-tx-muted font-mono break-all">{endpoint}</code>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { ClipboardCheck, Loader2, FileX, ArrowDownCircle, AlertTriangle, Building2, IdCard, Copy, Check } from 'lucide-react';
-import { PageHeader, Kpi, Card, SectionTitle, COLORS } from '@/components/ui/kit';
+import { PageHeader, Kpi, Card, SectionTitle, COLORS, tint } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -58,7 +58,7 @@ export default function SolicitacoesPage() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 18 }}>
         {FILTROS.map((f) => (
           <button key={f.k} onClick={() => setFiltro(f.k)}
-            style={{ padding: '6px 12px', borderRadius: 20, border: `1px solid ${filtro === f.k ? COLORS.acao : COLORS.border}`, background: filtro === f.k ? `${COLORS.acao}22` : COLORS.surface2, color: filtro === f.k ? COLORS.acao : COLORS.muted, fontSize: 12, cursor: 'pointer' }}>
+            style={{ padding: '6px 12px', borderRadius: 20, border: `1px solid ${filtro === f.k ? COLORS.acao : COLORS.border}`, background: filtro === f.k ? tint(COLORS.acao, 13) : COLORS.surface2, color: filtro === f.k ? COLORS.acao : COLORS.muted, fontSize: 12, cursor: 'pointer' }}>
             {f.label}
           </button>
         ))}
@@ -75,7 +75,7 @@ export default function SolicitacoesPage() {
                 {c.pendencias.map((p: any, i: number) => {
                   const Icon = ICO[p.tipo] ?? AlertTriangle;
                   return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 7, fontSize: 13, color: '#cbd5e1' }}>
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 7, fontSize: 13, color: 'var(--tx)' }}>
                       <Icon size={14} color={PRIO[p.prioridade]} style={{ marginTop: 2, flexShrink: 0 }} /> {p.texto}
                     </div>
                   );

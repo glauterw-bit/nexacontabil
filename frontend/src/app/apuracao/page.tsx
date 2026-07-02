@@ -52,7 +52,7 @@ export default function ApuracaoPage() {
               <div style={{ flex: 1 }}>Regime</div><div style={{ width: 130, textAlign: 'right' }}>Receita</div><div style={{ width: 120, textAlign: 'right' }}>ICMS</div><div style={{ width: 120, textAlign: 'right' }}>PIS+COFINS</div><div style={{ width: 70, textAlign: 'right' }}>Notas</div>
             </div>
             {ov.porRegime.map((r: any) => (
-              <div key={r.regime} style={{ display: 'flex', fontSize: 13, padding: '6px 4px', borderTop: '1px solid #1a1f2b' }}>
+              <div key={r.regime} style={{ display: 'flex', fontSize: 13, padding: '6px 4px', borderTop: '1px solid var(--border-soft)' }}>
                 <div style={{ flex: 1, fontWeight: 600 }}>{r.regime}</div>
                 <div style={{ width: 130, textAlign: 'right' }}>{BRL(r.receita)}</div>
                 <div style={{ width: 120, textAlign: 'right', color: COLORS.acao }}>{BRL(r.icms)}</div>

@@ -79,42 +79,42 @@ export default function EsteiraFiscalPage() {
     <div className="p-6 md:p-8 max-w-5xl space-y-5">
       <div>
         <div className="flex items-center gap-2 mb-0.5">
-          <Workflow className="h-5 w-5 text-indigo-400" />
-          <h1 className="text-xl font-semibold text-white">Esteira Fiscal Automática</h1>
-          <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 rounded">Auto</span>
+          <Workflow className="h-5 w-5 text-acao" />
+          <h1 className="text-xl font-semibold text-tx-strong">Esteira Fiscal Automática</h1>
+          <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-indigo-500/15 text-acao border border-indigo-500/30 rounded">Auto</span>
         </div>
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-tx-muted">
           Varre uma pasta do Drive, identifica o cliente de cada documento pelo CNPJ, valida a tributação
           contra o Banco de NCM e envia o relatório por e-mail + WhatsApp.
         </p>
       </div>
 
       {/* Painel de execução */}
-      <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5 space-y-4">
+      <div className="rounded-xl border border-line bg-card p-5 space-y-4">
         {conns.length === 0 ? (
           <div className="text-center py-6">
-            <FolderOpen className="h-8 w-8 mx-auto text-gray-600 mb-2" />
-            <p className="text-sm text-gray-400">Nenhum Google Drive conectado.</p>
-            <a href="/drive-conectado" className="text-indigo-400 hover:underline text-sm">Conectar Drive →</a>
+            <FolderOpen className="h-8 w-8 mx-auto text-tx-faint mb-2" />
+            <p className="text-sm text-tx-muted">Nenhum Google Drive conectado.</p>
+            <a href="/drive-conectado" className="text-acao hover:underline text-sm">Conectar Drive →</a>
           </div>
         ) : (
           <>
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-gray-500 mb-1.5 uppercase tracking-wider">Conexão Drive</label>
+                <label className="block text-xs text-tx-muted mb-1.5 uppercase tracking-wider">Conexão Drive</label>
                 <select value={connectionId} onChange={(e) => setConnectionId(e.target.value)}
-                  className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2.5 text-white text-sm outline-none focus:border-indigo-500">
+                  className="w-full bg-inset border border-line rounded-lg px-3 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500">
                   {conns.map((c) => <option key={c.id} value={c.id}>{c.label} · {c.accountEmail}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1.5 uppercase tracking-wider">ID da pasta (opcional)</label>
+                <label className="block text-xs text-tx-muted mb-1.5 uppercase tracking-wider">ID da pasta (opcional)</label>
                 <input value={folderId} onChange={(e) => setFolderId(e.target.value)} placeholder="vazio = pasta raiz da conexão"
-                  className="w-full bg-[#0f1117] border border-[#1e2740] rounded-lg px-3 py-2.5 text-white text-sm outline-none focus:border-indigo-500 placeholder-gray-600" />
+                  className="w-full bg-inset border border-line rounded-lg px-3 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500 placeholder-tx-faint" />
               </div>
             </div>
             <div className="flex items-center justify-between flex-wrap gap-3">
-              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-tx cursor-pointer">
                 <input type="checkbox" checked={enviar} onChange={(e) => setEnviar(e.target.checked)} className="accent-indigo-500" />
                 Enviar relatórios automaticamente (e-mail + WhatsApp)
               </label>
@@ -129,27 +129,27 @@ export default function EsteiraFiscalPage() {
       </div>
 
       {/* Histórico */}
-      <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5">
+      <div className="rounded-xl border border-line bg-card p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-white">Execuções recentes</h2>
-          <button onClick={loadExecucoes} className="text-gray-500 hover:text-white"><RefreshCw className="h-4 w-4" /></button>
+          <h2 className="text-sm font-medium text-tx-strong">Execuções recentes</h2>
+          <button onClick={loadExecucoes} className="text-tx-muted hover:text-tx-strong"><RefreshCw className="h-4 w-4" /></button>
         </div>
         {execucoes.length === 0 ? (
-          <p className="text-xs text-gray-500 text-center py-6">Nenhuma execução ainda.</p>
+          <p className="text-xs text-tx-muted text-center py-6">Nenhuma execução ainda.</p>
         ) : (
           <div className="space-y-2">
             {execucoes.map((e) => (
               <button key={e.id} onClick={() => abrirDetalhe(e.id)}
-                className="w-full flex items-center gap-3 p-3 rounded border border-[#1e2740] bg-[#0f1117] hover:border-indigo-500/40 text-left">
+                className="w-full flex items-center gap-3 p-3 rounded border border-line bg-inset hover:border-indigo-500/40 text-left">
                 <StatusBadge status={e.status} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white truncate">{e.folderName ?? 'Pasta'} · {e.totalArquivos} arquivos</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm text-tx-strong truncate">{e.folderName ?? 'Pasta'} · {e.totalArquivos} arquivos</p>
+                  <p className="text-xs text-tx-muted">
                     {e.roteados} roteados · {e.naoRoteados} sem cliente · {e.comInconsistencia} c/ inconsistência · {e.relatoriosEnviados} relatórios
                   </p>
                 </div>
-                <span className="text-[11px] text-gray-600">{new Date(e.createdAt).toLocaleString('pt-BR')}</span>
-                <ChevronRight className="h-4 w-4 text-gray-600" />
+                <span className="text-[11px] text-tx-faint">{new Date(e.createdAt).toLocaleString('pt-BR')}</span>
+                <ChevronRight className="h-4 w-4 text-tx-faint" />
               </button>
             ))}
           </div>
@@ -163,10 +163,10 @@ export default function EsteiraFiscalPage() {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { c: string; t: string }> = {
-    concluido: { c: 'bg-emerald-500/15 text-emerald-400', t: 'OK' },
-    parcial: { c: 'bg-amber-500/15 text-amber-400', t: 'Parcial' },
-    erro: { c: 'bg-red-500/15 text-red-400', t: 'Erro' },
-    rodando: { c: 'bg-blue-500/15 text-blue-400', t: 'Rodando' },
+    concluido: { c: 'bg-emerald-500/15 text-ok', t: 'OK' },
+    parcial: { c: 'bg-amber-500/15 text-warn', t: 'Parcial' },
+    erro: { c: 'bg-red-500/15 text-err', t: 'Erro' },
+    rodando: { c: 'bg-blue-500/15 text-info', t: 'Rodando' },
   };
   const s = map[status] ?? map.rodando;
   return <span className={`px-2 py-0.5 text-[10px] rounded ${s.c} flex-shrink-0`}>{s.t}</span>;
@@ -176,29 +176,29 @@ function DetalheModal({ detalhe, onClose }: { detalhe: any; onClose: () => void 
   const itens = detalhe.itens ?? [];
   const envios = detalhe.envios ?? [];
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-[#0f1117] border border-[#1e2740] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-[rgba(13,17,25,0.45)] backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-card border border-line rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-pop" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">Detalhe da execução</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white"><X className="h-5 w-5" /></button>
+          <h2 className="text-lg font-semibold text-tx-strong">Detalhe da execução</h2>
+          <button onClick={onClose} className="text-tx-muted hover:text-tx-strong"><X className="h-5 w-5" /></button>
         </div>
 
         <div className="mb-4">
-          <h3 className="text-xs uppercase text-gray-500 mb-2">Documentos roteados</h3>
+          <h3 className="text-xs uppercase text-tx-muted mb-2">Documentos roteados</h3>
           <div className="space-y-1.5">
             {itens.map((it: any, i: number) => (
-              <div key={i} className="p-2.5 rounded border border-[#1e2740] bg-[#161b2e]">
+              <div key={i} className="p-2.5 rounded border border-line bg-inset">
                 <div className="flex items-center gap-2">
-                  <FileText className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
-                  <span className="text-sm text-white truncate flex-1">{it.nome}</span>
+                  <FileText className="h-3.5 w-3.5 text-tx-muted flex-shrink-0" />
+                  <span className="text-sm text-tx-strong truncate flex-1">{it.nome}</span>
                   {it.roteado
-                    ? <span className="text-[10px] text-emerald-400 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{it.companyName}</span>
-                    : <span className="text-[10px] text-red-400">sem cliente</span>}
+                    ? <span className="text-[10px] text-ok flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{it.companyName}</span>
+                    : <span className="text-[10px] text-err">sem cliente</span>}
                 </div>
                 {it.inconsistencias?.length > 0 && (
                   <div className="mt-1.5 pl-5 space-y-0.5">
                     {it.inconsistencias.map((inc: string, j: number) => (
-                      <p key={j} className="text-[11px] text-amber-400 flex items-start gap-1">
+                      <p key={j} className="text-[11px] text-warn flex items-start gap-1">
                         <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />{inc}
                       </p>
                     ))}
@@ -211,13 +211,13 @@ function DetalheModal({ detalhe, onClose }: { detalhe: any; onClose: () => void 
 
         {envios.length > 0 && (
           <div>
-            <h3 className="text-xs uppercase text-gray-500 mb-2">Relatórios enviados</h3>
+            <h3 className="text-xs uppercase text-tx-muted mb-2">Relatórios enviados</h3>
             <div className="space-y-1.5">
               {envios.map((e: any) => (
-                <div key={e.id} className="flex items-center gap-2 p-2.5 rounded border border-[#1e2740] bg-[#161b2e]">
-                  {e.canal === 'email' ? <Mail className="h-3.5 w-3.5 text-indigo-400" /> : <MessageCircle className="h-3.5 w-3.5 text-green-400" />}
-                  <span className="text-sm text-gray-300 flex-1 truncate">{e.destino}</span>
-                  <span className={`text-[10px] ${e.status === 'enviado' ? 'text-emerald-400' : 'text-red-400'}`}>{e.status}</span>
+                <div key={e.id} className="flex items-center gap-2 p-2.5 rounded border border-line bg-inset">
+                  {e.canal === 'email' ? <Mail className="h-3.5 w-3.5 text-acao" /> : <MessageCircle className="h-3.5 w-3.5 text-ok" />}
+                  <span className="text-sm text-tx flex-1 truncate">{e.destino}</span>
+                  <span className={`text-[10px] ${e.status === 'enviado' ? 'text-ok' : 'text-err'}`}>{e.status}</span>
                 </div>
               ))}
             </div>

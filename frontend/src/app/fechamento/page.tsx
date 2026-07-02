@@ -116,8 +116,8 @@ export default function FechamentoPage() {
   if (!selectedCompany) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-gray-600" />
-        <p className="text-gray-400 text-sm">Selecione uma empresa.</p>
+        <Building2 className="h-12 w-12 text-tx-faint" />
+        <p className="text-tx-muted text-sm">Selecione uma empresa.</p>
         <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">Gerenciar</Link>
       </div>
     );
@@ -133,10 +133,10 @@ export default function FechamentoPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-2 mb-0.5">
-            <CalendarCheck className="h-5 w-5 text-indigo-400" />
-            <h1 className="text-xl font-semibold text-white">Fechamento mensal</h1>
+            <CalendarCheck className="h-5 w-5 text-acao" />
+            <h1 className="text-xl font-semibold text-tx-strong">Fechamento mensal</h1>
           </div>
-          <p className="text-sm text-gray-400">{selectedCompany.name}</p>
+          <p className="text-sm text-tx-muted">{selectedCompany.name}</p>
         </div>
         <input
           type="month"
@@ -145,47 +145,47 @@ export default function FechamentoPage() {
             const [y, m] = e.target.value.split('-').map(Number);
             setAno(y); setMes(m);
           }}
-          className="px-3 py-1.5 bg-[#161b2e] border border-[#1e2740] rounded-lg text-xs text-white outline-none focus:border-indigo-500/50"
+          className="px-3 py-1.5 bg-card border border-line rounded-lg text-xs text-tx-strong outline-none focus:border-indigo-500/50"
         />
       </div>
 
       {/* Header com status */}
       {loading ? (
-        <div className="text-sm text-gray-500 flex items-center gap-2">
+        <div className="text-sm text-tx-muted flex items-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
         </div>
       ) : closing ? (
         <>
-          <div className={`rounded-xl border p-5 ${isClosed ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-[#1e2740] bg-[#161b2e]'}`}>
+          <div className={`rounded-xl border p-5 ${isClosed ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-line bg-card'}`}>
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   {isClosed ? (
-                    <Lock className="h-4 w-4 text-emerald-400" />
+                    <Lock className="h-4 w-4 text-ok" />
                   ) : (
-                    <Unlock className="h-4 w-4 text-amber-400" />
+                    <Unlock className="h-4 w-4 text-warn" />
                   )}
-                  <h2 className="text-sm font-medium text-white">
+                  <h2 className="text-sm font-medium text-tx-strong">
                     {MESES[mes - 1]} de {ano} ·{' '}
-                    <span className={isClosed ? 'text-emerald-300' : 'text-amber-300'}>
+                    <span className={isClosed ? 'text-ok' : 'text-warn'}>
                       {closing.status === 'fechado' ? 'Fechado' : closing.status === 'reaberto' ? 'Reaberto' : 'Em andamento'}
                     </span>
                   </h2>
                 </div>
                 {isClosed ? (
                   <>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-tx-muted">
                       Fechado em {closing.closedAt && new Date(closing.closedAt).toLocaleString('pt-BR')} por <strong>{closing.closedBy}</strong>
                     </p>
                     {closing.hash && (
-                      <p className="text-[10px] text-gray-600 font-mono mt-1 flex items-center gap-1">
+                      <p className="text-[10px] text-tx-faint font-mono mt-1 flex items-center gap-1">
                         <Hash className="h-2.5 w-2.5" />
                         {closing.hash.slice(0, 32)}…
                       </p>
                     )}
                   </>
                 ) : (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-tx-muted">
                     Checklist: {done}/{total} concluído ({pct}%)
                   </p>
                 )}
@@ -215,7 +215,7 @@ export default function FechamentoPage() {
 
             {/* Progress bar */}
             {!isClosed && total > 0 && (
-              <div className="mt-4 h-2 bg-[#0f1117] rounded-full overflow-hidden">
+              <div className="mt-4 h-2 bg-inset rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all"
                   style={{ width: `${pct}%` }}
@@ -225,29 +225,29 @@ export default function FechamentoPage() {
           </div>
 
           {/* Checklist */}
-          <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5">
-            <h3 className="text-sm font-medium text-white mb-3">Checklist do fechamento</h3>
+          <div className="rounded-xl border border-line bg-card p-5">
+            <h3 className="text-sm font-medium text-tx-strong mb-3">Checklist do fechamento</h3>
             <div className="space-y-2">
               {(closing.checklist ?? []).map((item) => (
                 <Link
                   key={item.key}
                   href={item.href ?? '#'}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-[#1e2740] bg-[#0f1117] hover:border-indigo-500/30 transition-colors"
+                  className="flex items-center gap-3 p-3 rounded-lg border border-line bg-inset hover:border-indigo-500/30 transition-colors"
                 >
                   {item.done ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-ok flex-shrink-0" />
                   ) : (
-                    <Circle className="h-4 w-4 text-gray-600 flex-shrink-0" />
+                    <Circle className="h-4 w-4 text-tx-faint flex-shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${item.done ? 'text-white' : 'text-gray-300'}`}>{item.label}</p>
+                    <p className={`text-sm ${item.done ? 'text-tx-strong' : 'text-tx'}`}>{item.label}</p>
                     {item.detail && (
-                      <p className={`text-xs ${item.done ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
+                      <p className={`text-xs ${item.done ? 'text-ok' : 'text-warn/80'}`}>
                         {item.detail}
                       </p>
                     )}
                   </div>
-                  <ChevronRight className="h-3.5 w-3.5 text-gray-600" />
+                  <ChevronRight className="h-3.5 w-3.5 text-tx-faint" />
                 </Link>
               ))}
             </div>
@@ -256,13 +256,13 @@ export default function FechamentoPage() {
           {closing.reopenedMotivo && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
               <div className="flex gap-3">
-                <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="h-4 w-4 text-warn flex-shrink-0 mt-0.5" />
                 <div className="text-xs">
-                  <p className="font-medium text-white">Este período foi reaberto</p>
-                  <p className="text-gray-400 mt-1">
+                  <p className="font-medium text-tx-strong">Este período foi reaberto</p>
+                  <p className="text-tx-muted mt-1">
                     Em {closing.reopenedAt && new Date(closing.reopenedAt).toLocaleString('pt-BR')} por <strong>{closing.reopenedBy}</strong>.
                   </p>
-                  <p className="text-gray-300 mt-2">Motivo: {closing.reopenedMotivo}</p>
+                  <p className="text-tx mt-2">Motivo: {closing.reopenedMotivo}</p>
                 </div>
               </div>
             </div>
@@ -272,11 +272,11 @@ export default function FechamentoPage() {
 
       {/* Histórico */}
       {history.length > 0 && (
-        <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5">
-          <h3 className="text-sm font-medium text-white mb-3">Histórico</h3>
+        <div className="rounded-xl border border-line bg-card p-5">
+          <h3 className="text-sm font-medium text-tx-strong mb-3">Histórico</h3>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-gray-500 border-b border-[#1e2740]">
+              <tr className="text-left text-xs text-tx-muted border-b border-line">
                 <th className="pb-2 font-medium">Período</th>
                 <th className="pb-2 font-medium">Status</th>
                 <th className="pb-2 font-medium">Fechado por</th>
@@ -284,24 +284,24 @@ export default function FechamentoPage() {
                 <th className="pb-2 font-medium">Hash</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1e2740]">
+            <tbody className="divide-y divide-line">
               {history.map((h) => (
-                <tr key={h.id} className="hover:bg-white/5">
-                  <td className="py-2 text-gray-200">{String(h.mes).padStart(2, '0')}/{h.ano}</td>
+                <tr key={h.id} className="hover:bg-inset">
+                  <td className="py-2 text-tx">{String(h.mes).padStart(2, '0')}/{h.ano}</td>
                   <td className="py-2">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      h.status === 'fechado' ? 'bg-emerald-500/15 text-emerald-300' :
-                      h.status === 'reaberto' ? 'bg-amber-500/15 text-amber-300' :
-                      'bg-gray-500/15 text-gray-300'
+                      h.status === 'fechado' ? 'bg-emerald-500/15 text-ok' :
+                      h.status === 'reaberto' ? 'bg-amber-500/15 text-warn' :
+                      'bg-gray-500/15 text-tx'
                     }`}>
                       {h.status}
                     </span>
                   </td>
-                  <td className="py-2 text-xs text-gray-400">{h.closedBy ?? '—'}</td>
-                  <td className="py-2 text-xs text-gray-400">
+                  <td className="py-2 text-xs text-tx-muted">{h.closedBy ?? '—'}</td>
+                  <td className="py-2 text-xs text-tx-muted">
                     {h.closedAt ? new Date(h.closedAt).toLocaleDateString('pt-BR') : '—'}
                   </td>
-                  <td className="py-2 text-[10px] text-gray-600 font-mono">
+                  <td className="py-2 text-[10px] text-tx-faint font-mono">
                     {h.hash ? h.hash.slice(0, 12) + '…' : '—'}
                   </td>
                 </tr>

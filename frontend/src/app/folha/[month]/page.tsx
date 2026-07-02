@@ -130,8 +130,8 @@ export default function FolhaDetalhesMesPage() {
   if (!selectedCompany) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-gray-600" />
-        <p className="text-gray-400 text-sm">Selecione uma empresa.</p>
+        <Building2 className="h-12 w-12 text-tx-faint" />
+        <p className="text-tx-muted text-sm">Selecione uma empresa.</p>
         <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
       </div>
     );
@@ -143,16 +143,16 @@ export default function FolhaDetalhesMesPage() {
         <div className="flex items-center gap-4">
           <Link href="/folha" className="btn-ghost p-2"><ArrowLeft className="h-4 w-4" /></Link>
           <div>
-            <h1 className="text-2xl font-bold text-white">Folha de Pagamento — {titulo}</h1>
-            <p className="text-gray-400 text-sm mt-1">{selectedCompany.name} · {payslips.length} holerites</p>
+            <h1 className="text-2xl font-bold text-tx-strong">Folha de Pagamento — {titulo}</h1>
+            <p className="text-tx-muted text-sm mt-1">{selectedCompany.name} · {payslips.length} holerites</p>
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={calculateAllMissing} disabled={calculating} className="btn-ghost text-sm border border-[#1e2740] inline-flex items-center gap-1.5">
+          <button onClick={calculateAllMissing} disabled={calculating} className="btn-ghost text-sm border border-line inline-flex items-center gap-1.5">
             {calculating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}
             Calcular faltantes
           </button>
-          <button className="btn-ghost text-sm border border-[#1e2740]">
+          <button className="btn-ghost text-sm border border-line">
             <Download className="h-4 w-4" /> PDF
           </button>
           <button onClick={aprovarTodos} className="btn-primary text-sm">
@@ -163,14 +163,14 @@ export default function FolhaDetalhesMesPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: 'Total Bruto', value: totalBruto, color: 'text-white' },
-          { label: 'INSS', value: totalInss, color: 'text-orange-400' },
-          { label: 'IRRF', value: totalIrrf, color: 'text-red-400' },
+          { label: 'Total Bruto', value: totalBruto, color: 'text-tx-strong' },
+          { label: 'INSS', value: totalInss, color: 'text-warn' },
+          { label: 'IRRF', value: totalIrrf, color: 'text-err' },
           { label: 'FGTS', value: totalFgts, color: 'text-purple-400' },
-          { label: 'Líquido', value: totalLiquido, color: 'text-green-400' },
+          { label: 'Líquido', value: totalLiquido, color: 'text-ok' },
         ].map(t => (
           <div key={t.label} className="card-aura text-center">
-            <p className="text-xs text-gray-500 mb-1">{t.label}</p>
+            <p className="text-xs text-tx-muted mb-1">{t.label}</p>
             <p className={`text-lg font-bold ${t.color}`}>{Number(t.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
           </div>
         ))}
@@ -178,56 +178,56 @@ export default function FolhaDetalhesMesPage() {
 
       <div className="card-aura overflow-x-auto">
         {loading && payslips.length === 0 ? (
-          <div className="text-center py-12 text-sm text-gray-500 flex items-center justify-center gap-2">
+          <div className="text-center py-12 text-sm text-tx-muted flex items-center justify-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Carregando holerites…
           </div>
         ) : payslips.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-400 text-sm mb-3">Nenhum holerite calculado para {titulo}.</p>
+            <p className="text-tx-muted text-sm mb-3">Nenhum holerite calculado para {titulo}.</p>
             <button onClick={calculateAllMissing} disabled={calculating || allEmployees.length === 0} className="btn-primary inline-flex items-center gap-2">
               <Calculator className="h-4 w-4" />
               Calcular folha do mês
             </button>
             {allEmployees.length === 0 && (
-              <p className="text-xs text-gray-600 mt-3">
-                Nenhum colaborador cadastrado. <Link href="/folha/colaboradores" className="text-indigo-400 hover:underline">Cadastrar →</Link>
+              <p className="text-xs text-tx-faint mt-3">
+                Nenhum colaborador cadastrado. <Link href="/folha/colaboradores" className="text-acao hover:underline">Cadastrar →</Link>
               </p>
             )}
           </div>
         ) : (
           <table className="w-full min-w-[800px]">
             <thead>
-              <tr className="text-left text-xs text-gray-500 border-b border-[#1e2740]">
+              <tr className="text-left text-xs text-tx-muted border-b border-line">
                 <th className="pb-3 font-medium">Funcionário</th>
-                <th className="pb-3 font-medium text-right">Bruto</th>
-                <th className="pb-3 font-medium text-right">INSS</th>
-                <th className="pb-3 font-medium text-right">IRRF</th>
-                <th className="pb-3 font-medium text-right">FGTS</th>
-                <th className="pb-3 font-medium text-right">H.Ex.</th>
-                <th className="pb-3 font-medium text-right">Líquido</th>
+                <th className="pb-3 font-medium text-right num">Bruto</th>
+                <th className="pb-3 font-medium text-right num">INSS</th>
+                <th className="pb-3 font-medium text-right num">IRRF</th>
+                <th className="pb-3 font-medium text-right num">FGTS</th>
+                <th className="pb-3 font-medium text-right num">H.Ex.</th>
+                <th className="pb-3 font-medium text-right num">Líquido</th>
                 <th className="pb-3 font-medium text-center">Status</th>
                 <th className="pb-3 font-medium text-center"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1e2740]">
+            <tbody className="divide-y divide-line">
               {payslips.map((p: any) => (
                 <Fragment key={p.id}>
-                  <tr className="hover:bg-white/5 transition-colors">
+                  <tr className="hover:bg-inset transition-colors">
                     <td className="py-3">
-                      <p className="text-white text-sm font-medium">{p.employee?.name ?? p.employeeId}</p>
-                      <p className="text-gray-500 text-xs">{p.employee?.role}</p>
+                      <p className="text-tx-strong text-sm font-medium">{p.employee?.name ?? p.employeeId}</p>
+                      <p className="text-tx-muted text-xs">{p.employee?.role}</p>
                     </td>
-                    <td className="py-3 text-sm text-right font-mono text-white">{Number(p.grossSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                    <td className="py-3 text-sm text-right font-mono text-orange-400">{Number(p.inssEmployee).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                    <td className="py-3 text-sm text-right font-mono text-red-400">{Number(p.irrf).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    <td className="py-3 text-sm text-right font-mono text-tx-strong">{Number(p.grossSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    <td className="py-3 text-sm text-right font-mono text-warn">{Number(p.inssEmployee).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    <td className="py-3 text-sm text-right font-mono text-err">{Number(p.irrf).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                     <td className="py-3 text-sm text-right font-mono text-purple-400">{Number(p.fgts).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                    <td className="py-3 text-sm text-right font-mono text-blue-400">{p.overtimeHours > 0 ? `${p.overtimeHours}h` : '—'}</td>
-                    <td className="py-3 text-sm text-right font-mono text-green-400 font-semibold">{Number(p.netSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    <td className="py-3 text-sm text-right font-mono text-info">{p.overtimeHours > 0 ? `${p.overtimeHours}h` : '—'}</td>
+                    <td className="py-3 text-sm text-right font-mono text-ok font-semibold">{Number(p.netSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                     <td className="py-3 text-center">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
                         p.status === 'approved' || p.status === 'paid'
-                          ? 'bg-green-400/10 text-green-400'
-                          : 'bg-yellow-400/10 text-yellow-400'
+                          ? 'bg-green-400/10 text-ok'
+                          : 'bg-yellow-400/10 text-warn'
                       }`}>
                         {p.status === 'approved' ? 'Aprovado' : p.status === 'paid' ? 'Pago' : 'Pendente'}
                       </span>
@@ -240,25 +240,25 @@ export default function FolhaDetalhesMesPage() {
                   </tr>
                   {expanded === p.id && (
                     <tr>
-                      <td colSpan={9} className="bg-[#0f1117] px-4 py-4">
+                      <td colSpan={9} className="bg-inset px-4 py-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                           <div className="space-y-2">
-                            <p className="text-gray-500 text-xs font-medium uppercase tracking-wide">Proventos</p>
-                            <div className="flex justify-between"><span className="text-gray-400">Salário Base</span><span className="text-white font-mono">{Number(p.baseSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
-                            {p.overtimeValue > 0 && <div className="flex justify-between"><span className="text-gray-400">Horas Extras ({p.overtimeHours}h)</span><span className="text-blue-400 font-mono">+{Number(p.overtimeValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
-                            {p.bonuses > 0 && <div className="flex justify-between"><span className="text-gray-400">Bonificações</span><span className="text-green-400 font-mono">+{Number(p.bonuses).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
+                            <p className="text-tx-muted text-xs font-medium uppercase tracking-wide">Proventos</p>
+                            <div className="flex justify-between"><span className="text-tx-muted">Salário Base</span><span className="text-tx-strong font-mono">{Number(p.baseSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                            {p.overtimeValue > 0 && <div className="flex justify-between"><span className="text-tx-muted">Horas Extras ({p.overtimeHours}h)</span><span className="text-info font-mono">+{Number(p.overtimeValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
+                            {p.bonuses > 0 && <div className="flex justify-between"><span className="text-tx-muted">Bonificações</span><span className="text-ok font-mono">+{Number(p.bonuses).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
                           </div>
                           <div className="space-y-2">
-                            <p className="text-gray-500 text-xs font-medium uppercase tracking-wide">Descontos</p>
-                            <div className="flex justify-between"><span className="text-gray-400">INSS</span><span className="text-orange-400 font-mono">-{Number(p.inssEmployee).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
-                            <div className="flex justify-between"><span className="text-gray-400">IRRF</span><span className="text-red-400 font-mono">-{Number(p.irrf).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
-                            {p.otherDeductions > 0 && <div className="flex justify-between"><span className="text-gray-400">Outros</span><span className="text-red-400 font-mono">-{Number(p.otherDeductions).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
+                            <p className="text-tx-muted text-xs font-medium uppercase tracking-wide">Descontos</p>
+                            <div className="flex justify-between"><span className="text-tx-muted">INSS</span><span className="text-warn font-mono">-{Number(p.inssEmployee).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                            <div className="flex justify-between"><span className="text-tx-muted">IRRF</span><span className="text-err font-mono">-{Number(p.irrf).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                            {p.otherDeductions > 0 && <div className="flex justify-between"><span className="text-tx-muted">Outros</span><span className="text-err font-mono">-{Number(p.otherDeductions).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
                           </div>
                           <div className="space-y-2">
-                            <p className="text-gray-500 text-xs font-medium uppercase tracking-wide">Encargos Patronais</p>
-                            <div className="flex justify-between"><span className="text-gray-400">FGTS (8%)</span><span className="text-purple-400 font-mono">{Number(p.fgts).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
-                            <div className="flex justify-between"><span className="text-gray-400">INSS Patronal</span><span className="text-purple-400 font-mono">{Number(p.inssEmployer).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
-                            <div className="flex justify-between pt-2 border-t border-[#1e2740]"><span className="text-gray-300 font-medium">Custo Total</span><span className="text-white font-mono font-semibold">{(Number(p.grossSalary) + Number(p.fgts) + Number(p.inssEmployer)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                            <p className="text-tx-muted text-xs font-medium uppercase tracking-wide">Encargos Patronais</p>
+                            <div className="flex justify-between"><span className="text-tx-muted">FGTS (8%)</span><span className="text-purple-400 font-mono">{Number(p.fgts).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                            <div className="flex justify-between"><span className="text-tx-muted">INSS Patronal</span><span className="text-purple-400 font-mono">{Number(p.inssEmployer).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                            <div className="flex justify-between pt-2 border-t border-line"><span className="text-tx font-medium">Custo Total</span><span className="text-tx-strong font-mono font-semibold">{(Number(p.grossSalary) + Number(p.fgts) + Number(p.inssEmployer)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
                           </div>
                         </div>
                       </td>
@@ -266,15 +266,15 @@ export default function FolhaDetalhesMesPage() {
                   )}
                 </Fragment>
               ))}
-              <tr className="bg-[#161b2e]/50 font-semibold">
-                <td className="py-3 text-sm text-gray-300">TOTAIS</td>
-                <td className="py-3 text-sm text-right font-mono text-white">{totalBruto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                <td className="py-3 text-sm text-right font-mono text-orange-400">{totalInss.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                <td className="py-3 text-sm text-right font-mono text-red-400">{totalIrrf.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+              <tr className="bg-inset font-semibold">
+                <td className="py-3 text-sm text-tx">TOTAIS</td>
+                <td className="py-3 text-sm text-right font-mono text-tx-strong">{totalBruto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td className="py-3 text-sm text-right font-mono text-warn">{totalInss.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td className="py-3 text-sm text-right font-mono text-err">{totalIrrf.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                 <td className="py-3 text-sm text-right font-mono text-purple-400">{totalFgts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                 <td></td>
-                <td className="py-3 text-sm text-right font-mono text-green-400">{totalLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                <td colSpan={2} className="py-3 text-xs text-right text-gray-500">+ INSS patronal: {totalInssEmpresa.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td className="py-3 text-sm text-right font-mono text-ok">{totalLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td colSpan={2} className="py-3 text-xs text-right text-tx-muted">+ INSS patronal: {totalInssEmpresa.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
               </tr>
             </tbody>
           </table>
@@ -283,8 +283,8 @@ export default function FolhaDetalhesMesPage() {
 
       {anomalias.length > 0 && (
         <div className="card-aura">
-          <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
-            <Brain className="h-4 w-4 text-indigo-400" />
+          <h3 className="text-base font-semibold text-tx-strong mb-4 flex items-center gap-2">
+            <Brain className="h-4 w-4 text-acao" />
             Análise de IA — Anomalias Detectadas
           </h3>
           <div className="space-y-3">
@@ -294,10 +294,10 @@ export default function FolhaDetalhesMesPage() {
                 : a.tipo === 'ok' ? 'bg-green-400/5 border-green-400/20'
                 : 'bg-blue-400/5 border-blue-400/20'
               }`}>
-                {a.tipo === 'warning' ? <AlertTriangle className="h-4 w-4 text-yellow-400 flex-shrink-0 mt-0.5" />
-                  : a.tipo === 'ok' ? <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0 mt-0.5" />
-                  : <Brain className="h-4 w-4 text-blue-400 flex-shrink-0 mt-0.5" />}
-                <p className={`text-sm ${a.tipo === 'warning' ? 'text-yellow-200' : a.tipo === 'ok' ? 'text-green-200' : 'text-blue-200'}`}>{a.msg}</p>
+                {a.tipo === 'warning' ? <AlertTriangle className="h-4 w-4 text-warn flex-shrink-0 mt-0.5" />
+                  : a.tipo === 'ok' ? <CheckCircle className="h-4 w-4 text-ok flex-shrink-0 mt-0.5" />
+                  : <Brain className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />}
+                <p className={`text-sm ${a.tipo === 'warning' ? 'text-warn' : a.tipo === 'ok' ? 'text-ok' : 'text-info'}`}>{a.msg}</p>
               </div>
             ))}
           </div>

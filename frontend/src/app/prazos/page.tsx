@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { CalendarClock, Loader2, AlertTriangle } from 'lucide-react';
+import { tint } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -22,22 +23,22 @@ export default function PrazosPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8' }}><Loader2 size={32} className="animate-spin" /></div>;
+  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}><Loader2 size={32} className="animate-spin" /></div>;
   const hoje = new Date().toISOString().slice(0, 10);
   const maxTotal = Math.max(1, ...(data?.timeline ?? []).map((d: any) => d.tipos.reduce((s: number, t: any) => s + t.total, 0)));
 
   return (
     <div style={{ maxWidth: 1050, margin: '0 auto', padding: 24 }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <CalendarClock size={24} color="#6366f1" /> Mapa de Prazos & SLA
+        <CalendarClock size={24} color="var(--acao)" /> Mapa de Prazos & SLA
       </h1>
-      <p style={{ color: '#94a3b8', marginTop: 4 }}>Todas as obrigações da carteira na linha do tempo, com alerta de atraso.</p>
+      <p style={{ color: 'var(--muted)', marginTop: 4 }}>Todas as obrigações da carteira na linha do tempo, com alerta de atraso.</p>
 
       <div style={{ display: 'flex', gap: 14, marginTop: 20, flexWrap: 'wrap' }}>
-        <Stat label="Obrigações" value={data?.total} cor="#e2e8f0" />
-        <Stat label="Atrasadas" value={data?.atrasadas} cor="#ef4444" />
-        <Stat label="Vencem em 7 dias" value={data?.proximas7dias} cor="#f59e0b" />
-        <Stat label="Entregues" value={data?.entregues} cor="#10b981" />
+        <Stat label="Obrigações" value={data?.total} cor="var(--tx-strong)" />
+        <Stat label="Atrasadas" value={data?.atrasadas} cor="var(--erro)" />
+        <Stat label="Vencem em 7 dias" value={data?.proximas7dias} cor="var(--atencao)" />
+        <Stat label="Entregues" value={data?.entregues} cor="var(--ok)" />
       </div>
 
       <h2 style={{ fontSize: 16, fontWeight: 600, marginTop: 28, marginBottom: 12 }}>Linha do tempo</h2>
@@ -46,16 +47,16 @@ export default function PrazosPage() {
         const atras = d.tipos.reduce((s: number, t: any) => s + t.atrasadas, 0);
         const isHoje = d.data === hoje;
         return (
-          <div key={d.data} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid #1a1f2b' }}>
-            <div style={{ width: 110, fontSize: 13, color: isHoje ? '#6366f1' : '#94a3b8', fontWeight: isHoje ? 700 : 400 }}>
+          <div key={d.data} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--border-soft)' }}>
+            <div style={{ width: 110, fontSize: 13, color: isHoje ? 'var(--acao)' : 'var(--muted)', fontWeight: isHoje ? 700 : 400 }}>
               {diaBR(d.data)}{isHoje ? ' • hoje' : ''}
             </div>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ height: 22, width: `${(total / maxTotal) * 100}%`, minWidth: 40, background: atras ? '#ef444433' : '#6366f133', border: `1px solid ${atras ? '#ef4444' : '#6366f1'}`, borderRadius: 6, display: 'flex', alignItems: 'center', paddingLeft: 8, fontSize: 11, color: '#cbd5e1' }}>
+              <div style={{ height: 22, width: `${(total / maxTotal) * 100}%`, minWidth: 40, background: atras ? tint('var(--erro)', 20) : tint('var(--acao)', 20), border: `1px solid ${atras ? 'var(--erro)' : 'var(--acao)'}`, borderRadius: 6, display: 'flex', alignItems: 'center', paddingLeft: 8, fontSize: 11, color: 'var(--tx)' }}>
                 {total}
               </div>
-              <span style={{ fontSize: 11, color: '#64748b' }}>{d.tipos.map((t: any) => t.type).join(' · ')}</span>
-              {atras > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#ef4444' }}><AlertTriangle size={12} /> {atras}</span>}
+              <span style={{ fontSize: 11, color: 'var(--faint)' }}>{d.tipos.map((t: any) => t.type).join(' · ')}</span>
+              {atras > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--erro)' }}><AlertTriangle size={12} /> {atras}</span>}
             </div>
           </div>
         );
@@ -64,9 +65,9 @@ export default function PrazosPage() {
       <h2 style={{ fontSize: 16, fontWeight: 600, marginTop: 28, marginBottom: 12 }}>Por tipo</h2>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         {(data?.porTipo ?? []).map((t: any) => (
-          <div key={t.type} style={{ background: '#161b27', border: '1px solid #2a3142', borderRadius: 10, padding: '10px 14px' }}>
+          <div key={t.type} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontWeight: 600 }}>{t.type}</div>
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>{t.total} total{t.atrasadas ? ` · ${t.atrasadas} atrasadas` : ''}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t.total} total{t.atrasadas ? ` · ${t.atrasadas} atrasadas` : ''}</div>
           </div>
         ))}
       </div>
@@ -76,8 +77,8 @@ export default function PrazosPage() {
 
 function Stat({ label, value, cor }: { label: string; value: any; cor: string }) {
   return (
-    <div style={{ flex: '1 1 150px', background: '#161b27', border: '1px solid #2a3142', borderRadius: 12, padding: 16 }}>
-      <div style={{ fontSize: 12, color: '#64748b' }}>{label}</div>
+    <div style={{ flex: '1 1 150px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+      <div style={{ fontSize: 12, color: 'var(--faint)' }}>{label}</div>
       <div style={{ fontSize: 26, fontWeight: 700, color: cor, marginTop: 4 }}>{value ?? 0}</div>
     </div>
   );

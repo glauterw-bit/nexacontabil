@@ -45,35 +45,35 @@ export default function VisaoGeralPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2 mb-0.5">
-            <LayoutGrid className="h-5 w-5 text-indigo-400" />
-            <h1 className="text-xl font-semibold text-white">Visão Geral — Todos os Clientes</h1>
-            <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 rounded">Admin</span>
+            <LayoutGrid className="h-5 w-5 text-acao" />
+            <h1 className="text-xl font-semibold text-tx-strong">Visão Geral — Todos os Clientes</h1>
+            <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-indigo-500/15 text-acao border border-indigo-500/30 rounded">Admin</span>
           </div>
-          <p className="text-sm text-gray-400">Panorama de toda a carteira · clique num cliente pra abrir o painel dele</p>
+          <p className="text-sm text-tx-muted">Panorama de toda a carteira · clique num cliente pra abrir o painel dele</p>
         </div>
-        <button onClick={load} className="p-2 bg-[#161b2e] border border-[#1e2740] rounded-lg text-gray-400 hover:text-white"><RefreshCw className="h-4 w-4" /></button>
+        <button onClick={load} className="p-2 bg-card border border-line rounded-lg text-tx-muted hover:text-tx-strong"><RefreshCw className="h-4 w-4" /></button>
       </div>
 
       {loading ? (
-        <div className="text-center py-24 text-sm text-gray-500 flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Carregando carteira…</div>
+        <div className="text-center py-24 text-sm text-tx-muted flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Carregando carteira…</div>
       ) : data && (
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Kpi label="Clientes ativos" value={data.totals.clientes} icon={Building2} />
-            <Kpi label="Faturamento total" value={BRL(data.totals.faturamentoTotal)} icon={TrendingUp} color="#10b981" />
-            <Kpi label="Documentos" value={data.totals.docsTotal.toLocaleString('pt-BR')} icon={FileText} color="#6366f1" />
-            <Kpi label="Com pendência" value={data.totals.comPendencia} icon={AlertTriangle} color={data.totals.comPendencia ? '#ef4444' : '#10b981'} />
+            <Kpi label="Faturamento total" value={BRL(data.totals.faturamentoTotal)} icon={TrendingUp} color="var(--ok)" />
+            <Kpi label="Documentos" value={data.totals.docsTotal.toLocaleString('pt-BR')} icon={FileText} color="var(--acao)" />
+            <Kpi label="Com pendência" value={data.totals.comPendencia} icon={AlertTriangle} color={data.totals.comPendencia ? 'var(--erro)' : 'var(--ok)'} />
           </div>
 
           {/* Filtros */}
           <div className="flex gap-3 flex-wrap">
             <div className="relative flex-1 min-w-[240px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tx-muted" />
               <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente ou código…"
-                className="w-full bg-[#161b2e] border border-[#1e2740] rounded-lg pl-10 pr-4 py-2.5 text-white text-sm outline-none focus:border-indigo-500 placeholder-gray-600" />
+                className="w-full bg-card border border-line rounded-lg pl-10 pr-4 py-2.5 text-tx text-sm outline-none focus:border-indigo-500 placeholder:text-tx-faint" />
             </div>
-            <select value={ordem} onChange={(e) => setOrdem(e.target.value as any)} className="bg-[#161b2e] border border-[#1e2740] rounded-lg px-3 py-2.5 text-white text-sm outline-none focus:border-indigo-500">
+            <select value={ordem} onChange={(e) => setOrdem(e.target.value as any)} className="bg-card border border-line rounded-lg px-3 py-2.5 text-tx text-sm outline-none focus:border-indigo-500">
               <option value="pendencias">Ordenar: pendências</option>
               <option value="faturamento">Ordenar: faturamento</option>
               <option value="docs">Ordenar: documentos</option>
@@ -81,10 +81,10 @@ export default function VisaoGeralPage() {
           </div>
 
           {/* Tabela */}
-          <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] overflow-x-auto">
+          <div className="rounded-xl border border-line bg-card overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
-                <tr className="text-left text-xs text-gray-500 border-b border-[#1e2740]">
+                <tr className="text-left text-xs text-tx-muted border-b border-line">
                   <th className="px-4 py-3 font-medium">Cód.</th>
                   <th className="px-4 py-3 font-medium">Cliente</th>
                   <th className="px-4 py-3 font-medium">Regime</th>
@@ -95,42 +95,42 @@ export default function VisaoGeralPage() {
                   <th className="px-4 py-3 font-medium text-center">Pendências</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1e2740]">
+              <tbody className="divide-y divide-line">
                 {clientes.slice(0, 400).map((c: any) => (
-                  <tr key={c.id} onClick={() => abrir(c)} className="hover:bg-white/5 cursor-pointer">
-                    <td className="px-4 py-2.5 text-gray-500 font-mono">{c.codigo ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-white">{c.nome}</td>
-                    <td className="px-4 py-2.5"><span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-indigo-300">{REG[c.regime] ?? c.regime}</span></td>
-                    <td className="px-4 py-2.5 text-gray-400 text-xs capitalize">{c.segmento ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-right font-mono text-emerald-400">{c.faturamento ? BRL(c.faturamento) : '—'}</td>
-                    <td className="px-4 py-2.5 text-right text-gray-400">{c.docs}</td>
+                  <tr key={c.id} onClick={() => abrir(c)} className="hover:bg-inset cursor-pointer">
+                    <td className="px-4 py-2.5 text-tx-muted font-mono">{c.codigo ?? '—'}</td>
+                    <td className="px-4 py-2.5 text-tx-strong">{c.nome}</td>
+                    <td className="px-4 py-2.5"><span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-acao">{REG[c.regime] ?? c.regime}</span></td>
+                    <td className="px-4 py-2.5 text-tx-muted text-xs capitalize">{c.segmento ?? '—'}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-ok">{c.faturamento ? BRL(c.faturamento) : '—'}</td>
+                    <td className="px-4 py-2.5 text-right text-tx-muted">{c.docs}</td>
                     <td className="px-4 py-2.5 text-center">
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="w-12 h-1.5 bg-[#0f1117] rounded-full inline-block overflow-hidden">
-                          <span className="h-full block rounded-full" style={{ width: `${c.cronograma}%`, background: c.cronograma >= 80 ? '#10b981' : c.cronograma >= 40 ? '#f59e0b' : '#ef4444' }} />
+                        <span className="w-12 h-1.5 bg-inset rounded-full inline-block overflow-hidden">
+                          <span className="h-full block rounded-full" style={{ width: `${c.cronograma}%`, background: c.cronograma >= 80 ? 'var(--dot-ok)' : c.cronograma >= 40 ? 'var(--dot-atencao)' : 'var(--dot-erro)' }} />
                         </span>
-                        <span className="text-[10px] text-gray-500">{c.cronograma}%</span>
+                        <span className="text-[10px] text-tx-muted">{c.cronograma}%</span>
                       </span>
                     </td>
                     <td className="px-4 py-2.5 text-center">
-                      {c.pendencias > 0 ? <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-300">{c.pendencias}</span> : <span className="text-emerald-400 text-xs">✓</span>}
+                      {c.pendencias > 0 ? <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/15 text-err">{c.pendencias}</span> : <span className="text-ok text-xs">✓</span>}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-gray-600 text-center">Mostrando {Math.min(clientes.length, 400)} de {clientes.length} clientes</p>
+          <p className="text-[11px] text-tx-faint text-center">Mostrando {Math.min(clientes.length, 400)} de {clientes.length} clientes</p>
         </>
       )}
     </div>
   );
 }
 
-function Kpi({ label, value, icon: Icon, color = '#fff' }: any) {
+function Kpi({ label, value, icon: Icon, color = 'var(--tx-strong)' }: any) {
   return (
-    <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4">
-      <div className="flex items-center justify-between mb-1"><span className="text-[11px] text-gray-500">{label}</span><Icon className="h-3.5 w-3.5" style={{ color }} /></div>
+    <div className="rounded-xl border border-line bg-card p-4">
+      <div className="flex items-center justify-between mb-1"><span className="text-[11px] text-tx-muted">{label}</span><Icon className="h-3.5 w-3.5" style={{ color }} /></div>
       <p className="text-2xl font-bold" style={{ color }}>{value}</p>
     </div>
   );

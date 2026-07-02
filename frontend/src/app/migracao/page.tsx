@@ -72,23 +72,23 @@ export default function MigracaoPage() {
     <div className="p-6 md:p-8 max-w-4xl space-y-5">
       <div>
         <div className="flex items-center gap-2 mb-0.5">
-          <Upload className="h-5 w-5 text-indigo-400" />
-          <h1 className="text-xl font-semibold text-white">Migração em massa</h1>
+          <Upload className="h-5 w-5 text-acao" />
+          <h1 className="text-xl font-semibold text-tx-strong">Migração em massa</h1>
         </div>
-        <p className="text-sm text-gray-400 max-w-2xl">
+        <p className="text-sm text-tx-muted max-w-2xl">
           Importe clientes em lote a partir de CSV/Excel ou exportação de outros sistemas contábeis.
         </p>
       </div>
 
       {/* Tipo */}
-      <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4 space-y-3">
+      <div className="rounded-xl border border-line bg-card p-4 space-y-3">
         <div className="flex gap-2">
           <button
             onClick={() => setTipo('csv')}
             className={`flex-1 px-3 py-2 text-xs font-medium rounded border ${
               tipo === 'csv'
-                ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-300'
-                : 'bg-[#0f1117] border-[#1e2740] text-gray-400 hover:text-white'
+                ? 'bg-indigo-500/20 border-indigo-500/50 text-acao'
+                : 'bg-inset border-line text-tx-muted hover:text-tx-strong'
             }`}
           >
             CSV / Excel (genérico)
@@ -97,8 +97,8 @@ export default function MigracaoPage() {
             onClick={() => setTipo('dominio')}
             className={`flex-1 px-3 py-2 text-xs font-medium rounded border ${
               tipo === 'dominio'
-                ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-300'
-                : 'bg-[#0f1117] border-[#1e2740] text-gray-400 hover:text-white'
+                ? 'bg-indigo-500/20 border-indigo-500/50 text-acao'
+                : 'bg-inset border-line text-tx-muted hover:text-tx-strong'
             }`}
           >
             Domínio Sistemas (.txt export)
@@ -106,13 +106,13 @@ export default function MigracaoPage() {
         </div>
 
         {tipo === 'csv' && (
-          <p className="text-[11px] text-gray-500">
-            Formato esperado: colunas <code className="text-indigo-300">cnpj, razao_social, regime, email, telefone</code>{' '}
+          <p className="text-[11px] text-tx-muted">
+            Formato esperado: colunas <code className="text-acao">cnpj, razao_social, regime, email, telefone</code>{' '}
             (variantes aceitas). Separador vírgula ou ponto-e-vírgula.
           </p>
         )}
         {tipo === 'dominio' && (
-          <p className="text-[11px] text-gray-500">
+          <p className="text-[11px] text-tx-muted">
             Exporte clientes do Domínio em formato texto. O sistema detecta CNPJ + razão social automaticamente.
           </p>
         )}
@@ -122,7 +122,7 @@ export default function MigracaoPage() {
             type="file"
             accept=".csv,.txt"
             onChange={(e) => e.target.files?.[0] && readFile(e.target.files[0])}
-            className="text-xs text-gray-400"
+            className="text-xs text-tx-muted"
           />
           <textarea
             value={conteudo}
@@ -133,7 +133,7 @@ export default function MigracaoPage() {
                 : 'Cole o conteúdo do arquivo de exportação aqui…'
             }
             rows={8}
-            className="w-full px-3 py-2 bg-[#0f1117] border border-[#1e2740] rounded text-xs text-white outline-none font-mono"
+            className="w-full px-3 py-2 bg-inset border border-line rounded text-xs text-tx-strong outline-none font-mono"
           />
         </div>
 
@@ -142,7 +142,7 @@ export default function MigracaoPage() {
             <button
               onClick={doPreview}
               disabled={loading || !conteudo.trim()}
-              className="px-3 py-1.5 text-xs bg-[#1e2740] hover:bg-[#2a3550] disabled:opacity-50 text-white rounded"
+              className="px-3 py-1.5 text-xs bg-inset hover:bg-card border border-line disabled:opacity-50 text-tx-strong rounded"
             >
               Preview
             </button>
@@ -167,26 +167,26 @@ export default function MigracaoPage() {
 
       {/* Preview */}
       {preview && (
-        <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4">
-          <p className="text-xs text-gray-400 mb-2">
+        <div className="rounded-xl border border-line bg-card p-4">
+          <p className="text-xs text-tx-muted mb-2">
             {preview.total} linha(s) válida(s). Amostra das primeiras 10:
           </p>
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-gray-500 border-b border-[#1e2740]">
+              <tr className="text-left text-tx-muted border-b border-line">
                 <th className="pb-1">CNPJ</th>
                 <th className="pb-1">Razão Social</th>
                 <th className="pb-1">Regime</th>
                 <th className="pb-1">E-mail</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1e2740]">
+            <tbody className="divide-y divide-line">
               {preview.sample.map((r: any, i: number) => (
                 <tr key={i}>
-                  <td className="py-1 font-mono text-gray-300">{r.cnpj}</td>
-                  <td className="py-1 text-white truncate max-w-[200px]">{r.razaoSocial}</td>
-                  <td className="py-1 text-gray-400">{r.regime ?? '—'}</td>
-                  <td className="py-1 text-gray-500 truncate max-w-[180px]">{r.email ?? '—'}</td>
+                  <td className="py-1 font-mono text-tx">{r.cnpj}</td>
+                  <td className="py-1 text-tx-strong truncate max-w-[200px]">{r.razaoSocial}</td>
+                  <td className="py-1 text-tx-muted">{r.regime ?? '—'}</td>
+                  <td className="py-1 text-tx-muted truncate max-w-[180px]">{r.email ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -198,29 +198,29 @@ export default function MigracaoPage() {
       {result && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-            <h3 className="text-sm font-medium text-white">Importação concluída</h3>
+            <CheckCircle2 className="h-4 w-4 text-ok" />
+            <h3 className="text-sm font-medium text-tx-strong">Importação concluída</h3>
           </div>
           <div className="grid grid-cols-3 gap-3 text-xs">
-            <div className="rounded bg-[#0f1117] border border-[#1e2740] p-2 text-center">
-              <p className="text-[10px] text-gray-500 uppercase">Total</p>
-              <p className="text-lg font-bold text-white">{result.total}</p>
+            <div className="rounded bg-inset border border-line p-2 text-center">
+              <p className="text-[10px] text-tx-muted uppercase">Total</p>
+              <p className="text-lg font-bold text-tx-strong">{result.total}</p>
             </div>
-            <div className="rounded bg-[#0f1117] border border-[#1e2740] p-2 text-center">
-              <p className="text-[10px] text-gray-500 uppercase">Criadas</p>
-              <p className="text-lg font-bold text-emerald-400">{result.created}</p>
+            <div className="rounded bg-inset border border-line p-2 text-center">
+              <p className="text-[10px] text-tx-muted uppercase">Criadas</p>
+              <p className="text-lg font-bold text-ok">{result.created}</p>
             </div>
-            <div className="rounded bg-[#0f1117] border border-[#1e2740] p-2 text-center">
-              <p className="text-[10px] text-gray-500 uppercase">Pulou (já existe)</p>
-              <p className="text-lg font-bold text-amber-400">{result.skipped}</p>
+            <div className="rounded bg-inset border border-line p-2 text-center">
+              <p className="text-[10px] text-tx-muted uppercase">Pulou (já existe)</p>
+              <p className="text-lg font-bold text-warn">{result.skipped}</p>
             </div>
           </div>
           {result.errors?.length > 0 && (
             <details className="text-xs">
-              <summary className="cursor-pointer text-red-300">
+              <summary className="cursor-pointer text-err">
                 {result.errors.length} erro(s)
               </summary>
-              <pre className="mt-2 p-2 bg-[#0f1117] rounded text-[10px] text-red-300 overflow-x-auto">
+              <pre className="mt-2 p-2 bg-inset rounded text-[10px] text-err overflow-x-auto">
                 {JSON.stringify(result.errors, null, 2)}
               </pre>
             </details>

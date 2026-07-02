@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FolderTree, Loader2, ArrowDownUp, MapPin, Receipt, Boxes, Calendar, Building2, ChevronRight } from 'lucide-react';
-import { PageHeader, Kpi, Card, SectionTitle, Bar, COLORS } from '@/components/ui/kit';
+import { PageHeader, Kpi, Card, SectionTitle, Bar, COLORS, tint } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -76,7 +76,7 @@ export default function OrganizacaoPage() {
             <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 8 }}>Produtos onde o PIS/COFINS deve ser zerado na revenda — atenção a recolhimento a maior.</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {d.fiscal.monofasico.grupos.map((g: any) => (
-                <span key={g.chave} style={{ padding: '6px 12px', borderRadius: 20, background: `${COLORS.atencao}18`, border: `1px solid ${COLORS.atencao}55`, color: COLORS.atencao, fontSize: 12 }}>
+                <span key={g.chave} style={{ padding: '6px 12px', borderRadius: 20, background: tint(COLORS.atencao, 9), border: `1px solid ${tint(COLORS.atencao, 33)}`, color: COLORS.atencao, fontSize: 12 }}>
                   {g.chave}: {BRL(g.valor)} ({g.qtd})
                 </span>
               ))}

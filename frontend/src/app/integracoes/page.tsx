@@ -61,7 +61,7 @@ export default function IntegracoesPage() {
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center gap-3 text-gray-400">
+      <div className="p-8 flex items-center gap-3 text-tx-muted">
         <Loader2 className="h-4 w-4 animate-spin" />
         Verificando integrações…
       </div>
@@ -70,7 +70,7 @@ export default function IntegracoesPage() {
 
   if (!data) {
     return (
-      <div className="p-8 text-red-400 text-sm">
+      <div className="p-8 text-err text-sm">
         Falha ao carregar status. Tente novamente em alguns segundos.
       </div>
     );
@@ -83,27 +83,27 @@ export default function IntegracoesPage() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="h-5 w-5 text-indigo-400" />
-          <h1 className="text-xl font-semibold text-white">Integrações</h1>
+          <Sparkles className="h-5 w-5 text-acao" />
+          <h1 className="text-xl font-semibold text-tx-strong">Integrações</h1>
         </div>
-        <p className="text-sm text-gray-400 max-w-2xl">
+        <p className="text-sm text-tx-muted max-w-2xl">
           O NexaContábil funciona sem nenhuma destas APIs externas (modo demo). Cada uma adicionada
           desbloqueia uma capacidade real. Configure pelo Railway → backend → Variables.
         </p>
       </div>
 
       {/* Progress bar */}
-      <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-5">
+      <div className="rounded-xl border border-line bg-card p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <p className="text-sm font-medium text-white">
+            <p className="text-sm font-medium text-tx-strong">
               Progresso de configuração: {data.summary.configured} de {data.summary.total}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5">{pct}% do potencial ativado</p>
+            <p className="text-xs text-tx-muted mt-0.5">{pct}% do potencial ativado</p>
           </div>
-          <span className="text-2xl font-bold text-indigo-400 font-mono">{pct}%</span>
+          <span className="text-2xl font-bold text-acao font-mono">{pct}%</span>
         </div>
-        <div className="h-2 bg-[#0f1117] rounded-full overflow-hidden">
+        <div className="h-2 bg-inset rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all"
             style={{ width: `${pct}%` }}
@@ -119,9 +119,9 @@ export default function IntegracoesPage() {
         return (
         <div key={grupo} className="space-y-2">
           <div className="flex items-center gap-2 pt-2">
-            {grupo === 1 ? <Zap className="h-4 w-4 text-indigo-400" /> : grupo === 2 ? <Receipt className="h-4 w-4 text-gray-400" /> : <Cloud className="h-4 w-4 text-gray-500" />}
-            <h2 className="text-sm font-semibold text-white">{g.titulo}</h2>
-            <span className="text-xs text-gray-500">· {g.desc}</span>
+            {grupo === 1 ? <Zap className="h-4 w-4 text-acao" /> : grupo === 2 ? <Receipt className="h-4 w-4 text-tx-muted" /> : <Cloud className="h-4 w-4 text-tx-muted" />}
+            <h2 className="text-sm font-semibold text-tx-strong">{g.titulo}</h2>
+            <span className="text-xs text-tx-muted">· {g.desc}</span>
           </div>
         {items.map((it) => {
           const Icon = ICONS[it.key] || Cloud;
@@ -134,7 +134,7 @@ export default function IntegracoesPage() {
                   ? 'border-emerald-500/30 bg-emerald-500/5'
                   : it.status === 'partial'
                   ? 'border-amber-500/30 bg-amber-500/5'
-                  : 'border-[#1e2740] bg-[#161b2e]'
+                  : 'border-line bg-card'
               } transition-colors`}
             >
               <button
@@ -143,46 +143,46 @@ export default function IntegracoesPage() {
               >
                 <div className="flex-shrink-0">
                   {it.status === 'configured' ? (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                    <CheckCircle2 className="h-5 w-5 text-ok" />
                   ) : it.status === 'partial' ? (
-                    <AlertTriangle className="h-5 w-5 text-amber-400" />
+                    <AlertTriangle className="h-5 w-5 text-warn" />
                   ) : (
-                    <Circle className="h-5 w-5 text-gray-600" />
+                    <Circle className="h-5 w-5 text-tx-faint" />
                   )}
                 </div>
-                <Icon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <Icon className="h-4 w-4 text-tx-muted flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-white">{it.name}</p>
+                    <p className="text-sm font-medium text-tx-strong">{it.name}</p>
                     {it.required && (
-                      <span className="px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider bg-red-500/15 text-red-300 border border-red-500/30 rounded">
+                      <span className="px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider bg-red-500/15 text-err border border-red-500/30 rounded">
                         Obrigatório por cliente
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 mt-0.5 truncate">{it.helps[0]}</p>
+                  <p className="text-xs text-tx-muted mt-0.5 truncate">{it.helps[0]}</p>
                   {it.usadoEm && (
-                    <p className="text-[11px] text-indigo-300/70 mt-0.5 truncate">Usado em: {it.usadoEm}</p>
+                    <p className="text-[11px] text-acao mt-0.5 truncate">Usado em: {it.usadoEm}</p>
                   )}
                 </div>
                 {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                  <ChevronDown className="h-4 w-4 text-tx-muted" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                  <ChevronRight className="h-4 w-4 text-tx-muted" />
                 )}
               </button>
 
               {isExpanded && (
-                <div className="px-4 pb-4 pt-1 border-t border-[#1e2740] space-y-4">
+                <div className="px-4 pb-4 pt-1 border-t border-line space-y-4">
                   {/* O que isso desbloqueia */}
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">
+                    <p className="text-[10px] uppercase tracking-wider text-tx-muted mb-1.5">
                       O que essa integração desbloqueia
                     </p>
                     <ul className="space-y-1">
                       {it.helps.map((h, i) => (
-                        <li key={i} className="text-xs text-gray-300 flex gap-2">
-                          <span className="text-indigo-400">·</span>
+                        <li key={i} className="text-xs text-tx flex gap-2">
+                          <span className="text-acao">·</span>
                           {h}
                         </li>
                       ))}
@@ -191,13 +191,13 @@ export default function IntegracoesPage() {
 
                   {/* Passos */}
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">
+                    <p className="text-[10px] uppercase tracking-wider text-tx-muted mb-1.5">
                       Passo a passo
                     </p>
                     <ol className="space-y-2">
                       {it.setupSteps.map((s, i) => (
-                        <li key={i} className="text-xs text-gray-300 flex gap-2.5">
-                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 text-[10px] flex items-center justify-center font-mono">
+                        <li key={i} className="text-xs text-tx flex gap-2.5">
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-acao text-[10px] flex items-center justify-center font-mono">
                             {i + 1}
                           </span>
                           <span className="leading-relaxed">
@@ -206,12 +206,12 @@ export default function IntegracoesPage() {
                                 <button
                                   key={j}
                                   onClick={() => copy(part)}
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 bg-[#0f1117] border border-[#2a3550] hover:border-indigo-500/40 text-indigo-300 font-mono rounded text-[10px] transition-colors"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 bg-inset border border-line hover:border-indigo-500/40 text-acao font-mono rounded text-[10px] transition-colors"
                                   title="Copiar"
                                 >
                                   {part}
                                   {copied === part ? (
-                                    <Check className="h-2.5 w-2.5 text-emerald-400" />
+                                    <Check className="h-2.5 w-2.5 text-ok" />
                                   ) : (
                                     <Copy className="h-2.5 w-2.5" />
                                   )}
@@ -243,7 +243,7 @@ export default function IntegracoesPage() {
                       href="https://railway.com/project/13950cf7-4eb4-481c-9496-d8cb64fdced6/service/8189c609-e8a5-4a8c-b42e-695c1712e62c/variables"
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#1e2740] hover:bg-[#2a3550] text-white border border-[#2a3550] rounded-lg transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-inset hover:bg-card text-tx-strong border border-line rounded-lg transition-colors"
                     >
                       Variáveis do backend (Railway)
                       <ExternalLink className="h-3 w-3" />
@@ -259,11 +259,11 @@ export default function IntegracoesPage() {
       })}
 
       {/* Help */}
-      <div className="rounded-xl border border-[#1e2740] bg-[#161b2e] p-4">
+      <div className="rounded-xl border border-line bg-card p-4">
         <div className="flex gap-3">
-          <Building2 className="h-4 w-4 text-indigo-400 flex-shrink-0 mt-0.5" />
-          <div className="text-xs text-gray-400 leading-relaxed">
-            <p className="font-medium text-white mb-1">Funciona sem nenhuma integração?</p>
+          <Building2 className="h-4 w-4 text-acao flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-tx-muted leading-relaxed">
+            <p className="font-medium text-tx-strong mb-1">Funciona sem nenhuma integração?</p>
             <p>
               Sim — o sistema opera em modo demo (cálculos, plano de contas, calendário fiscal,
               cadastros, lançamentos manuais, SPED gerado em arquivo). As integrações desbloqueiam
