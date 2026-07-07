@@ -5,6 +5,7 @@ import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { CommandPalette } from './CommandPalette';
 import { WelcomeOnboarding } from './WelcomeOnboarding';
+import { Assistente } from './Assistente';
 import { ToastProvider } from '@/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Zap } from 'lucide-react';
@@ -73,6 +74,7 @@ function AuthenticatedShell({ children }: { children: React.ReactNode }) {
       </div>
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
       <WelcomeOnboarding />
+      <Assistente />
     </div>
   );
 }
