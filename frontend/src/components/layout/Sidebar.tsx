@@ -43,9 +43,8 @@ const CAMINHO: Step[] = [
   {
     n: 1, label: 'Receber', cor: '#6cb2ff',
     items: [
-      { href: '/captura-xml',     icon: Inbox,         label: 'Captura de XMLs' },
-      { href: '/drive-conectado', icon: Globe,         label: 'Drives Conectados' },
-      { href: '/solicitacoes',    icon: ClipboardList, label: 'Solicitar Clientes' },
+      { href: '/captura-xml',  icon: Inbox,         label: 'Captura de XMLs' },
+      { href: '/solicitacoes', icon: ClipboardList, label: 'Solicitar Clientes' },
     ],
   },
   {
@@ -59,9 +58,8 @@ const CAMINHO: Step[] = [
   {
     n: 3, label: 'Apurar', cor: '#ffc247',
     items: [
-      { href: '/apuracao',         icon: ClipboardList, label: 'Apuração de Impostos' },
-      { href: '/simples-nacional', icon: Award,         label: 'Simples Nacional' },
-      { href: '/inconsistencias',  icon: ShieldCheck,   label: 'Inconsistências (malha)' },
+      { href: '/apuracao',        icon: ClipboardList, label: 'Apuração de Impostos' },
+      { href: '/inconsistencias', icon: ShieldCheck,   label: 'Inconsistências (malha)' },
     ],
   },
   {
@@ -77,20 +75,39 @@ const CAMINHO: Step[] = [
     items: [
       { href: '/atendimentos', icon: MessageCircle, label: 'Central de Atendimento' },
       { href: '/whatsapp',     icon: MessageCircle, label: 'WhatsApp IA' },
-      { href: '/comunicados',  icon: Megaphone,     label: 'Comunicados' },
     ],
   },
 ];
 
 const CLIENTES: NavItem[] = [
   { href: '/carteira',           icon: Briefcase,  label: 'Carteira de Clientes' },
-  { href: '/dashboard',          icon: Building2,  label: 'Painel do Cliente' },
   { href: '/organizacao',        icon: FolderTree, label: 'Organização de Docs' },
   { href: '/onboarding-cliente', icon: Plus,       label: 'Novo Cliente' },
-  { href: '/portal-cliente',     icon: Globe,      label: 'Portal do Cliente' },
 ];
 
 const MODULOS: NavGroup[] = [
+  {
+    label: 'Gestão avançada',
+    items: [
+      { href: '/visao-geral',          icon: Building2, label: 'Visão Geral' },
+      { href: '/produtividade',        icon: Users,     label: 'Produtividade' },
+      { href: '/atribuir-responsavel', icon: UserCheck, label: 'Atribuir Responsáveis' },
+      { href: '/gestao-equipe',        icon: Users,     label: 'Gestão de Equipe' },
+      { href: '/dashboard',            icon: Building2, label: 'Painel do Cliente' },
+      { href: '/insights',             icon: Boxes,     label: 'Insights de IA' },
+    ],
+  },
+  {
+    label: 'Fiscal avançado',
+    items: [
+      { href: '/simples-nacional', icon: Award,       label: 'Simples Nacional' },
+      { href: '/sped',             icon: FileCode,    label: 'SPED / EFD' },
+      { href: '/fiscal',           icon: Receipt,     label: 'NF-e / NFS-e' },
+      { href: '/certidoes',        icon: ShieldCheck, label: 'Certidões' },
+      { href: '/onvio',            icon: Building2,   label: 'Onvio · Domínio' },
+      { href: '/mei',              icon: Award,       label: 'MEI — DAS / DASN' },
+    ],
+  },
   {
     label: 'Contábil',
     items: [
@@ -111,16 +128,6 @@ const MODULOS: NavGroup[] = [
     ],
   },
   {
-    label: 'Fiscal avançado',
-    items: [
-      { href: '/sped',      icon: FileCode,    label: 'SPED / EFD' },
-      { href: '/fiscal',    icon: Receipt,     label: 'NF-e / NFS-e' },
-      { href: '/certidoes', icon: ShieldCheck, label: 'Certidões' },
-      { href: '/onvio',     icon: Building2,   label: 'Onvio · Domínio' },
-      { href: '/mei',       icon: Award,       label: 'MEI — DAS / DASN' },
-    ],
-  },
-  {
     label: 'Financeiro',
     items: [
       { href: '/boletos',    icon: Banknote,   label: 'Boletos' },
@@ -129,27 +136,26 @@ const MODULOS: NavGroup[] = [
     ],
   },
   {
-    label: 'Inteligência & Consultoria',
+    label: 'Consultoria & Relacionamento',
     items: [
-      { href: '/insights',           icon: Boxes,  label: 'Insights de IA' },
-      { href: '/copilot',            icon: Bot,    label: 'Copilot IA' },
-      { href: '/benchmark',          icon: Target, label: 'Benchmark Setorial' },
-      { href: '/tributario',         icon: Scale,  label: 'Plan. Tributário' },
-      { href: '/reforma-tributaria', icon: Scale,  label: 'Reforma Tributária' },
+      { href: '/tributario',         icon: Scale,         label: 'Plan. Tributário' },
+      { href: '/reforma-tributaria', icon: Scale,         label: 'Reforma Tributária' },
+      { href: '/benchmark',          icon: Target,        label: 'Benchmark Setorial' },
+      { href: '/copilot',            icon: Bot,           label: 'Copilot IA' },
+      { href: '/comunicados',        icon: Megaphone,     label: 'Comunicados' },
+      { href: '/crm',                icon: Users,         label: 'CRM / Pipeline' },
+      { href: '/portal-cliente',     icon: Globe,         label: 'Portal do Cliente' },
     ],
   },
   {
-    label: 'Administração',
+    label: 'Setup & Administração',
     items: [
-      { href: '/visao-geral',          icon: Building2,      label: 'Visão Geral' },
-      { href: '/produtividade',        icon: Users,          label: 'Produtividade' },
-      { href: '/atribuir-responsavel', icon: UserCheck,      label: 'Atribuir Responsáveis' },
-      { href: '/gestao-equipe',        icon: Users,          label: 'Gestão de Equipe' },
-      { href: '/migracao',             icon: ArrowLeftRight, label: 'Migração em Massa' },
-      { href: '/integracoes',          icon: Settings,       label: 'Integrações' },
-      { href: '/abertura-empresa',     icon: Store,          label: 'Abertura de Empresa' },
-      { href: '/audit',                icon: Hash,           label: 'Auditoria' },
-      { href: '/guia',                 icon: FileText,       label: 'Guia de Uso' },
+      { href: '/drive-conectado',  icon: Globe,          label: 'Drives Conectados' },
+      { href: '/integracoes',      icon: Settings,       label: 'Integrações' },
+      { href: '/migracao',         icon: ArrowLeftRight, label: 'Migração em Massa' },
+      { href: '/abertura-empresa', icon: Store,          label: 'Abertura de Empresa' },
+      { href: '/audit',            icon: Hash,           label: 'Auditoria' },
+      { href: '/guia',             icon: FileText,       label: 'Guia de Uso' },
     ],
   },
 ];
@@ -199,9 +205,17 @@ export function Sidebar() {
   const modulos = isAnalista ? MODULOS_ANALISTA : MODULOS;
 
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [avancado, setAvancado] = useState(false);
   useEffect(() => {
     try { setOpen(JSON.parse(localStorage.getItem(OPEN_KEY) || '{}')); } catch {}
+    try { setAvancado(localStorage.getItem('nexa_nav_avancado') === '1'); } catch {}
   }, []);
+  const toggleAvancado = () => {
+    setAvancado((v) => {
+      try { localStorage.setItem('nexa_nav_avancado', v ? '0' : '1'); } catch {}
+      return !v;
+    });
+  };
   const toggleGroup = (label: string) => {
     setOpen((prev) => {
       const next = { ...prev, [label]: !prev[label] };
@@ -340,9 +354,16 @@ export function Sidebar() {
           </>
         )}
 
-        <Rotulo>Módulos</Rotulo>
+        {/* Módulos avançados: fora do caminho diário — visíveis só sob demanda
+            (ou quando a rota atual pertence a um deles) */}
+        <button onClick={toggleAvancado}
+          className="w-full flex items-center gap-1.5 px-3 mt-4 py-1.5 text-[11px] text-tx-faint font-semibold uppercase tracking-[0.06em] hover:text-tx-muted transition-colors">
+          {avancado ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          Módulos avançados
+          <span className="ml-auto normal-case font-normal">{modulos.reduce((s, g) => s + g.items.length, 0)}</span>
+        </button>
         <div className="space-y-0.5">
-          {modulos.map(group => {
+          {modulos.filter(group => avancado || groupHasActive(group.items)).map(group => {
             const expanded = open[group.label] || groupHasActive(group.items);
             return (
               <div key={group.label}>
