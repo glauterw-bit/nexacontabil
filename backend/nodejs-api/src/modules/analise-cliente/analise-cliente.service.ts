@@ -188,6 +188,30 @@ export class AnaliseClienteService {
     return { processados: lote.length, restantes: Math.max(0, pendentes - lote.length), novosDocs, detalhes };
   }
 
+  /** Diagnóstico do acervo JÁ CAPTURADO: por tipo, por ano de emissão (inclui sem-data)
+   *  e os documentos mais recentes por data de ingestão. Responde "temos 2026?". */
+  async diagnostico() {
+    const docs = await this.prisma.document.findMany({
+      select: { type: true, issueDate: true, createdAt: true, originalFilename: true },
+    });
+    const porTipo: Record<string, number> = {};
+    const porAno: Record<string, number> = {};
+    let semData = 0, max: string | null = null, doc2026 = 0;
+    for (const d of docs) {
+      porTipo[d.type ?? '?'] = (porTipo[d.type ?? '?'] ?? 0) + 1;
+      if (d.issueDate) {
+        const iso = new Date(d.issueDate).toISOString().slice(0, 10);
+        const ano = iso.slice(0, 4);
+        porAno[ano] = (porAno[ano] ?? 0) + 1;
+        if (!max || iso > max) max = iso;
+        if (ano >= '2026') doc2026++;
+      } else semData++;
+    }
+    const recentesIngest = [...docs].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 15)
+      .map((d) => ({ arquivo: d.originalFilename, tipo: d.type, emissao: d.issueDate ? new Date(d.issueDate).toISOString().slice(0, 10) : null }));
+    return { totalDocs: docs.length, porTipo, porAno, semData, maxEmissao: max, docsDe2026: doc2026, recentesIngest };
+  }
+
   /** Progresso da análise da carteira (pra barra de progresso ao vivo). */
   async progresso() {
     const [total, analisados, ativos, ativosFeitos, documentos] = await Promise.all([
@@ -319,7 +343,13 @@ function parseNfe(xml: string): null | {
     tipo,
     numero: pick(xml, 'nNF'),
     chave: (xml.match(/Id="NFe(\d{44})"/) ?? [])[1],
-    dataEmissao: pick(xml, 'dhEmi')?.slice(0, 10) ?? pick(xml, 'dEmi'),
+    dataEmissao: (
+      pick(xml, 'dhEmi') ?? pick(xml, 'dEmi') ??           // NF-e / CT-e
+      pick(xml, 'DataEmissao') ?? pick(xml, 'dtEmissao') ?? // NFS-e (ABRASF e variantes)
+      pick(xml, 'DataEmissaoRps') ?? pick(xml, 'dhProc') ??
+      pick(xml, 'dhRecbto') ?? pick(xml, 'dCompet') ??      // competência
+      pick(xml, 'Competencia') ?? pick(xml, 'dhEvento')
+    )?.slice(0, 10),
     valorTotal: num(pick(totalBloco, 'vNF')),
     natOp: pick(xml, 'natOp'),
     totais: {

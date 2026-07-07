@@ -208,6 +208,33 @@ export class OneDriveService {
   }
 
   /**
+   * DIAGNÓSTICO de recência: varre EXAUSTIVAMENTE a pasta de um cliente (sem teto de
+   * captura) e reporta os arquivos XML por ANO de modificação + os mais recentes.
+   * Responde de forma definitiva se existe QUALQUER arquivo de 2026 no drive do cliente.
+   */
+  async recenciaDrive(connectionId: string, driveId: string, folderId: string) {
+    const porAno: Record<string, number> = {};
+    const recentes: Array<{ name: string; modified: string | null }> = [];
+    const queue: string[] = [folderId];
+    let guard = 0, totalArquivos = 0;
+    while (queue.length && guard++ < 4000) {
+      const fid = queue.shift()!;
+      let items: any[] = [];
+      try { items = await this.listAllChildren(connectionId, driveId, fid); } catch { continue; }
+      for (const it of items) {
+        if (it.isFolder) { queue.push(it.id); continue; }
+        if (!/\.(xml)$/i.test(it.name ?? '')) continue;
+        totalArquivos++;
+        const ano = it.modified ? String(it.modified).slice(0, 4) : 'sem-data';
+        porAno[ano] = (porAno[ano] ?? 0) + 1;
+        recentes.push({ name: it.name, modified: it.modified ?? null });
+      }
+    }
+    recentes.sort((a, b) => String(b.modified ?? '').localeCompare(String(a.modified ?? '')));
+    return { totalArquivos, porAno, arquivos2026: porAno['2026'] ?? 0, recentes: recentes.slice(0, 12) };
+  }
+
+  /**
    * Análise da carteira: lê os sites "Empresas Ativas/Inativas" do SharePoint,
    * interpreta cada pasta como um cliente (nome + regime + nº de documentos)
    * e devolve a visão agregada pronta pra dashboard.

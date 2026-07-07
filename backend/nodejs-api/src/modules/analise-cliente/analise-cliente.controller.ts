@@ -29,6 +29,12 @@ export class AnaliseClienteController {
     return this.svc.resyncLote(body.desde, body?.limit ?? 8, body?.maxFiles ?? 300);
   }
 
+  /** Diagnóstico do acervo capturado: por tipo, por ano de emissão, sem-data, "temos 2026?". */
+  @Get('diagnostico')
+  diagnostico() {
+    return this.svc.diagnostico();
+  }
+
   /** Limpa análises e zera flags (pra re-análise com parser novo). */
   @Post('reset')
   reset() {

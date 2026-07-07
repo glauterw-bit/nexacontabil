@@ -61,6 +61,31 @@ export class CloudController {
     return this.onedrive.getCarteira(id);
   }
 
+  /** Varredura EXAUSTIVA de recência do drive de uma amostra de clientes: existe algum arquivo de 2026? */
+  @Get('recencia')
+  async recencia(@Query('limit') limit?: string, @Query('companyId') companyId?: string) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) throw new NotFoundException('Nenhuma conexão OneDrive ativa');
+    const where: any = { active: true, sharepointItemId: { not: null }, sharepointDriveId: { not: null } };
+    if (companyId) where.id = companyId;
+    const empresas = await this.prisma.company.findMany({
+      where, orderBy: { sharepointDocsCount: 'desc' }, take: companyId ? 1 : Math.min(30, parseInt(limit ?? '12', 10) || 12),
+      select: { id: true, name: true, sharepointDriveId: true, sharepointItemId: true },
+    });
+    const geralPorAno: Record<string, number> = {};
+    const porCliente: any[] = [];
+    for (const e of empresas) {
+      try {
+        const r = await this.onedrive.recenciaDrive(conn.id, e.sharepointDriveId!, e.sharepointItemId!);
+        for (const [ano, n] of Object.entries(r.porAno)) geralPorAno[ano] = (geralPorAno[ano] ?? 0) + (n as number);
+        porCliente.push({ cliente: e.name, totalArquivos: r.totalArquivos, arquivos2026: r.arquivos2026, maisRecente: r.recentes[0]?.modified ?? null, porAno: r.porAno });
+      } catch (err: any) {
+        porCliente.push({ cliente: e.name, erro: err?.message ?? 'erro' });
+      }
+    }
+    return { clientesVarridos: empresas.length, arquivos2026Total: geralPorAno['2026'] ?? 0, geralPorAno, porCliente };
+  }
+
   /** Importa os clientes da carteira (SharePoint) como empresas no sistema. */
   @Post('importar-carteira')
   async importarCarteira(@Body() body: { connectionId?: string }) {
