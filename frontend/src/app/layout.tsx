@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 // Aplica o tema salvo antes da hidratação para evitar flash. ESCURO é o padrão.
-const themeInit = `(function(){try{if(localStorage.getItem('nexa_theme')!=='light'){document.documentElement.classList.add('dark')}}catch(e){}})()`;
+const themeInit = `(function(){try{if(localStorage.getItem('nexa_theme2')!=='light'){document.documentElement.classList.add('dark')}}catch(e){}})()`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

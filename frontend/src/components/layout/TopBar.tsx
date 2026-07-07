@@ -96,7 +96,7 @@ function useTheme() {
   const toggle = useCallback(() => {
     const next = !document.documentElement.classList.contains('dark');
     document.documentElement.classList.toggle('dark', next);
-    try { localStorage.setItem('nexa_theme', next ? 'dark' : 'light'); } catch {}
+    try { localStorage.setItem('nexa_theme2', next ? 'dark' : 'light'); } catch {}
     setDark(next);
   }, []);
   return { dark, toggle };
