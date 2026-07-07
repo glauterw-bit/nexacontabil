@@ -2,8 +2,8 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { FileWarning, Loader2, ArrowLeft, Wrench, AlertTriangle, HeartPulse } from 'lucide-react';
-import { tint, Dot } from '@/components/ui/kit';
+import { FileWarning, ArrowLeft, Wrench, AlertTriangle, HeartPulse } from 'lucide-react';
+import { tint, Dot, PageHeader, COLORS, Kpi, SectionTitle, Spinner, EmptyState } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -42,25 +42,24 @@ function Conteudo() {
     } catch {} finally { setBaixando(null); }
   }
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}><Loader2 size={32} className="animate-spin" /></div>;
-  if (!data?.empresa) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--faint)' }}>Cliente não informado ou sem erros.</div>;
+  if (loading) return <Spinner />;
+  if (!data?.empresa) return <EmptyState icon={<FileWarning size={32} />} title="Cliente não informado ou sem erros." />;
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: 24 }}>
+    <div className="page-narrow">
       <Link href="/meu-dia" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--muted)', fontSize: 13, textDecoration: 'none', marginBottom: 12 }}>
         <ArrowLeft size={15} /> Voltar
       </Link>
-      <h1 style={{ fontSize: 22, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <FileWarning size={22} color="var(--atencao)" /> Erros fiscais — {data.empresa.name}
-      </h1>
-      <p style={{ color: 'var(--muted)', marginTop: 4 }}>
-        {data.empresa.taxRegime} · responsável: {data.empresa.responsavel ?? '—'}
-      </p>
+      <PageHeader
+        icon={<FileWarning size={22} color={COLORS.acao} />}
+        title={`Erros fiscais — ${data.empresa.name}`}
+        subtitle={`${data.empresa.taxRegime} · responsável: ${data.empresa.responsavel ?? '—'}`}
+      />
 
-      <div style={{ display: 'flex', gap: 14, marginTop: 18, flexWrap: 'wrap' }}>
-        <Stat label="Notas com erro" value={data.totalNotas} cor="var(--atencao)" />
-        <Stat label="Erros (total)" value={data.totalErros} cor="var(--erro)" />
-        <Stat label="Valor envolvido" value={BRL(data.valorEnvolvido)} cor="var(--tx-strong)" />
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+        <Kpi label="Notas com erro" value={data.totalNotas ?? 0} cor="var(--atencao)" />
+        <Kpi label="Erros (total)" value={data.totalErros ?? 0} cor="var(--erro)" />
+        <Kpi label="Valor envolvido" value={BRL(data.valorEnvolvido)} cor="var(--tx-strong)" />
       </div>
 
       {/* Saúde do cliente — 6 dimensões calculadas do dado real */}
@@ -77,15 +76,14 @@ function Conteudo() {
         </div>
       )}
 
-      <h2 style={{ fontSize: 16, fontWeight: 600, marginTop: 26, marginBottom: 12 }}>Notas e como corrigir</h2>
+      <SectionTitle>Notas e como corrigir</SectionTitle>
       {data.notas.map((n: any) => (
-        <div key={n.docId} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 12 }}>
+        <div key={n.docId} className="card-aura" style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 10 }}>
             <div><strong>NF {n.nota ?? '—'}</strong> <span style={{ fontSize: 12, color: 'var(--faint)' }}>· {dataBR(n.data)}</span></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <strong>{BRL(n.valor)}</strong>
-              <button onClick={() => baixar(n.docId, n.arquivo)} disabled={baixando === n.docId}
-                style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--muted)', fontSize: 12, cursor: 'pointer' }}>
+              <button onClick={() => baixar(n.docId, n.arquivo)} disabled={baixando === n.docId} className="btn-secondary">
                 {baixando === n.docId ? '...' : 'XML'}
               </button>
             </div>
@@ -124,7 +122,7 @@ const scoreDot = (s: number) => s >= 75 ? 'var(--dot-ok)' : s >= 50 ? 'var(--dot
 
 function SaudeCliente({ s }: { s: any }) {
   return (
-    <div style={{ marginTop: 18, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, boxShadow: 'var(--shadow-card)' }}>
+    <div className="card-aura" style={{ marginTop: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <HeartPulse size={18} color={scoreCor(s.scoreGeral)} />
@@ -159,15 +157,6 @@ function SaudeCliente({ s }: { s: any }) {
   );
 }
 
-function Stat({ label, value, cor }: { label: string; value: any; cor: string }) {
-  return (
-    <div style={{ flex: '1 1 140px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
-      <div style={{ fontSize: 12, color: 'var(--faint)' }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: cor, marginTop: 4 }}>{value ?? 0}</div>
-    </div>
-  );
-}
-
 export default function ClienteErrosPage() {
-  return <Suspense fallback={<div style={{ textAlign: 'center', padding: 60 }}><Loader2 size={28} className="animate-spin" /></div>}><Conteudo /></Suspense>;
+  return <Suspense fallback={<Spinner />}><Conteudo /></Suspense>;
 }

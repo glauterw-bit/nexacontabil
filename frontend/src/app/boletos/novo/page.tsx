@@ -1,8 +1,9 @@
 'use client';
 import { useState } from 'react';
-import { ArrowLeft, CreditCard } from 'lucide-react';
+import { ArrowLeft, CreditCard, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useCompany } from '@/contexts/CompanyContext';
+import { PageHeader, SectionTitle, COLORS, tint } from '@/components/ui/kit';
 
 export default function NovoBoletoPage() {
   const { selectedCompany } = useCompany();
@@ -34,87 +35,87 @@ export default function NovoBoletoPage() {
   };
 
   return (
-    <div className="p-8 space-y-6 max-w-4xl">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/boletos" className="btn-ghost p-2"><ArrowLeft className="h-4 w-4" /></Link>
-        <div>
-          <h1 className="text-2xl font-bold text-tx-strong">Novo Boleto</h1>
-          {selectedCompany && <p className="text-tx-muted text-sm mt-1">{selectedCompany.name}</p>}
-        </div>
-      </div>
+    <div className="page-narrow">
+      <PageHeader
+        icon={<CreditCard size={22} color={COLORS.acao} />}
+        title="Novo Boleto"
+        subtitle={selectedCompany?.name}
+        action={<Link href="/boletos" className="btn-secondary"><ArrowLeft className="h-4 w-4" /> Voltar</Link>}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Form */}
+        <div>
+        <SectionTitle>Dados do Boleto</SectionTitle>
         <div className="card-aura space-y-4">
-          <h2 className="text-base font-semibold text-tx-strong">Dados do Boleto</h2>
-
           <div>
             <label className="block text-sm text-tx-muted mb-1.5">Nome do Pagador *</label>
             <input value={form.pagador} onChange={e => setForm(f => ({ ...f, pagador: e.target.value }))}
-              className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="Empresa ABC Ltda" />
+              className="input-aura w-full" placeholder="Empresa ABC Ltda" />
           </div>
           <div>
             <label className="block text-sm text-tx-muted mb-1.5">CNPJ / CPF *</label>
             <input value={form.cnpjCpf} onChange={e => setForm(f => ({ ...f, cnpjCpf: e.target.value }))}
-              className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="00.000.000/0001-00" />
+              className="input-aura w-full" placeholder="00.000.000/0001-00" />
           </div>
           <div>
             <label className="block text-sm text-tx-muted mb-1.5">E-mail</label>
             <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="pagador@email.com" />
+              className="input-aura w-full" placeholder="pagador@email.com" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-tx-muted mb-1.5">Valor (R$) *</label>
               <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setForm(f => ({ ...f, valor: e.target.value }))}
-                className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="1000.00" />
+                className="input-aura w-full" placeholder="1000.00" />
             </div>
             <div>
               <label className="block text-sm text-tx-muted mb-1.5">Vencimento *</label>
               <input type="date" value={form.vencimento} onChange={e => setForm(f => ({ ...f, vencimento: e.target.value }))}
-                className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" />
+                className="input-aura w-full" />
             </div>
           </div>
           <div>
             <label className="block text-sm text-tx-muted mb-1.5">Descrição</label>
             <input value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))}
-              className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" placeholder="Honorários Contábeis — Mar/2026" />
+              className="input-aura w-full" placeholder="Honorários Contábeis — Mar/2026" />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm text-tx-muted mb-1.5">Multa (%)</label>
               <input type="number" min="0" step="0.1" value={form.multa} onChange={e => setForm(f => ({ ...f, multa: e.target.value }))}
-                className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" />
+                className="input-aura w-full" />
             </div>
             <div>
               <label className="block text-sm text-tx-muted mb-1.5">Juros (%/mês)</label>
               <input type="number" min="0" step="0.1" value={form.juros} onChange={e => setForm(f => ({ ...f, juros: e.target.value }))}
-                className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" />
+                className="input-aura w-full" />
             </div>
             <div>
               <label className="block text-sm text-tx-muted mb-1.5">Desconto (%)</label>
               <input type="number" min="0" step="0.1" value={form.desconto} onChange={e => setForm(f => ({ ...f, desconto: e.target.value }))}
-                className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" />
+                className="input-aura w-full" />
             </div>
           </div>
           <div>
             <label className="block text-sm text-tx-muted mb-1.5">Instruções ao Banco</label>
             <textarea value={form.instrucoes} onChange={e => setForm(f => ({ ...f, instrucoes: e.target.value }))} rows={3}
-              className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500 resize-none" placeholder="Ex: Após vencimento cobrar multa de 2% e juros de 1% ao mês." />
+              className="input-aura w-full resize-none" placeholder="Ex: Após vencimento cobrar multa de 2% e juros de 1% ao mês." />
           </div>
           <button onClick={gerar} disabled={gerando} className="btn-primary w-full justify-center">
             {gerando ? (
-              <span className="flex items-center gap-2"><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Gerando...</span>
+              <span className="flex items-center gap-2"><Loader2 className="animate-spin h-4 w-4" />Gerando...</span>
             ) : (
               <span className="flex items-center gap-2"><CreditCard className="h-4 w-4" />Gerar Boleto</span>
             )}
           </button>
         </div>
+        </div>
 
         {/* Preview */}
+        <div>
+        <SectionTitle>Preview do Boleto</SectionTitle>
         <div className="card-aura space-y-4">
-          <h2 className="text-base font-semibold text-tx-strong">Preview do Boleto</h2>
           <div className="bg-white rounded-xl p-4 text-gray-900">
             <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-3">
               <div>
@@ -154,11 +155,13 @@ export default function NovoBoletoPage() {
             )}
           </div>
           {gerado && (
-            <div className="flex items-center gap-2 text-sm text-ok bg-green-400/10 border border-green-400/30 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 text-sm text-ok rounded-lg px-3 py-2"
+              style={{ background: tint(COLORS.ok, 10), border: `1px solid ${tint(COLORS.ok, 30)}` }}>
               <CreditCard className="h-4 w-4" />
               Boleto gerado com sucesso! Código de barras disponível.
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>

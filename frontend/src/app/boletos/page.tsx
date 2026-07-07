@@ -6,6 +6,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
+import { PageHeader, Kpi, StatusChip, Spinner, EmptyState, COLORS, StatusTone } from '@/components/ui/kit';
 
 const LIST_BOLETOS = gql`
   query Boletos($companyId: String!) {
@@ -50,15 +51,15 @@ interface Boleto {
   paidAt?: string;
 }
 
-const STATUS_MAP: Record<string, { label: string; classes: string }> = {
-  pending: { label: 'Pendente', classes: 'text-warn bg-amber-500/10 border-amber-500/30' },
-  pendente: { label: 'Pendente', classes: 'text-warn bg-amber-500/10 border-amber-500/30' },
-  paid: { label: 'Pago', classes: 'text-ok bg-emerald-500/10 border-emerald-500/30' },
-  pago: { label: 'Pago', classes: 'text-ok bg-emerald-500/10 border-emerald-500/30' },
-  overdue: { label: 'Vencido', classes: 'text-err bg-red-500/10 border-red-500/30' },
-  vencido: { label: 'Vencido', classes: 'text-err bg-red-500/10 border-red-500/30' },
-  cancelled: { label: 'Cancelado', classes: 'text-tx-muted bg-gray-500/10 border-gray-500/30' },
-  cancelado: { label: 'Cancelado', classes: 'text-tx-muted bg-gray-500/10 border-gray-500/30' },
+const STATUS_MAP: Record<string, { label: string; tone: StatusTone }> = {
+  pending: { label: 'Pendente', tone: 'atencao' },
+  pendente: { label: 'Pendente', tone: 'atencao' },
+  paid: { label: 'Pago', tone: 'ok' },
+  pago: { label: 'Pago', tone: 'ok' },
+  overdue: { label: 'Vencido', tone: 'critico' },
+  vencido: { label: 'Vencido', tone: 'critico' },
+  cancelled: { label: 'Cancelado', tone: 'pendente' },
+  cancelado: { label: 'Cancelado', tone: 'pendente' },
 };
 
 function brl(n: number) {
@@ -116,36 +117,32 @@ export default function BoletosPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa.</p>
-        <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">Gerenciar Empresas</Link>
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione uma empresa" sub="Escolha uma empresa da carteira para ver os boletos." />
+        <div className="flex justify-center">
+          <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-6xl space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <Banknote className="h-5 w-5 text-acao" />
-            <h1 className="text-xl font-semibold text-tx-strong">Boletos</h1>
-          </div>
-          <p className="text-sm text-tx-muted">{selectedCompany.name} · {boletos.length} boleto(s)</p>
-        </div>
-        <button
-          onClick={() => setShowNew(true)}
-          className="px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded inline-flex items-center gap-1.5"
-        >
-          <Plus className="h-3.5 w-3.5" /> Novo boleto
-        </button>
-      </div>
+    <div className="page space-y-5">
+      <PageHeader
+        icon={<Banknote size={22} color={COLORS.acao} />}
+        title="Boletos"
+        subtitle={`${selectedCompany.name} · ${boletos.length} boleto(s)`}
+        action={
+          <button onClick={() => setShowNew(true)} className="btn-primary">
+            <Plus className="h-4 w-4" /> Novo boleto
+          </button>
+        }
+      />
 
-      <div className="grid md:grid-cols-3 gap-3">
-        <KPI label="Pendentes" value={brl(totals.pendentes)} color="text-warn" />
-        <KPI label="Vencidos" value={brl(totals.vencidos)} color="text-err" />
-        <KPI label="Pagos" value={brl(totals.pagos)} color="text-ok" />
+      <div className="flex gap-3 flex-wrap">
+        <Kpi label="Pendentes" value={brl(totals.pendentes)} cor={COLORS.atencao} />
+        <Kpi label="Vencidos" value={brl(totals.vencidos)} cor={COLORS.erro} />
+        <Kpi label="Pagos" value={brl(totals.pagos)} cor={COLORS.ok} />
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
@@ -155,13 +152,13 @@ export default function BoletosPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por pagador ou CNPJ/CPF"
-            className="w-full pl-9 pr-3 py-1.5 bg-card border border-line rounded text-sm text-tx-strong outline-none"
+            className="input-aura w-full pl-9"
           />
         </div>
         <select
           value={statusFiltro}
           onChange={(e) => setStatusFiltro(e.target.value)}
-          className="px-3 py-1.5 bg-card border border-line rounded text-sm text-tx-strong outline-none"
+          className="input-aura"
         >
           <option value="todos">Todos status</option>
           <option value="pending">Pendentes</option>
@@ -172,46 +169,42 @@ export default function BoletosPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-10 text-sm text-tx-muted flex items-center justify-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
-        </div>
+        <Spinner />
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-line bg-card p-10 text-center">
-          <Banknote className="h-10 w-10 text-tx-faint mx-auto mb-3" />
-          <p className="text-sm font-medium text-tx-strong">Nenhum boleto encontrado</p>
-          <p className="text-xs text-tx-muted mt-1">
-            Crie um boleto manual ou configure o Banco Inter API em /integracoes para emissão automática.
-          </p>
+        <div className="card-aura">
+          <EmptyState
+            icon={<Banknote size={40} />}
+            title="Nenhum boleto encontrado"
+            sub="Crie um boleto manual ou configure o Banco Inter API em /integracoes para emissão automática."
+          />
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map((b) => {
-            const sc = STATUS_MAP[b.status] ?? { label: b.status, classes: 'text-tx-muted' };
+            const sc = STATUS_MAP[b.status] ?? { label: b.status, tone: 'pendente' as StatusTone };
             const isVencido = (b.status === 'pending' || b.status === 'pendente') && new Date(b.dueDate) < new Date();
             const venc = new Date(b.dueDate).toLocaleDateString('pt-BR');
             return (
-              <div key={b.id} className="rounded-lg border border-line bg-card p-3 hover:border-indigo-500/40 transition-colors">
+              <div key={b.id} className="card-aura hover:border-[var(--acao)] transition-colors">
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex-1 min-w-[200px]">
-                    <p className="text-sm font-medium text-tx-strong truncate">{b.payerName}</p>
+                    <p className="text-[13px] font-medium text-tx-strong truncate">{b.payerName}</p>
                     <p className="text-[11px] text-tx-muted font-mono">{b.payerCnpjCpf} · vence {venc}</p>
                   </div>
-                  <span className="text-lg font-bold text-ok font-mono">{brl(b.amount)}</span>
-                  <span className={`px-2 py-0.5 text-[10px] border rounded ${sc.classes}`}>
-                    {isVencido ? 'Vencido' : sc.label}
-                  </span>
-                  <div className="flex gap-1">
+                  <span className="num text-[15px] font-bold text-tx-strong">{brl(b.amount)}</span>
+                  <StatusChip tone={isVencido ? 'critico' : sc.tone} label={isVencido ? 'Vencido' : sc.label} size="sm" />
+                  <div className="flex gap-1 items-center">
                     {b.digitableLine && (
-                      <button onClick={() => copyLine(b.digitableLine!)} className="p-1.5 text-tx-muted hover:text-tx-strong" title="Copiar linha">
+                      <button onClick={() => copyLine(b.digitableLine!)} className="btn-ghost p-1.5" title="Copiar linha">
                         <Copy className="h-3.5 w-3.5" />
                       </button>
                     )}
                     {(b.status === 'pending' || b.status === 'pendente') && (
                       <>
-                        <button onClick={() => markPaid({ variables: { id: b.id } })} className="px-2 py-1 text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white rounded">
+                        <button onClick={() => markPaid({ variables: { id: b.id } })} className="btn-secondary text-xs px-2.5 py-1.5">
                           Marcar pago
                         </button>
-                        <button onClick={() => confirm('Cancelar boleto?') && cancelBoleto({ variables: { id: b.id } })} className="px-2 py-1 text-[10px] bg-red-600/30 hover:bg-red-600/50 text-err rounded">
+                        <button onClick={() => confirm('Cancelar boleto?') && cancelBoleto({ variables: { id: b.id } })} className="btn-ghost text-xs px-2.5 py-1.5 text-err">
                           Cancelar
                         </button>
                       </>
@@ -219,7 +212,7 @@ export default function BoletosPage() {
                   </div>
                 </div>
                 {b.digitableLine && (
-                  <p className="text-[10px] font-mono text-tx-muted mt-1 truncate">{b.digitableLine}</p>
+                  <p className="text-[11px] font-mono text-tx-muted mt-1 truncate">{b.digitableLine}</p>
                 )}
               </div>
             );
@@ -232,26 +225,17 @@ export default function BoletosPage() {
   );
 }
 
-function KPI({ label, value, color }: any) {
-  return (
-    <div className="rounded-xl border border-line bg-card p-4">
-      <p className="text-xs text-tx-muted">{label}</p>
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
-    </div>
-  );
-}
-
 function NewBoletoModal({ companyId, onClose, onCreate, loading }: any) {
   const [form, setForm] = useState({
     payerName: '', payerCnpjCpf: '', amount: 0, dueDate: new Date().toISOString().slice(0, 10),
     beneficiaryName: '', beneficiaryCnpj: '', instructions: '',
   });
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-card border border-line rounded-xl overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-[rgba(13,17,25,0.45)] flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-card border border-line rounded-xl shadow-pop overflow-hidden">
         <div className="px-5 py-3 border-b border-line flex justify-between">
           <p className="text-sm font-medium text-tx-strong">Novo boleto</p>
-          <button onClick={onClose}><X className="h-4 w-4 text-tx-muted" /></button>
+          <button onClick={onClose} className="btn-ghost p-1"><X className="h-4 w-4" /></button>
         </div>
         <div className="p-5 space-y-3">
           {[
@@ -264,19 +248,19 @@ function NewBoletoModal({ companyId, onClose, onCreate, loading }: any) {
             { k: 'instructions', label: 'Descrição (opcional)', type: 'text' },
           ].map((f) => (
             <div key={f.k}>
-              <label className="text-[10px] uppercase text-tx-muted tracking-wider block mb-1">{f.label}</label>
+              <label className="text-[11px] uppercase text-tx-faint tracking-wider block mb-1">{f.label}</label>
               <input
                 type={f.type}
                 value={(form as any)[f.k]}
                 onChange={(e) => setForm({ ...form, [f.k]: f.type === 'number' ? Number(e.target.value) : e.target.value })}
-                className="w-full px-3 py-1.5 bg-inset border border-line rounded text-sm text-tx-strong outline-none"
+                className="input-aura w-full"
               />
             </div>
           ))}
           <button
             onClick={() => onCreate({ variables: { input: { companyId, ...form, dueDate: new Date(form.dueDate) } } })}
             disabled={loading || !form.payerName || form.amount <= 0}
-            className="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs rounded"
+            className="btn-primary w-full justify-center"
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin inline" /> : 'Criar boleto'}
           </button>

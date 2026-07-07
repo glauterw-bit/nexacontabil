@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Search, Loader2, FileText, AlertTriangle, Sparkles, Download } from 'lucide-react';
-import { tint } from '@/components/ui/kit';
+import { tint, COLORS, PageHeader, Card, Kpi, Spinner, EmptyState } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -53,47 +53,46 @@ export default function BuscarDocsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto', padding: 24 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Sparkles size={24} color="var(--acao)" /> Buscar Documentos
-      </h1>
-      <p style={{ color: 'var(--muted)', marginTop: 4 }}>
-        Peça em linguagem natural. A IA interpreta e traz os arquivos <strong>+ a análise fiscal</strong>.
-      </p>
+    <div className="page-narrow">
+      <PageHeader
+        icon={<Sparkles size={22} color={COLORS.acao} />}
+        title="Buscar Documentos"
+        subtitle="Peça em linguagem natural. A IA interpreta e traz os arquivos + a análise fiscal."
+      />
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
         <div style={{ position: 'relative', flex: 1 }}>
-          <Search size={18} style={{ position: 'absolute', left: 14, top: 14, color: 'var(--faint)' }} />
+          <Search size={18} style={{ position: 'absolute', left: 14, top: 12, color: 'var(--faint)' }} />
           <input
             value={query} onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && buscar()}
             placeholder="Ex: NF da Laser Tech de junho acima de 1000 reais"
-            style={{ width: '100%', padding: '12px 14px 12px 42px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--tx)', fontSize: 15 }}
+            className="input-aura w-full"
+            style={{ paddingLeft: 42 }}
           />
         </div>
-        <button onClick={() => buscar()} disabled={loading}
-          style={{ padding: '0 22px', borderRadius: 10, border: 'none', background: 'var(--acao)', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>
+        <button onClick={() => buscar()} disabled={loading} className="btn-primary">
           {loading ? <Loader2 size={18} className="animate-spin" /> : 'Buscar'}
         </button>
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
         {EXEMPLOS.map((ex) => (
-          <button key={ex} onClick={() => buscar(ex)}
-            style={{ padding: '6px 12px', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--muted)', fontSize: 12, cursor: 'pointer' }}>
+          <button key={ex} onClick={() => buscar(ex)} className="btn-secondary"
+            style={{ borderRadius: 20, padding: '6px 12px', fontSize: 12 }}>
             {ex}
           </button>
         ))}
       </div>
 
-      {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}><Loader2 size={28} className="animate-spin" /></div>}
+      {loading && <Spinner />}
 
       {data && (
         <div style={{ marginTop: 24 }}>
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-            <Card label="Encontrados" value={`${data.encontrados}`} sub={data.totalDisponivel > data.encontrados ? `de ${data.totalDisponivel}+` : undefined} />
-            <Card label="Valor total" value={BRL(data.valorTotal)} />
-            <Card label="Com inconsistência" value={`${data.comInconsistencia}`} cor={data.comInconsistencia ? 'var(--atencao)' : 'var(--ok)'} />
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+            <Kpi label="Encontrados" value={data.encontrados} sub={data.totalDisponivel > data.encontrados ? `de ${data.totalDisponivel}+` : undefined} />
+            <Kpi label="Valor total" value={BRL(data.valorTotal)} />
+            <Kpi label="Com inconsistência" value={data.comInconsistencia} cor={data.comInconsistencia ? COLORS.atencao : COLORS.ok} />
           </div>
 
           {/* como o sistema interpretou a busca — transparência p/ o analista confiar */}
@@ -113,17 +112,15 @@ export default function BuscarDocsPage() {
           )}
 
           {data.encontrados === 0 && !data.clienteNaoEncontrado && (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--faint)', border: '1px dashed var(--border)', borderRadius: 10 }}>
-              Nenhum documento encontrado para essa busca.
-            </div>
+            <EmptyState icon={<Search size={28} />} title="Nenhum documento encontrado para essa busca." />
           )}
 
           {data.resultados.map((r: any) => (
-            <div key={r.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 10 }}>
+            <Card key={r.id} style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <FileText size={16} color="var(--acao)" />
+                    <FileText size={16} color="var(--muted)" />
                     <strong>{r.emitente || r.arquivo}</strong>
                     <span style={{ fontSize: 11, color: 'var(--faint)', textTransform: 'uppercase' }}>{r.tipo} {r.numero ? `#${r.numero}` : ''}</span>
                   </div>
@@ -133,10 +130,10 @@ export default function BuscarDocsPage() {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                  <div style={{ fontWeight: 700, fontSize: 16 }}>{BRL(r.valor)}</div>
-                  {r.impostos && <div style={{ fontSize: 11, color: 'var(--faint)' }}>ICMS {BRL(r.impostos.icms)}</div>}
+                  <div className="num" style={{ fontWeight: 700, fontSize: 16 }}>{BRL(r.valor)}</div>
+                  {r.impostos && <div className="num" style={{ fontSize: 11, color: 'var(--faint)' }}>ICMS {BRL(r.impostos.icms)}</div>}
                   <button onClick={() => baixar(r.id, r.arquivo)} disabled={baixando === r.id}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--muted)', fontSize: 12, cursor: 'pointer' }}>
+                    className="btn-secondary" style={{ padding: '5px 10px', fontSize: 12 }}>
                     {baixando === r.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} XML
                   </button>
                 </div>
@@ -150,7 +147,7 @@ export default function BuscarDocsPage() {
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -160,15 +157,4 @@ export default function BuscarDocsPage() {
 
 function Chip({ txt, cor }: { txt: string; cor: string }) {
   return <span style={{ padding: '3px 10px', borderRadius: 20, border: `1px solid ${tint(cor, 25)}`, background: tint(cor, 8), color: cor }}>{txt}</span>;
-}
-
-function Card({ label, value, cor, sub }: { label: string; value: string; cor?: string; sub?: string }) {
-  return (
-    <div style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-      <div style={{ fontSize: 12, color: 'var(--faint)' }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: cor || 'var(--tx-strong)', marginTop: 4 }}>
-        {value} {sub && <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--faint)' }}>{sub}</span>}
-      </div>
-    </div>
-  );
 }

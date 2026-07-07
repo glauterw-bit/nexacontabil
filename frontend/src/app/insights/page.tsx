@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { Brain, Loader2, Sparkles, TrendingUp, AlertTriangle, Lightbulb, X, Play } from 'lucide-react';
-import { PageHeader, Kpi, Card, SectionTitle, COLORS, tint } from '@/components/ui/kit';
+import { Brain, Loader2, Sparkles, TrendingUp, AlertTriangle, Lightbulb, Play } from 'lucide-react';
+import { PageHeader, Kpi, Card, SectionTitle, COLORS, tint, Spinner, Drawer, EmptyState } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -39,12 +39,12 @@ export default function InsightsPage() {
     } finally { setRodando(false); }
   }
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: COLORS.muted }}><Loader2 size={32} className="animate-spin" /></div>;
+  if (loading) return <Spinner />;
 
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto', padding: 24 }}>
-      <PageHeader icon={<Brain size={24} color={COLORS.acao} />} title="Insights de IA" subtitle="Análise fiscal e contábil avançada sobre os dados reais da carteira."
-        action={<button onClick={rodarLote} disabled={rodando} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, border: 'none', background: COLORS.acao, color: '#fff', fontWeight: 600, cursor: 'pointer' }}>
+    <div className="page">
+      <PageHeader icon={<Brain size={22} color={COLORS.acao} />} title="Insights de IA" subtitle="Análise fiscal e contábil avançada sobre os dados reais da carteira."
+        action={<button onClick={rodarLote} disabled={rodando} className="btn-primary">
           {rodando ? <Loader2 size={16} className="animate-spin" /> : <Play size={15} />} Gerar insights (lote de 40)
         </button>} />
 
@@ -55,8 +55,8 @@ export default function InsightsPage() {
       )}
 
       {(!data || data.total === 0) ? (
-        <Card style={{ textAlign: 'center', padding: 30, color: COLORS.faint }}>
-          Nenhum insight gerado ainda. Clique em <strong>Gerar insights</strong> para a IA analisar a carteira.
+        <Card>
+          <EmptyState icon={<Sparkles size={28} />} title="Nenhum insight gerado ainda." sub="Clique em Gerar insights para a IA analisar a carteira." />
         </Card>
       ) : (
         <>
@@ -125,34 +125,31 @@ function InsightDrawer({ companyId, onClose }: { companyId: string; onClose: () 
   ) : null);
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,17,25,0.45)', display: 'flex', justifyContent: 'flex-end', zIndex: 50 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 540, maxWidth: '96vw', height: '100%', background: COLORS.surface, borderLeft: `1px solid ${COLORS.border}`, overflowY: 'auto', padding: 22 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: COLORS.acao }}>
-            <Sparkles size={18} /> Insight
-            {p.fonte && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: p.fonte === 'ia' ? tint(COLORS.acao, 13) : tint(COLORS.atencao, 13), color: p.fonte === 'ia' ? COLORS.acao : COLORS.atencao }}>{p.fonte === 'ia' ? 'IA avançada' : 'por regras'}</span>}
-          </div>
-          <X size={18} style={{ cursor: 'pointer', color: COLORS.faint }} onClick={onClose} />
+    <Drawer open onClose={onClose} width={540}
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: COLORS.acao }}>
+          <Sparkles size={18} /> Insight
+          {p.fonte && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: p.fonte === 'ia' ? tint(COLORS.acao, 13) : tint(COLORS.atencao, 13), color: p.fonte === 'ia' ? COLORS.acao : COLORS.atencao }}>{p.fonte === 'ia' ? 'IA avançada' : 'por regras'}</span>}
         </div>
-        {loading ? <div style={{ textAlign: 'center', padding: 40 }}><Loader2 size={24} className="animate-spin" /></div> :
-          !d ? <div style={{ color: COLORS.faint }}>Sem insight gerado para este cliente.</div> : (
-            <>
-              {d.scoreSaude != null && <div style={{ fontSize: 34, fontWeight: 800, color: scoreCor(d.scoreSaude) }}>{d.scoreSaude}<span style={{ fontSize: 14, color: COLORS.muted, fontWeight: 400 }}> / 100 saúde</span></div>}
-              <p style={{ color: 'var(--tx)', fontSize: 14, lineHeight: 1.7, marginTop: 8 }}>{p.resumoExecutivo}</p>
-              <Card style={{ marginTop: 8, padding: 12, background: tint(COLORS.acao, 8) }}>
-                <div style={{ fontSize: 12, color: COLORS.faint }}>Economia potencial</div>
-                <div style={{ fontSize: 13, color: COLORS.ok, marginTop: 2 }}>{p.economiaPotencial}</div>
-              </Card>
-              <SectionTitle>Fiscal</SectionTitle>
-              <Lista titulo="Observações" itens={p.fiscal?.observacoes} cor={COLORS.info} icon={<TrendingUp size={14} />} />
-              <Lista titulo="Oportunidades" itens={p.fiscal?.oportunidades} cor={COLORS.ok} icon={<Lightbulb size={14} />} />
-              <Lista titulo="Riscos" itens={p.fiscal?.riscos} cor={COLORS.erro} icon={<AlertTriangle size={14} />} />
-              <SectionTitle>Contábil</SectionTitle>
-              <Lista titulo="Observações" itens={p.contabil?.observacoes} cor={COLORS.info} icon={<TrendingUp size={14} />} />
-              <Lista titulo="Recomendações" itens={p.contabil?.recomendacoes} cor={COLORS.acao} icon={<Lightbulb size={14} />} />
-            </>
-          )}
-      </div>
-    </div>
+      }>
+      {loading ? <Spinner pad={40} /> :
+        !d ? <EmptyState icon={<Sparkles size={28} />} title="Sem insight gerado para este cliente." /> : (
+          <>
+            {d.scoreSaude != null && <div className="num" style={{ fontSize: 34, fontWeight: 800, color: scoreCor(d.scoreSaude) }}>{d.scoreSaude}<span style={{ fontSize: 14, color: COLORS.muted, fontWeight: 400 }}> / 100 saúde</span></div>}
+            <p style={{ color: 'var(--tx)', fontSize: 14, lineHeight: 1.7, marginTop: 8 }}>{p.resumoExecutivo}</p>
+            <Card style={{ marginTop: 8, padding: 12, background: tint(COLORS.acao, 8) }}>
+              <div style={{ fontSize: 12, color: COLORS.faint }}>Economia potencial</div>
+              <div style={{ fontSize: 13, color: COLORS.ok, marginTop: 2 }}>{p.economiaPotencial}</div>
+            </Card>
+            <SectionTitle>Fiscal</SectionTitle>
+            <Lista titulo="Observações" itens={p.fiscal?.observacoes} cor={COLORS.info} icon={<TrendingUp size={14} />} />
+            <Lista titulo="Oportunidades" itens={p.fiscal?.oportunidades} cor={COLORS.ok} icon={<Lightbulb size={14} />} />
+            <Lista titulo="Riscos" itens={p.fiscal?.riscos} cor={COLORS.erro} icon={<AlertTriangle size={14} />} />
+            <SectionTitle>Contábil</SectionTitle>
+            <Lista titulo="Observações" itens={p.contabil?.observacoes} cor={COLORS.info} icon={<TrendingUp size={14} />} />
+            <Lista titulo="Recomendações" itens={p.contabil?.recomendacoes} cor={COLORS.acao} icon={<Lightbulb size={14} />} />
+          </>
+        )}
+    </Drawer>
   );
 }

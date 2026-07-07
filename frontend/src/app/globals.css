@@ -93,15 +93,72 @@
   ::-webkit-scrollbar-thumb:hover { background: var(--faint); }
 
   ::selection { background: color-mix(in srgb, var(--acao) 25%, transparent); }
+
+  /* Foco visível e consistente em elementos interativos */
+  button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--acao) 60%, transparent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  h1, h2, h3 { color: var(--tx-strong); letter-spacing: -0.01em; }
 }
 
 @layer components {
+  /* ── Container padrão de página: TODA tela usa isto (consistência total) ── */
+  .page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .page-narrow {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+
   .card-aura {
     background-color: var(--surface);
     border-radius: 0.75rem;
     border: 1px solid var(--border);
     box-shadow: var(--shadow-card);
-    padding: 1.5rem;
+    padding: 1.25rem;
+  }
+
+  /* ── Tabela padrão (densa, legível) ── */
+  .table-aura { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .table-aura thead th {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--faint); text-align: left; padding: 8px 12px;
+    border-bottom: 1px solid var(--border); background: var(--surface);
+    position: sticky; top: 0; z-index: 1;
+  }
+  .table-aura tbody td { padding: 9px 12px; border-bottom: 1px solid var(--border-soft); color: var(--tx); }
+  .table-aura tbody tr { transition: background 0.1s; }
+  .table-aura tbody tr:hover { background: var(--surface2); }
+  .table-aura .num, .table-aura td.num, .table-aura th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--tx);
+    font-weight: 500;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border);
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+  }
+  .btn-secondary:hover { background: var(--surface2); color: var(--tx-strong); }
+  .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 9999px;
+    font-size: 12px; font-weight: 600; white-space: nowrap;
   }
 
   .btn-primary {

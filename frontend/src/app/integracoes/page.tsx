@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react';
 import {
   CheckCircle2, Circle, AlertTriangle, ExternalLink, ChevronDown, ChevronRight,
   Sparkles, Receipt, Banknote, MessageCircle, Cloud, Mail, ShieldCheck, Building2,
-  Copy, Check, Loader2, HardDrive, Zap,
+  Copy, Check, HardDrive, Zap,
 } from 'lucide-react';
+import { PageHeader, SectionTitle, Spinner, EmptyState, COLORS, tint } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
@@ -61,17 +62,16 @@ export default function IntegracoesPage() {
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center gap-3 text-tx-muted">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Verificando integrações…
+      <div className="page">
+        <Spinner />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="p-8 text-err text-sm">
-        Falha ao carregar status. Tente novamente em alguns segundos.
+      <div className="page">
+        <EmptyState icon={<Cloud size={40} />} title="Falha ao carregar status" sub="Tente novamente em alguns segundos." />
       </div>
     );
   }
@@ -79,34 +79,28 @@ export default function IntegracoesPage() {
   const pct = data.summary.total > 0 ? Math.round((data.summary.configured / data.summary.total) * 100) : 0;
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl space-y-6">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="h-5 w-5 text-acao" />
-          <h1 className="text-xl font-semibold text-tx-strong">Integrações</h1>
-        </div>
-        <p className="text-sm text-tx-muted max-w-2xl">
-          O NexaContábil funciona sem nenhuma destas APIs externas (modo demo). Cada uma adicionada
-          desbloqueia uma capacidade real. Configure pelo Railway → backend → Variables.
-        </p>
-      </div>
+    <div className="page space-y-6">
+      <PageHeader
+        icon={<Sparkles size={22} color={COLORS.acao} />}
+        title="Integrações"
+        subtitle="O NexaContábil funciona sem nenhuma destas APIs (modo demo); cada uma adicionada desbloqueia uma capacidade real — configure pelo Railway → backend → Variables."
+      />
 
       {/* Progress bar */}
-      <div className="rounded-xl border border-line bg-card p-5">
+      <div className="card-aura">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <p className="text-sm font-medium text-tx-strong">
+            <p className="text-[13px] font-medium text-tx-strong">
               Progresso de configuração: {data.summary.configured} de {data.summary.total}
             </p>
             <p className="text-xs text-tx-muted mt-0.5">{pct}% do potencial ativado</p>
           </div>
-          <span className="text-2xl font-bold text-acao font-mono">{pct}%</span>
+          <span className="num text-2xl font-bold text-acao">{pct}%</span>
         </div>
         <div className="h-2 bg-inset rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all"
-            style={{ width: `${pct}%` }}
+            className="h-full transition-all"
+            style={{ width: `${pct}%`, background: COLORS.acao }}
           />
         </div>
       </div>
@@ -118,24 +112,25 @@ export default function IntegracoesPage() {
         const g = GRUPOS[grupo];
         return (
         <div key={grupo} className="space-y-2">
-          <div className="flex items-center gap-2 pt-2">
-            {grupo === 1 ? <Zap className="h-4 w-4 text-acao" /> : grupo === 2 ? <Receipt className="h-4 w-4 text-tx-muted" /> : <Cloud className="h-4 w-4 text-tx-muted" />}
-            <h2 className="text-sm font-semibold text-tx-strong">{g.titulo}</h2>
-            <span className="text-xs text-tx-muted">· {g.desc}</span>
-          </div>
+          <SectionTitle>
+            {grupo === 1 ? <Zap className="h-4 w-4 text-tx-muted" /> : grupo === 2 ? <Receipt className="h-4 w-4 text-tx-muted" /> : <Cloud className="h-4 w-4 text-tx-muted" />}
+            {g.titulo}
+            <span className="text-xs text-tx-muted font-normal">· {g.desc}</span>
+          </SectionTitle>
         {items.map((it) => {
           const Icon = ICONS[it.key] || Cloud;
           const isExpanded = expanded === it.key;
           return (
             <div
               key={it.key}
-              className={`rounded-xl border ${
+              className="card-aura !p-0 transition-colors"
+              style={
                 it.status === 'configured'
-                  ? 'border-emerald-500/30 bg-emerald-500/5'
+                  ? { borderColor: tint(COLORS.ok, 30), background: tint(COLORS.ok, 5) }
                   : it.status === 'partial'
-                  ? 'border-amber-500/30 bg-amber-500/5'
-                  : 'border-line bg-card'
-              } transition-colors`}
+                  ? { borderColor: tint(COLORS.atencao, 30), background: tint(COLORS.atencao, 5) }
+                  : undefined
+              }
             >
               <button
                 onClick={() => setExpanded(isExpanded ? null : it.key)}
@@ -155,14 +150,15 @@ export default function IntegracoesPage() {
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium text-tx-strong">{it.name}</p>
                     {it.required && (
-                      <span className="px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider bg-red-500/15 text-err border border-red-500/30 rounded">
+                      <span className="px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-err rounded"
+                        style={{ background: tint(COLORS.erro, 12), border: `1px solid ${tint(COLORS.erro, 30)}` }}>
                         Obrigatório por cliente
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-tx-muted mt-0.5 truncate">{it.helps[0]}</p>
                   {it.usadoEm && (
-                    <p className="text-[11px] text-acao mt-0.5 truncate">Usado em: {it.usadoEm}</p>
+                    <p className="text-[11px] text-tx-muted mt-0.5 truncate">Usado em: {it.usadoEm}</p>
                   )}
                 </div>
                 {isExpanded ? (
@@ -197,7 +193,8 @@ export default function IntegracoesPage() {
                     <ol className="space-y-2">
                       {it.setupSteps.map((s, i) => (
                         <li key={i} className="text-xs text-tx flex gap-2.5">
-                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-acao text-[10px] flex items-center justify-center font-mono">
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full text-acao text-[10px] flex items-center justify-center font-mono"
+                            style={{ background: tint(COLORS.acao, 12), border: `1px solid ${tint(COLORS.acao, 30)}` }}>
                             {i + 1}
                           </span>
                           <span className="leading-relaxed">
@@ -206,7 +203,7 @@ export default function IntegracoesPage() {
                                 <button
                                   key={j}
                                   onClick={() => copy(part)}
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 bg-inset border border-line hover:border-indigo-500/40 text-acao font-mono rounded text-[10px] transition-colors"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 bg-inset border border-line hover:border-[var(--acao)] text-acao font-mono rounded text-[10px] transition-colors"
                                   title="Copiar"
                                 >
                                   {part}
@@ -233,7 +230,7 @@ export default function IntegracoesPage() {
                         href={it.signupUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+                        className="btn-primary text-xs"
                       >
                         Abrir provedor
                         <ExternalLink className="h-3 w-3" />
@@ -243,7 +240,7 @@ export default function IntegracoesPage() {
                       href="https://railway.com/project/13950cf7-4eb4-481c-9496-d8cb64fdced6/service/8189c609-e8a5-4a8c-b42e-695c1712e62c/variables"
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-inset hover:bg-card text-tx-strong border border-line rounded-lg transition-colors"
+                      className="btn-secondary text-xs"
                     >
                       Variáveis do backend (Railway)
                       <ExternalLink className="h-3 w-3" />
@@ -259,9 +256,9 @@ export default function IntegracoesPage() {
       })}
 
       {/* Help */}
-      <div className="rounded-xl border border-line bg-card p-4">
+      <div className="card-aura">
         <div className="flex gap-3">
-          <Building2 className="h-4 w-4 text-acao flex-shrink-0 mt-0.5" />
+          <Building2 className="h-4 w-4 text-tx-muted flex-shrink-0 mt-0.5" />
           <div className="text-xs text-tx-muted leading-relaxed">
             <p className="font-medium text-tx-strong mb-1">Funciona sem nenhuma integração?</p>
             <p>

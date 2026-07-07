@@ -5,6 +5,7 @@ import {
   AlertTriangle, FileText, RefreshCw, ChevronRight, X,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
+import { PageHeader, StatusChip, EmptyState, COLORS } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
@@ -76,25 +77,19 @@ export default function EsteiraFiscalPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl space-y-5">
-      <div>
-        <div className="flex items-center gap-2 mb-0.5">
-          <Workflow className="h-5 w-5 text-acao" />
-          <h1 className="text-xl font-semibold text-tx-strong">Esteira Fiscal Automática</h1>
-          <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-indigo-500/15 text-acao border border-indigo-500/30 rounded">Auto</span>
-        </div>
-        <p className="text-sm text-tx-muted">
-          Varre uma pasta do Drive, identifica o cliente de cada documento pelo CNPJ, valida a tributação
-          contra o Banco de NCM e envia o relatório por e-mail + WhatsApp.
-        </p>
-      </div>
+    <div className="page space-y-5">
+      <PageHeader
+        icon={<Workflow size={22} color={COLORS.acao} />}
+        title="Esteira Fiscal Automática"
+        subtitle="Varre uma pasta do Drive, identifica o cliente de cada documento pelo CNPJ, valida a tributação contra o Banco de NCM e envia o relatório por e-mail + WhatsApp."
+        action={<StatusChip tone="processando" label="Auto" size="sm" />}
+      />
 
       {/* Painel de execução */}
-      <div className="rounded-xl border border-line bg-card p-5 space-y-4">
+      <div className="card-aura space-y-4">
         {conns.length === 0 ? (
-          <div className="text-center py-6">
-            <FolderOpen className="h-8 w-8 mx-auto text-tx-faint mb-2" />
-            <p className="text-sm text-tx-muted">Nenhum Google Drive conectado.</p>
+          <div className="text-center">
+            <EmptyState icon={<FolderOpen size={28} />} title="Nenhum Google Drive conectado." />
             <a href="/drive-conectado" className="text-acao hover:underline text-sm">Conectar Drive →</a>
           </div>
         ) : (
@@ -103,14 +98,14 @@ export default function EsteiraFiscalPage() {
               <div>
                 <label className="block text-xs text-tx-muted mb-1.5 uppercase tracking-wider">Conexão Drive</label>
                 <select value={connectionId} onChange={(e) => setConnectionId(e.target.value)}
-                  className="w-full bg-inset border border-line rounded-lg px-3 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500">
+                  className="input-aura w-full">
                   {conns.map((c) => <option key={c.id} value={c.id}>{c.label} · {c.accountEmail}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs text-tx-muted mb-1.5 uppercase tracking-wider">ID da pasta (opcional)</label>
                 <input value={folderId} onChange={(e) => setFolderId(e.target.value)} placeholder="vazio = pasta raiz da conexão"
-                  className="w-full bg-inset border border-line rounded-lg px-3 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500 placeholder-tx-faint" />
+                  className="input-aura w-full" />
               </div>
             </div>
             <div className="flex items-center justify-between flex-wrap gap-3">
@@ -118,8 +113,7 @@ export default function EsteiraFiscalPage() {
                 <input type="checkbox" checked={enviar} onChange={(e) => setEnviar(e.target.checked)} className="accent-indigo-500" />
                 Enviar relatórios automaticamente (e-mail + WhatsApp)
               </label>
-              <button onClick={executar} disabled={running}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm rounded-lg inline-flex items-center gap-2">
+              <button onClick={executar} disabled={running} className="btn-primary">
                 {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                 {running ? 'Processando…' : 'Executar esteira'}
               </button>
@@ -129,18 +123,18 @@ export default function EsteiraFiscalPage() {
       </div>
 
       {/* Histórico */}
-      <div className="rounded-xl border border-line bg-card p-5">
+      <div className="card-aura">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-tx-strong">Execuções recentes</h2>
-          <button onClick={loadExecucoes} className="text-tx-muted hover:text-tx-strong"><RefreshCw className="h-4 w-4" /></button>
+          <h2 className="text-[15px] font-semibold text-tx-strong m-0">Execuções recentes</h2>
+          <button onClick={loadExecucoes} className="btn-ghost" aria-label="Atualizar"><RefreshCw className="h-4 w-4" /></button>
         </div>
         {execucoes.length === 0 ? (
-          <p className="text-xs text-tx-muted text-center py-6">Nenhuma execução ainda.</p>
+          <EmptyState icon={<Workflow size={28} />} title="Nenhuma execução ainda." />
         ) : (
           <div className="space-y-2">
             {execucoes.map((e) => (
               <button key={e.id} onClick={() => abrirDetalhe(e.id)}
-                className="w-full flex items-center gap-3 p-3 rounded border border-line bg-inset hover:border-indigo-500/40 text-left">
+                className="w-full flex items-center gap-3 p-3 rounded border border-line-soft bg-inset hover:border-acao text-left">
                 <StatusBadge status={e.status} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-tx-strong truncate">{e.folderName ?? 'Pasta'} · {e.totalArquivos} arquivos</p>
@@ -162,14 +156,14 @@ export default function EsteiraFiscalPage() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { c: string; t: string }> = {
-    concluido: { c: 'bg-emerald-500/15 text-ok', t: 'OK' },
-    parcial: { c: 'bg-amber-500/15 text-warn', t: 'Parcial' },
-    erro: { c: 'bg-red-500/15 text-err', t: 'Erro' },
-    rodando: { c: 'bg-blue-500/15 text-info', t: 'Rodando' },
+  const map: Record<string, { tone: 'ok' | 'atencao' | 'critico' | 'processando'; t: string }> = {
+    concluido: { tone: 'ok', t: 'OK' },
+    parcial: { tone: 'atencao', t: 'Parcial' },
+    erro: { tone: 'critico', t: 'Erro' },
+    rodando: { tone: 'processando', t: 'Rodando' },
   };
   const s = map[status] ?? map.rodando;
-  return <span className={`px-2 py-0.5 text-[10px] rounded ${s.c} flex-shrink-0`}>{s.t}</span>;
+  return <StatusChip tone={s.tone} label={s.t} size="sm" />;
 }
 
 function DetalheModal({ detalhe, onClose }: { detalhe: any; onClose: () => void }) {
@@ -177,10 +171,10 @@ function DetalheModal({ detalhe, onClose }: { detalhe: any; onClose: () => void 
   const envios = detalhe.envios ?? [];
   return (
     <div className="fixed inset-0 bg-[rgba(13,17,25,0.45)] backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-card border border-line rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-pop" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card border border-line rounded-xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-pop" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-tx-strong">Detalhe da execução</h2>
-          <button onClick={onClose} className="text-tx-muted hover:text-tx-strong"><X className="h-5 w-5" /></button>
+          <h2 className="text-[15px] font-semibold text-tx-strong m-0">Detalhe da execução</h2>
+          <button onClick={onClose} className="btn-ghost" aria-label="Fechar"><X className="h-5 w-5" /></button>
         </div>
 
         <div className="mb-4">
@@ -215,7 +209,7 @@ function DetalheModal({ detalhe, onClose }: { detalhe: any; onClose: () => void 
             <div className="space-y-1.5">
               {envios.map((e: any) => (
                 <div key={e.id} className="flex items-center gap-2 p-2.5 rounded border border-line bg-inset">
-                  {e.canal === 'email' ? <Mail className="h-3.5 w-3.5 text-acao" /> : <MessageCircle className="h-3.5 w-3.5 text-ok" />}
+                  {e.canal === 'email' ? <Mail className="h-3.5 w-3.5 text-tx-muted" /> : <MessageCircle className="h-3.5 w-3.5 text-tx-muted" />}
                   <span className="text-sm text-tx flex-1 truncate">{e.destino}</span>
                   <span className={`text-[10px] ${e.status === 'enviado' ? 'text-ok' : 'text-err'}`}>{e.status}</span>
                 </div>

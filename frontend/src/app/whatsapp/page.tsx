@@ -8,6 +8,7 @@ import {
   Receipt, TrendingUp, AlertTriangle, Lightbulb, Package, Percent
 } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
+import { PageHeader, SectionTitle, StatusChip, EmptyState, COLORS } from '@/components/ui/kit';
 import Link from 'next/link';
 
 const AI_URL = process.env.NEXT_PUBLIC_AI_URL || 'http://localhost:8001';
@@ -57,9 +58,9 @@ const stageColor: Record<string, string> = {
   greeting: 'text-tx-muted',
   identify: 'text-warn',
   collect_docs: 'text-info',
-  ask_details: 'text-acao',
-  process: 'text-purple-400',
-  review: 'text-orange-400',
+  ask_details: 'text-info',
+  process: 'text-info',
+  review: 'text-warn',
   completed: 'text-ok',
 };
 
@@ -206,33 +207,32 @@ export default function WhatsAppPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa para gerenciar o WhatsApp.</p>
+      <div className="flex flex-col items-center justify-center h-full gap-2 p-8">
+        <EmptyState icon={<Building2 size={34} />} title="Selecione uma empresa para gerenciar o WhatsApp." />
         <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-tx-strong">WhatsApp IA</h1>
-          <p className="text-tx-muted text-sm mt-1">{selectedCompany.name} · Atendente contábil humanizado</p>
-        </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Nova Instância
-        </button>
-      </div>
+    <div className="page space-y-8">
+      <PageHeader
+        icon={<MessageSquare size={22} color={COLORS.acao} />}
+        title="WhatsApp IA"
+        subtitle={`${selectedCompany.name} · Atendente contábil humanizado`}
+        action={
+          <button onClick={() => setShowCreate(true)} className="btn-primary">
+            <Plus className="h-4 w-4" />
+            Nova Instância
+          </button>
+        }
+      />
 
       {/* Create Instance Modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-[rgba(13,17,25,0.45)] backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-card border border-line rounded-2xl p-8 w-full max-w-md space-y-6 shadow-pop">
-            <h2 className="text-xl font-semibold text-tx-strong">Conectar WhatsApp</h2>
+          <div className="bg-card border border-line rounded-xl p-8 w-full max-w-md space-y-6 shadow-pop">
+            <h2 className="text-[15px] font-semibold text-tx-strong m-0">Conectar WhatsApp</h2>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-tx-muted mb-2">Nome da instância</label>
@@ -240,7 +240,7 @@ export default function WhatsAppPage() {
                   value={form.instance_name}
                   onChange={e => setForm(f => ({ ...f, instance_name: e.target.value }))}
                   placeholder="ex: contabilidade-cliente1"
-                  className="w-full bg-inset border border-line rounded-lg px-4 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500"
+                  className="input-aura w-full"
                 />
               </div>
               <div>
@@ -249,7 +249,7 @@ export default function WhatsAppPage() {
                   value={form.phone_number}
                   onChange={e => setForm(f => ({ ...f, phone_number: e.target.value.replace(/\D/g, '') }))}
                   placeholder="5511999998888"
-                  className="w-full bg-inset border border-line rounded-lg px-4 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500"
+                  className="input-aura w-full"
                 />
               </div>
               <div>
@@ -258,12 +258,12 @@ export default function WhatsAppPage() {
                   value={form.attendant_name}
                   onChange={e => setForm(f => ({ ...f, attendant_name: e.target.value }))}
                   placeholder="Ana"
-                  className="w-full bg-inset border border-line rounded-lg px-4 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500"
+                  className="input-aura w-full"
                 />
               </div>
             </div>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setShowCreate(false)} className="btn-ghost flex-1">Cancelar</button>
+              <button onClick={() => setShowCreate(false)} className="btn-secondary flex-1 justify-center">Cancelar</button>
               <button
                 onClick={createInstance}
                 disabled={loading || !form.instance_name || !form.phone_number}
@@ -280,10 +280,10 @@ export default function WhatsAppPage() {
       {/* QR Code Modal */}
       {qrcode && (
         <div className="fixed inset-0 bg-[rgba(13,17,25,0.45)] backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-card border border-line rounded-2xl p-8 w-full max-w-sm space-y-6 text-center shadow-pop">
+          <div className="bg-card border border-line rounded-xl p-8 w-full max-w-sm space-y-6 text-center shadow-pop">
             <div>
-              <QrCode className="h-8 w-8 text-acao mx-auto mb-2" />
-              <h2 className="text-xl font-semibold text-tx-strong">Escanear QR Code</h2>
+              <QrCode className="h-8 w-8 text-tx-muted mx-auto mb-2" />
+              <h2 className="text-[15px] font-semibold text-tx-strong m-0">Escanear QR Code</h2>
               <p className="text-tx-muted text-sm mt-1">Instância: {qrcode.instance}</p>
             </div>
             <div className="bg-white p-4 rounded-xl inline-block">
@@ -294,22 +294,21 @@ export default function WhatsAppPage() {
               )}
             </div>
             <p className="text-tx-muted text-xs">Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo</p>
-            <button onClick={() => setQrcode(null)} className="btn-ghost w-full">Fechar</button>
+            <button onClick={() => setQrcode(null)} className="btn-secondary w-full justify-center">Fechar</button>
           </div>
         </div>
       )}
 
       {/* Instances Grid */}
       <div>
-        <h2 className="text-lg font-semibold text-tx-strong mb-4 flex items-center gap-2">
-          <Phone className="h-5 w-5 text-acao" />
+        <SectionTitle>
+          <Phone size={16} className="text-tx-muted" />
           Instâncias Conectadas
-        </h2>
+        </SectionTitle>
         {instances.length === 0 ? (
-          <div className="card-aura text-center py-12">
-            <Phone className="h-12 w-12 text-tx-faint mx-auto mb-3" />
-            <p className="text-tx-muted text-sm">Nenhuma instância cadastrada.</p>
-            <p className="text-tx-faint text-xs mt-1">Clique em "Nova Instância" para conectar um número.</p>
+          <div className="card-aura">
+            <EmptyState icon={<Phone size={34} />} title="Nenhuma instância cadastrada."
+              sub={'Clique em "Nova Instância" para conectar um número.'} />
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -330,18 +329,12 @@ export default function WhatsAppPage() {
                       </div>
                       <p className="text-tx-muted text-xs mt-1">{inst.phone_number || '—'}</p>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full border ${
-                      connected
-                        ? 'text-ok border-green-400/30 bg-green-400/10'
-                        : 'text-err border-red-400/30 bg-red-400/10'
-                    }`}>
-                      {connected ? 'Online' : inst.status || 'Offline'}
-                    </span>
+                    <StatusChip tone={connected ? 'ok' : 'critico'} label={connected ? 'Online' : inst.status || 'Offline'} size="sm" />
                   </div>
 
                   <div className="flex items-center gap-2 text-xs text-tx-muted">
-                    <Bot className="h-3.5 w-3.5 text-acao" />
-                    <span>Atendente: <strong className="text-acao">{inst.attendant_name}</strong></span>
+                    <Bot className="h-3.5 w-3.5 text-tx-muted" />
+                    <span>Atendente: <strong className="text-tx-strong">{inst.attendant_name}</strong></span>
                   </div>
 
                   {/* Toggle IA */}
@@ -357,9 +350,8 @@ export default function WhatsAppPage() {
                     <button
                       onClick={() => toggleAI(inst)}
                       disabled={isToggling}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
-                        inst.ai_enabled ? 'bg-green-500' : 'bg-gray-600'
-                      }`}
+                      className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50"
+                      style={{ background: inst.ai_enabled ? 'var(--dot-ok)' : 'var(--border)' }}
                     >
                       <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
                         inst.ai_enabled ? 'translate-x-4' : 'translate-x-1'
@@ -370,9 +362,9 @@ export default function WhatsAppPage() {
                   {/* Toggle Voz */}
                   <div className="flex items-center justify-between bg-inset rounded-lg px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <Volume2 className="h-3.5 w-3.5 text-purple-400" />
+                      <Volume2 className="h-3.5 w-3.5 text-tx-muted" />
                       <span className="text-xs text-tx-muted">
-                        Voz: <span className="text-purple-300 font-medium">
+                        Voz: <span className="text-tx-strong font-medium">
                           {isFemale ? '♀ Feminina' : '♂ Masculina'}
                         </span>
                       </span>
@@ -381,7 +373,8 @@ export default function WhatsAppPage() {
                       onClick={() => toggleVoice(inst)}
                       disabled={isTogglingVoice}
                       title={isFemale ? 'Trocar para masculina' : 'Trocar para feminina'}
-                      className="flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 transition-colors disabled:opacity-50"
+                      className="btn-secondary"
+                      style={{ padding: '4px 8px', fontSize: 12 }}
                     >
                       {isTogglingVoice
                         ? <Loader2 className="h-3 w-3 animate-spin" />
@@ -409,7 +402,7 @@ export default function WhatsAppPage() {
                     </button>
                     <button
                       onClick={() => deleteInstance(inst.instance_name)}
-                      className="btn-ghost flex items-center gap-1.5 text-xs text-err hover:text-red-300 flex-1 justify-center"
+                      className="btn-ghost flex items-center gap-1.5 text-xs text-err flex-1 justify-center"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       Remover
@@ -425,20 +418,19 @@ export default function WhatsAppPage() {
       {/* Conversations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
-          <h2 className="text-lg font-semibold text-tx-strong mb-4 flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-acao" />
+          <SectionTitle>
+            <MessageSquare size={16} className="text-tx-muted" />
             Conversas Ativas
             {conversations.length > 0 && (
-              <span className="ml-auto text-xs bg-indigo-600/20 text-acao border border-indigo-500/30 px-2 py-0.5 rounded-full">
+              <span className="ml-auto text-xs bg-inset text-tx-muted border border-line px-2 py-0.5 rounded-full">
                 {conversations.length}
               </span>
             )}
-          </h2>
+          </SectionTitle>
           {conversations.length === 0 ? (
-            <div className="card-aura text-center py-8">
-              <MessageSquare className="h-8 w-8 text-tx-faint mx-auto mb-2" />
-              <p className="text-tx-muted text-sm">Nenhuma conversa ativa.</p>
-              <p className="text-tx-faint text-xs mt-1">Aguardando mensagens no WhatsApp...</p>
+            <div className="card-aura">
+              <EmptyState icon={<MessageSquare size={28} />} title="Nenhuma conversa ativa."
+                sub="Aguardando mensagens no WhatsApp..." />
             </div>
           ) : (
             <div className="card-aura space-y-2">
@@ -446,10 +438,10 @@ export default function WhatsAppPage() {
                 <button
                   key={i}
                   onClick={() => loadConvDetail(conv)}
-                  className="w-full flex items-center gap-4 p-3 bg-inset rounded-lg border border-line hover:border-indigo-500/40 transition-colors text-left"
+                  className="w-full flex items-center gap-4 p-3 bg-inset rounded-lg border border-line-soft hover:border-acao transition-colors text-left"
                 >
-                  <div className="h-10 w-10 rounded-full bg-indigo-600/20 flex items-center justify-center flex-shrink-0">
-                    <User className="h-5 w-5 text-acao" />
+                  <div className="h-10 w-10 rounded-full bg-card border border-line flex items-center justify-center flex-shrink-0">
+                    <User className="h-5 w-5 text-tx-muted" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-tx-strong text-sm font-medium truncate">
@@ -481,10 +473,10 @@ export default function WhatsAppPage() {
         {selectedConv && (
           <div className="space-y-4">
             {/* Header da conversa */}
-            <h2 className="text-lg font-semibold text-tx-strong flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-acao" />
+            <SectionTitle>
+              <MessageSquare size={16} className="text-tx-muted" />
               {selectedConv.client_name || selectedConv.phone}
-            </h2>
+            </SectionTitle>
 
             {/* Info resumida */}
             <div className="card-aura flex flex-wrap items-center gap-4 text-xs">
@@ -498,8 +490,8 @@ export default function WhatsAppPage() {
             {/* Documentos analisados */}
             {selectedConv.collected_docs.length > 0 && (
               <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-tx-strong flex items-center gap-2">
-                  <Receipt className="h-4 w-4 text-ok" />
+                <h3 className="text-sm font-semibold text-tx-strong flex items-center gap-2 m-0">
+                  <Receipt className="h-4 w-4 text-tx-muted" />
                   Documentos Analisados pela IA
                 </h3>
                 {selectedConv.collected_docs.map((doc, i) => {
@@ -521,7 +513,7 @@ export default function WhatsAppPage() {
                         onClick={() => setExpandedDoc(isOpen ? null : i)}
                         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-card transition-colors text-left"
                       >
-                        <FileText className="h-4 w-4 text-acao flex-shrink-0" />
+                        <FileText className="h-4 w-4 text-tx-muted flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-tx-strong text-sm font-medium">
@@ -529,10 +521,10 @@ export default function WhatsAppPage() {
                               {d.number ? ` nº ${d.number}` : ''}
                             </span>
                             {d.confidence_score != null && (
-                              <span className={`text-xs px-1.5 py-0.5 rounded-full border ${
-                                d.confidence_score >= 0.8 ? 'text-ok border-green-400/30 bg-green-400/10'
-                                : d.confidence_score >= 0.5 ? 'text-warn border-yellow-400/30 bg-yellow-400/10'
-                                : 'text-err border-red-400/30 bg-red-400/10'
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full border border-line-soft bg-inset ${
+                                d.confidence_score >= 0.8 ? 'text-ok'
+                                : d.confidence_score >= 0.5 ? 'text-warn'
+                                : 'text-err'
                               }`}>
                                 {Math.round(d.confidence_score * 100)}%
                               </span>
@@ -544,7 +536,7 @@ export default function WhatsAppPage() {
                         </div>
                         <div className="text-right flex-shrink-0">
                           {d.total_value != null && (
-                            <p className="text-ok font-mono text-sm font-semibold">{fmt(d.total_value)}</p>
+                            <p className="num text-tx-strong font-mono text-sm font-semibold">{fmt(d.total_value)}</p>
                           )}
                           <ChevronDown className={`h-4 w-4 text-tx-muted ml-auto mt-0.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                         </div>
@@ -575,9 +567,9 @@ export default function WhatsAppPage() {
                           {/* Valores */}
                           <div className="grid grid-cols-3 gap-2 text-xs">
                             {d.total_value != null && (
-                              <div className="bg-green-400/5 border border-green-400/20 rounded-lg px-3 py-2">
+                              <div className="bg-card border border-line rounded-lg px-3 py-2">
                                 <p className="text-tx-muted">Total</p>
-                                <p className="text-ok font-mono font-semibold">{fmt(d.total_value)}</p>
+                                <p className="num text-tx-strong font-mono font-semibold">{fmt(d.total_value)}</p>
                               </div>
                             )}
                             {d.net_value != null && (
@@ -589,7 +581,7 @@ export default function WhatsAppPage() {
                             {d.discount != null && d.discount > 0 && (
                               <div className="bg-card border border-line rounded-lg px-3 py-2">
                                 <p className="text-tx-muted">Desconto</p>
-                                <p className="text-orange-400 font-mono">{fmt(d.discount)}</p>
+                                <p className="num text-warn font-mono">{fmt(d.discount)}</p>
                               </div>
                             )}
                             {d.freight != null && d.freight > 0 && (
@@ -616,9 +608,9 @@ export default function WhatsAppPage() {
                               </p>
                               <div className="grid grid-cols-2 gap-1.5">
                                 {taxes.map((t, ti) => (
-                                  <div key={ti} className="bg-purple-500/5 border border-purple-500/20 rounded-lg px-3 py-2 text-xs">
+                                  <div key={ti} className="bg-card border border-line rounded-lg px-3 py-2 text-xs">
                                     <div className="flex justify-between">
-                                      <span className="text-purple-300 font-semibold">{t.name}</span>
+                                      <span className="text-tx-strong font-semibold">{t.name}</span>
                                       {t.rate != null && <span className="text-tx-muted">{t.rate}%</span>}
                                     </div>
                                     {t.value != null && <p className="text-tx-strong font-mono mt-0.5">{fmt(t.value)}</p>}
@@ -640,7 +632,7 @@ export default function WhatsAppPage() {
                                   <div key={ii} className="bg-card border border-line rounded-lg px-3 py-2 text-xs">
                                     <div className="flex justify-between gap-2">
                                       <span className="text-tx flex-1">{it.description}</span>
-                                      {it.total != null && <span className="text-ok font-mono flex-shrink-0">{fmt(it.total)}</span>}
+                                      {it.total != null && <span className="num text-tx-strong font-mono flex-shrink-0">{fmt(it.total)}</span>}
                                     </div>
                                     <div className="flex gap-3 mt-1 text-tx-muted">
                                       {it.quantity != null && <span>Qtd: {it.quantity}</span>}
@@ -656,7 +648,7 @@ export default function WhatsAppPage() {
 
                           {/* Alertas */}
                           {alerts.length > 0 && (
-                            <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg px-3 py-2">
+                            <div className="rounded-lg px-3 py-2" style={{ border: '1px solid color-mix(in srgb, var(--atencao) 25%, transparent)', background: 'color-mix(in srgb, var(--atencao) 6%, transparent)' }}>
                               <p className="text-warn text-xs font-medium flex items-center gap-1 mb-1">
                                 <AlertTriangle className="h-3 w-3" /> Alertas
                               </p>
@@ -666,11 +658,11 @@ export default function WhatsAppPage() {
 
                           {/* Sugestões */}
                           {suggestions.length > 0 && (
-                            <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-lg px-3 py-2">
-                              <p className="text-acao text-xs font-medium flex items-center gap-1 mb-1">
-                                <Lightbulb className="h-3 w-3" /> Sugestões contábeis
+                            <div className="bg-inset border border-line-soft rounded-lg px-3 py-2">
+                              <p className="text-tx-strong text-xs font-medium flex items-center gap-1 mb-1">
+                                <Lightbulb className="h-3 w-3 text-tx-muted" /> Sugestões contábeis
                               </p>
-                              {suggestions.map((s, si) => <p key={si} className="text-acao text-xs">• {s}</p>)}
+                              {suggestions.map((s, si) => <p key={si} className="text-tx text-xs">• {s}</p>)}
                             </div>
                           )}
 
@@ -696,19 +688,19 @@ export default function WhatsAppPage() {
                 {selectedConv.messages.map((msg, i) => (
                   <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                     <div className={`h-7 w-7 rounded-full flex-shrink-0 flex items-center justify-center ${
-                      msg.role === 'user' ? 'bg-indigo-600' : 'bg-card border border-line'
+                      msg.role === 'user' ? 'bg-acao' : 'bg-card border border-line'
                     }`}>
                       {msg.role === 'user'
                         ? <User className="h-3.5 w-3.5 text-white" />
-                        : <Bot className="h-3.5 w-3.5 text-acao" />}
+                        : <Bot className="h-3.5 w-3.5 text-tx-muted" />}
                     </div>
                     <div className={`max-w-xs rounded-xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap ${
                       msg.role === 'user'
-                        ? 'bg-indigo-600 text-white rounded-tr-sm'
+                        ? 'bg-acao text-white rounded-tr-sm'
                         : 'bg-card border border-line text-tx rounded-tl-sm'
                     }`}>
-                      {msg.type === 'audio' && <Mic className="h-3 w-3 inline mr-1 text-indigo-300" />}
-                      {(msg.type === 'image' || msg.type === 'document') && <FileText className="h-3 w-3 inline mr-1 text-indigo-300" />}
+                      {msg.type === 'audio' && <Mic className="h-3 w-3 inline mr-1 opacity-70" />}
+                      {(msg.type === 'image' || msg.type === 'document') && <FileText className="h-3 w-3 inline mr-1 opacity-70" />}
                       {msg.content}
                     </div>
                   </div>
@@ -720,9 +712,9 @@ export default function WhatsAppPage() {
       </div>
 
       {/* Info Banner */}
-      <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-xl p-5">
-        <h3 className="text-acao font-medium mb-2 flex items-center gap-2">
-          <Bot className="h-4 w-4" />
+      <div className="card-aura">
+        <h3 className="text-tx-strong text-sm font-semibold mb-2 flex items-center gap-2 m-0">
+          <Bot className="h-4 w-4 text-tx-muted" />
           Como funciona o Atendente IA
         </h3>
         <ul className="text-tx-muted text-sm space-y-1">

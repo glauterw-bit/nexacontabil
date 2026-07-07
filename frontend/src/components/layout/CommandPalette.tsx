@@ -166,7 +166,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                       onMouseEnter={() => setActiveIdx(flatIdx)}
                       onClick={() => pick(item)}
                       className={`w-full flex items-center justify-between px-4 py-2 text-sm transition-colors ${
-                        active ? 'bg-indigo-600/20 text-tx-strong' : 'text-tx hover:bg-inset'
+                        active ? 'bg-[color-mix(in_srgb,var(--acao)_15%,transparent)] text-tx-strong' : 'text-tx hover:bg-inset'
                       }`}
                     >
                       <span>{item.label}</span>
@@ -180,9 +180,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         </div>
 
         <div className="px-4 py-2 border-t border-line text-xs text-tx-faint flex items-center gap-4">
-          <span><kbd className="text-tx-muted">↑↓</kbd> navegar</span>
-          <span><kbd className="text-tx-muted">Enter</kbd> abrir</span>
-          <span><kbd className="text-tx-muted">Esc</kbd> fechar</span>
+          <span><kbd className="px-1.5 py-0.5 rounded border border-line bg-inset text-tx-muted text-[10px]">↑↓</kbd> navegar</span>
+          <span><kbd className="px-1.5 py-0.5 rounded border border-line bg-inset text-tx-muted text-[10px]">Enter</kbd> abrir</span>
+          <span><kbd className="px-1.5 py-0.5 rounded border border-line bg-inset text-tx-muted text-[10px]">Esc</kbd> fechar</span>
         </div>
       </div>
     </div>

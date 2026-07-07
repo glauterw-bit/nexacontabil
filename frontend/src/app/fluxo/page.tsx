@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { Workflow, Loader2, FileCheck, RefreshCw, ChevronRight, ChevronLeft, CheckCircle2, AlertCircle } from 'lucide-react';
-import { PageHeader, COLORS, tint } from '@/components/ui/kit';
+import { PageHeader, COLORS, tint, Spinner } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -51,41 +51,38 @@ export default function FluxoPage() {
   const idx = (k: string) => colunas.findIndex((c: any) => c.key === k);
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto', padding: 24 }}>
-      <PageHeader icon={<Workflow size={24} color={COLORS.acao} />} title="Fluxo de Trabalho"
+    <div className="page">
+      <PageHeader icon={<Workflow size={22} color={COLORS.acao} />} title="Fluxo de Trabalho"
         subtitle="Acompanhe cada cliente nas etapas do mês. A validação de recibos é automática (lê o drive)."
         action={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {meses.length > 0 ? (
-              <select value={comp} onChange={(e) => setComp(e.target.value)} title="Mês a apurar (retroativo)"
-                style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 13 }}>
+              <select value={comp} onChange={(e) => setComp(e.target.value)} title="Mês a apurar (retroativo)" className="input-aura">
                 {meses.map((m) => <option key={m.competencia} value={m.competencia}>{m.competencia} ({m.docs} docs)</option>)}
               </select>
             ) : (
-              <input type="month" value={comp} onChange={(e) => setComp(e.target.value)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 13 }} />
+              <input type="month" value={comp} onChange={(e) => setComp(e.target.value)} className="input-aura" />
             )}
-            <button onClick={load} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.muted, cursor: 'pointer' }}><RefreshCw size={14} /></button>
+            <button onClick={load} className="btn-ghost" aria-label="Atualizar"><RefreshCw size={14} /></button>
           </div>
         } />
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
         {(['fiscal', 'contabil'] as const).map((d) => (
-          <button key={d} onClick={() => setDep(d)}
-            style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${dep === d ? COLORS.acao : COLORS.border}`, background: dep === d ? COLORS.acao : COLORS.surface, color: dep === d ? '#fff' : COLORS.muted, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>
+          <button key={d} onClick={() => setDep(d)} className={dep === d ? 'btn-primary' : 'btn-secondary'}>
             {d === 'fiscal' ? 'Fiscal' : 'Contábil'}
           </button>
         ))}
         <div style={{ flex: 1 }} />
         {dep === 'fiscal' && (
-          <button onClick={verificarRecibos} disabled={verificando}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: 'none', background: COLORS.atencao, color: '#3a2806', fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={verificarRecibos} disabled={verificando} className="btn-primary">
             {verificando ? <Loader2 size={15} className="animate-spin" /> : <FileCheck size={15} />} Validar recibos no drive
           </button>
         )}
       </div>
       {msg && <div style={{ marginBottom: 12, padding: 10, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 8, fontSize: 13, color: 'var(--tx)' }}>{msg}</div>}
 
-      {loading ? <div style={{ textAlign: 'center', padding: 60 }}><Loader2 size={32} className="animate-spin" /></div> : (
+      {loading ? <Spinner /> : (
         <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 12 }}>
           {colunas.map((col: any, ci: number) => (
             <div key={col.key} style={{ minWidth: 260, flex: '0 0 260px' }}>

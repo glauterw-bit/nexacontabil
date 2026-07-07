@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { ClipboardCheck, Loader2, FileX, ArrowDownCircle, AlertTriangle, Building2, IdCard, Copy, Check } from 'lucide-react';
-import { PageHeader, Kpi, Card, SectionTitle, COLORS, tint } from '@/components/ui/kit';
+import { ClipboardCheck, FileX, ArrowDownCircle, AlertTriangle, Building2, IdCard, Copy, Check } from 'lucide-react';
+import { PageHeader, Kpi, Card, SectionTitle, COLORS, tint, Spinner, EmptyState } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -30,8 +30,8 @@ export default function SolicitacoesPage() {
     catch { alert(texto); }
   }
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: COLORS.muted }}><Loader2 size={32} className="animate-spin" /></div>;
-  if (!d) return <div style={{ padding: 40, textAlign: 'center', color: COLORS.faint }}>Sem dados.</div>;
+  if (loading) return <Spinner />;
+  if (!d) return <EmptyState icon={<ClipboardCheck size={32} />} title="Sem dados." />;
 
   const FILTROS = [
     { k: '', label: 'Todos' },
@@ -44,8 +44,8 @@ export default function SolicitacoesPage() {
   const lista = (d.clientes ?? []).filter((c: any) => !filtro || c.pendencias.some((p: any) => p.tipo === filtro));
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto', padding: 24 }}>
-      <PageHeader icon={<ClipboardCheck size={24} color={COLORS.acao} />} title="Solicitar aos Clientes"
+    <div className="page-narrow">
+      <PageHeader icon={<ClipboardCheck size={22} color={COLORS.acao} />} title="Solicitar aos Clientes"
         subtitle="O que falta em cada cliente — pra o analista pedir e completar a contabilidade." />
 
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
@@ -82,14 +82,14 @@ export default function SolicitacoesPage() {
                 })}
               </div>
             </div>
-            <button onClick={() => copiarMsg(c.companyId, c.nome)}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface2, color: copiado === c.companyId ? COLORS.ok : COLORS.muted, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button onClick={() => copiarMsg(c.companyId, c.nome)} className="btn-secondary"
+              style={{ whiteSpace: 'nowrap', color: copiado === c.companyId ? COLORS.ok : undefined }}>
               {copiado === c.companyId ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Mensagem</>}
             </button>
           </div>
         </Card>
       ))}
-      {lista.length === 0 && <Card style={{ textAlign: 'center', padding: 24, color: COLORS.ok }}>Nenhuma pendência nesse filtro. ✅</Card>}
+      {lista.length === 0 && <Card><EmptyState icon={<Check size={28} />} title="Nenhuma pendência nesse filtro. ✅" /></Card>}
     </div>
   );
 }

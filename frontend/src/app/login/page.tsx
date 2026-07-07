@@ -33,7 +33,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-brand-600 shadow-card mb-4">
+          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-pop mb-4">
             <Zap className="h-7 w-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-tx-strong">DomoSYS</h1>
@@ -41,7 +41,7 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-card border border-line rounded-2xl shadow-card p-6">
+        <div className="bg-card border border-line rounded-xl shadow-pop p-6">
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -53,7 +53,7 @@ export default function LoginPage() {
                 required
                 autoComplete="email"
                 placeholder="seu@email.com"
-                className="input-aura w-full rounded-xl"
+                className="input-aura w-full"
               />
             </div>
 
@@ -67,7 +67,7 @@ export default function LoginPage() {
                   required
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  className="input-aura w-full rounded-xl pr-11"
+                  className="input-aura w-full pr-11"
                 />
                 <button
                   type="button"
@@ -80,7 +80,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p className="text-err text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              <p className="text-err text-sm bg-[color-mix(in_srgb,var(--erro)_10%,transparent)] border border-[color-mix(in_srgb,var(--erro)_25%,transparent)] rounded-lg px-3 py-2">
                 {error}
               </p>
             )}
@@ -88,7 +88,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full justify-center py-3 rounded-xl"
+              className="btn-primary w-full justify-center py-3"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Entrar

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Calculator, Loader2, TrendingUp, TrendingDown, Info, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
+import { PageHeader, COLORS, tint, Kpi } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
@@ -79,24 +80,21 @@ export default function ReformaTributariaPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl space-y-5">
-      <div>
-        <div className="flex items-center gap-2 mb-0.5">
-          <Calculator className="h-5 w-5 text-acao" />
-          <h1 className="text-xl font-semibold text-tx-strong">Reforma Tributária — CBS/IBS</h1>
-          <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-amber-500/15 text-warn border border-amber-500/30 rounded">
+    <div className="page space-y-5">
+      <PageHeader
+        icon={<Calculator size={22} color={COLORS.acao} />}
+        title="Reforma Tributária — CBS/IBS"
+        subtitle="Simulador da transição tributária 2026-2033. Compara a carga atual com o novo regime CBS/IBS ano a ano, com reduções setoriais aplicadas."
+        action={
+          <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-inset text-tx-muted border border-line rounded">
             LC 214/2025
           </span>
-        </div>
-        <p className="text-sm text-tx-muted max-w-3xl">
-          Simulador da transição tributária 2026-2033. Compara a carga atual com o novo regime CBS/IBS
-          ano a ano, com reduções setoriais aplicadas.
-        </p>
-      </div>
+        }
+      />
 
       {/* Form de simulação */}
-      <div className="rounded-xl border border-line bg-card p-5 space-y-3">
-        <h2 className="text-sm font-medium text-tx-strong">Simular impacto na empresa</h2>
+      <div className="card-aura space-y-3">
+        <h3 className="text-[15px] font-semibold text-tx-strong m-0">Simular impacto na empresa</h3>
         <div className="grid md:grid-cols-3 gap-3">
           <div>
             <label className="text-[10px] uppercase text-tx-muted tracking-wider mb-1 block">
@@ -106,7 +104,7 @@ export default function ReformaTributariaPage() {
               type="number"
               value={receita}
               onChange={(e) => setReceita(Number(e.target.value))}
-              className="w-full px-3 py-1.5 bg-inset border border-line rounded text-sm text-tx-strong outline-none"
+              className="input-aura w-full"
             />
           </div>
           <div>
@@ -116,7 +114,7 @@ export default function ReformaTributariaPage() {
             <select
               value={regime}
               onChange={(e) => setRegime(e.target.value)}
-              className="w-full px-3 py-1.5 bg-inset border border-line rounded text-sm text-tx-strong outline-none"
+              className="input-aura w-full"
             >
               <option value="SIMPLES_NACIONAL">Simples Nacional</option>
               <option value="LUCRO_PRESUMIDO">Lucro Presumido</option>
@@ -130,7 +128,7 @@ export default function ReformaTributariaPage() {
             <select
               value={setor}
               onChange={(e) => setSetor(e.target.value)}
-              className="w-full px-3 py-1.5 bg-inset border border-line rounded text-sm text-tx-strong outline-none"
+              className="input-aura w-full"
             >
               {table && Object.keys(table.setores).map((k) => (
                 <option key={k} value={k}>
@@ -143,7 +141,7 @@ export default function ReformaTributariaPage() {
         <button
           onClick={simulate}
           disabled={loading}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm rounded inline-flex items-center gap-1.5"
+          className="btn-primary"
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Calculator className="h-3.5 w-3.5" />}
           Simular
@@ -152,30 +150,30 @@ export default function ReformaTributariaPage() {
 
       {/* Tabela de transição */}
       {table && (
-        <div className="rounded-xl border border-line bg-card p-5">
-          <h2 className="text-sm font-medium text-tx-strong mb-3">Cronograma oficial (LC 214/2025)</h2>
-          <table className="w-full text-xs">
+        <div className="card-aura overflow-x-auto">
+          <h3 className="text-[15px] font-semibold text-tx-strong m-0 mb-3">Cronograma oficial (LC 214/2025)</h3>
+          <table className="table-aura">
             <thead>
-              <tr className="text-left text-tx-muted border-b border-line">
-                <th className="pb-2 font-medium">Ano</th>
-                <th className="pb-2 font-medium text-right">IBS</th>
-                <th className="pb-2 font-medium text-right">CBS</th>
-                <th className="pb-2 font-medium text-right">PIS/COFINS</th>
-                <th className="pb-2 font-medium text-right">ICMS</th>
-                <th className="pb-2 font-medium text-right">ISS</th>
-                <th className="pb-2 font-medium">Status</th>
+              <tr>
+                <th>Ano</th>
+                <th className="num">IBS</th>
+                <th className="num">CBS</th>
+                <th className="num">PIS/COFINS</th>
+                <th className="num">ICMS</th>
+                <th className="num">ISS</th>
+                <th>Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line font-mono">
+            <tbody>
               {Object.entries(table.rates).map(([ano, r]) => (
-                <tr key={ano} className="hover:bg-inset">
-                  <td className="py-1.5 text-tx-strong font-semibold">{ano}</td>
-                  <td className="py-1.5 text-right text-ok">{r.ibs}%</td>
-                  <td className="py-1.5 text-right text-acao">{r.cbs}%</td>
-                  <td className="py-1.5 text-right text-tx-muted">{r.pisCofins}%</td>
-                  <td className="py-1.5 text-right text-tx-muted">{r.icms}%</td>
-                  <td className="py-1.5 text-right text-tx-muted">{r.iss}%</td>
-                  <td className="py-1.5 text-[10px] text-warn">{r.status.replace(/_/g, ' ')}</td>
+                <tr key={ano}>
+                  <td className="text-tx-strong font-semibold">{ano}</td>
+                  <td className="num text-tx-strong">{r.ibs}%</td>
+                  <td className="num text-tx-strong">{r.cbs}%</td>
+                  <td className="num text-tx-muted">{r.pisCofins}%</td>
+                  <td className="num text-tx-muted">{r.icms}%</td>
+                  <td className="num text-tx-muted">{r.iss}%</td>
+                  <td className="text-[10px] text-warn">{r.status.replace(/_/g, ' ')}</td>
                 </tr>
               ))}
             </tbody>
@@ -185,40 +183,42 @@ export default function ReformaTributariaPage() {
 
       {/* Resultado da simulação */}
       {result && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 space-y-3">
-          <h2 className="text-sm font-medium text-tx-strong">Resultado da simulação</h2>
+        <div className="rounded-xl p-5 space-y-3"
+          style={{ background: tint(COLORS.dotOk, 5), border: `1px solid ${tint(COLORS.dotOk, 30)}` }}>
+          <h3 className="text-[15px] font-semibold text-tx-strong m-0">Resultado da simulação</h3>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <KPI label="Economia acumulada" value={brl(result.sumario.economiaTotalNoPeriodo)} color="text-ok" icon={TrendingDown} />
-            <KPI label="Aumento acumulado" value={brl(result.sumario.aumentoTotalNoPeriodo)} color="text-err" icon={TrendingUp} />
-            <KPI label="Impacto líquido" value={brl(result.sumario.impactoLiquido)} color={result.sumario.impactoLiquido > 0 ? 'text-err' : 'text-ok'} />
+          <div className="flex flex-wrap gap-3">
+            <Kpi label="Economia acumulada" value={brl(result.sumario.economiaTotalNoPeriodo)} cor={COLORS.ok} />
+            <Kpi label="Aumento acumulado" value={brl(result.sumario.aumentoTotalNoPeriodo)} cor={COLORS.erro} />
+            <Kpi label="Impacto líquido" value={brl(result.sumario.impactoLiquido)} cor={result.sumario.impactoLiquido > 0 ? COLORS.erro : COLORS.ok} />
           </div>
 
-          <div className="rounded-lg bg-inset border border-line p-3 flex gap-2 items-start">
-            <Info className="h-4 w-4 text-acao flex-shrink-0 mt-0.5" />
+          <div className="rounded-lg p-3 flex gap-2 items-start"
+            style={{ background: tint(COLORS.info, 8), border: `1px solid ${tint(COLORS.info, 25)}` }}>
+            <Info className="h-4 w-4 text-info flex-shrink-0 mt-0.5" />
             <p className="text-xs text-tx">{result.sumario.recomendacao}</p>
           </div>
 
-          <table className="w-full text-xs">
+          <table className="table-aura">
             <thead>
-              <tr className="text-left text-tx-muted border-b border-line">
-                <th className="pb-2 font-medium">Ano</th>
-                <th className="pb-2 font-medium text-right">Regime atual</th>
-                <th className="pb-2 font-medium text-right">Novo (CBS/IBS)</th>
-                <th className="pb-2 font-medium text-right">Diferença</th>
-                <th className="pb-2 font-medium text-right">%</th>
+              <tr>
+                <th>Ano</th>
+                <th className="num">Regime atual</th>
+                <th className="num">Novo (CBS/IBS)</th>
+                <th className="num">Diferença</th>
+                <th className="num">%</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line font-mono">
+            <tbody>
               {result.linhas.map((l) => (
                 <tr key={l.ano}>
-                  <td className="py-1.5 text-tx-strong">{l.ano}</td>
-                  <td className="py-1.5 text-right text-tx">{brl(l.cargaAtual)}</td>
-                  <td className="py-1.5 text-right text-tx">{brl(l.cargaNovo)}</td>
-                  <td className={`py-1.5 text-right ${l.diferenca > 0 ? 'text-err' : 'text-ok'}`}>
+                  <td className="text-tx-strong">{l.ano}</td>
+                  <td className="num">{brl(l.cargaAtual)}</td>
+                  <td className="num">{brl(l.cargaNovo)}</td>
+                  <td className={`num ${l.diferenca > 0 ? 'text-err' : 'text-ok'}`}>
                     {brl(l.diferenca)}
                   </td>
-                  <td className={`py-1.5 text-right ${l.pctDiferenca > 0 ? 'text-err' : 'text-ok'}`}>
+                  <td className={`num ${l.pctDiferenca > 0 ? 'text-err' : 'text-ok'}`}>
                     {l.pctDiferenca > 0 ? '+' : ''}{l.pctDiferenca.toFixed(1)}%
                   </td>
                 </tr>
@@ -229,7 +229,8 @@ export default function ReformaTributariaPage() {
       )}
 
       {/* Disclaimer */}
-      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 flex gap-2 items-start">
+      <div className="rounded-xl p-3 flex gap-2 items-start"
+        style={{ background: tint(COLORS.dotAtencao, 8), border: `1px solid ${tint(COLORS.dotAtencao, 30)}` }}>
         <AlertTriangle className="h-4 w-4 text-warn flex-shrink-0 mt-0.5" />
         <p className="text-xs text-warn leading-relaxed">
           Cálculos baseados em estimativas médias. Alíquotas finais IBS dependem da regulamentação
@@ -237,18 +238,6 @@ export default function ReformaTributariaPage() {
           a 12º da LC 214/2025. Não substitui análise contábil específica.
         </p>
       </div>
-    </div>
-  );
-}
-
-function KPI({ label, value, color, icon: Icon }: any) {
-  return (
-    <div className="rounded-lg border border-line bg-inset p-3">
-      <div className="flex items-center gap-1.5 mb-1">
-        {Icon && <Icon className={`h-3.5 w-3.5 ${color}`} />}
-        <p className="text-[10px] uppercase tracking-wider text-tx-muted">{label}</p>
-      </div>
-      <p className={`text-lg font-bold ${color}`}>{value}</p>
     </div>
   );
 }

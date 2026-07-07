@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { Calculator, Loader2, AlertTriangle, Search } from 'lucide-react';
-import { PageHeader, Kpi, Card, SectionTitle, COLORS } from '@/components/ui/kit';
+import { Calculator, AlertTriangle, Search } from 'lucide-react';
+import { PageHeader, Kpi, Card, SectionTitle, COLORS, Spinner, EmptyState } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -31,33 +31,33 @@ export default function ApuracaoPage() {
     if (r.ok) setDet(await r.json());
   }, []);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: COLORS.muted }}><Loader2 size={32} className="animate-spin" /></div>;
+  if (loading) return <Spinner />;
   const filtrados = companies.filter((c) => (c.nome || '').toLowerCase().includes(busca.toLowerCase())).slice(0, 40);
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: 24 }}>
-      <PageHeader icon={<Calculator size={24} color={COLORS.acao} />} title="Apuração de Impostos"
+    <div className="page">
+      <PageHeader icon={<Calculator size={22} color={COLORS.acao} />} title="Apuração de Impostos"
         subtitle="Impostos a recolher por cliente e competência, calculados dos documentos reais." />
 
       {ov && (
         <>
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
             <Kpi label="Receita (saídas)" value={BRL(ov.receitaTotal)} />
-            <Kpi label="ICMS destacado" value={BRL(ov.icmsTotal)} cor={COLORS.acao} />
-            <Kpi label="PIS+COFINS" value={BRL(ov.pisCofinsTotal)} cor={COLORS.info} />
+            <Kpi label="ICMS destacado" value={BRL(ov.icmsTotal)} />
+            <Kpi label="PIS+COFINS" value={BRL(ov.pisCofinsTotal)} />
           </div>
           <SectionTitle>Por regime</SectionTitle>
           <Card>
-            <div style={{ display: 'flex', fontSize: 11, color: COLORS.faint, padding: '0 4px 6px', textTransform: 'uppercase' }}>
+            <div style={{ display: 'flex', fontSize: 11, fontWeight: 600, color: COLORS.faint, padding: '0 4px 6px', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${COLORS.border}` }}>
               <div style={{ flex: 1 }}>Regime</div><div style={{ width: 130, textAlign: 'right' }}>Receita</div><div style={{ width: 120, textAlign: 'right' }}>ICMS</div><div style={{ width: 120, textAlign: 'right' }}>PIS+COFINS</div><div style={{ width: 70, textAlign: 'right' }}>Notas</div>
             </div>
             {ov.porRegime.map((r: any) => (
               <div key={r.regime} style={{ display: 'flex', fontSize: 13, padding: '6px 4px', borderTop: '1px solid var(--border-soft)' }}>
                 <div style={{ flex: 1, fontWeight: 600 }}>{r.regime}</div>
-                <div style={{ width: 130, textAlign: 'right' }}>{BRL(r.receita)}</div>
-                <div style={{ width: 120, textAlign: 'right', color: COLORS.acao }}>{BRL(r.icms)}</div>
-                <div style={{ width: 120, textAlign: 'right', color: COLORS.info }}>{BRL(r.pisCofins)}</div>
-                <div style={{ width: 70, textAlign: 'right', color: COLORS.muted }}>{r.notas}</div>
+                <div className="num" style={{ width: 130, textAlign: 'right' }}>{BRL(r.receita)}</div>
+                <div className="num" style={{ width: 120, textAlign: 'right' }}>{BRL(r.icms)}</div>
+                <div className="num" style={{ width: 120, textAlign: 'right' }}>{BRL(r.pisCofins)}</div>
+                <div className="num" style={{ width: 70, textAlign: 'right', color: COLORS.muted }}>{r.notas}</div>
               </div>
             ))}
           </Card>
@@ -70,7 +70,7 @@ export default function ApuracaoPage() {
           <div style={{ position: 'relative', marginBottom: 10 }}>
             <Search size={16} style={{ position: 'absolute', left: 12, top: 11, color: COLORS.faint }} />
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente…"
-              style={{ width: '100%', padding: '9px 12px 9px 36px', borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 14 }} />
+              className="input-aura" style={{ width: '100%', paddingLeft: 36 }} />
           </div>
           {filtrados.map((c) => (
             <Card key={c.companyId} style={{ marginBottom: 6, padding: '10px 12px', cursor: 'pointer', borderColor: sel?.companyId === c.companyId ? COLORS.acao : COLORS.border }}>
@@ -83,21 +83,21 @@ export default function ApuracaoPage() {
         </div>
 
         <div style={{ flex: '2 1 560px' }}>
-          {!sel ? <Card style={{ textAlign: 'center', padding: 30, color: COLORS.faint }}>Selecione um cliente para ver a apuração mês a mês.</Card> :
-            !det ? <div style={{ textAlign: 'center', padding: 30 }}><Loader2 size={24} className="animate-spin" /></div> :
+          {!sel ? <Card><EmptyState icon={<Calculator size={28} />} title="Selecione um cliente para ver a apuração mês a mês." /></Card> :
+            !det ? <Spinner pad={30} /> :
             det.erro ? <Card style={{ color: COLORS.erro }}>{det.erro}</Card> : (
               <>
                 <Card style={{ marginBottom: 10 }}>
                   <div style={{ fontWeight: 700 }}>{det.empresa.nome}</div>
                   <div style={{ fontSize: 12, color: COLORS.muted }}>{det.empresa.regime}{det.dasEfetiva ? ` · DAS efetivo ${det.dasEfetiva}%` : ''} · RBT12 {BRL(det.rbt12)}</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.acao, marginTop: 6 }}>{BRL(det.totalApurado)} <span style={{ fontSize: 12, color: COLORS.muted, fontWeight: 400 }}>apurado em {det.competencias} competências</span></div>
+                  <div className="num" style={{ fontSize: 20, fontWeight: 700, color: COLORS.strong, marginTop: 6 }}>{BRL(det.totalApurado)} <span style={{ fontSize: 12, color: COLORS.muted, fontWeight: 400 }}>apurado em {det.competencias} competências</span></div>
                   {det.semEntradas && <div style={{ display: 'flex', gap: 6, marginTop: 8, fontSize: 12, color: COLORS.atencao }}><AlertTriangle size={14} /> Apuração de ICMS parcial — faltam notas de entrada p/ crédito.</div>}
                 </Card>
                 {det.apuracoes.slice().reverse().map((a: any) => (
                   <Card key={a.competencia} style={{ marginBottom: 8, padding: '12px 14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                       <strong>{a.competencia}</strong>
-                      <div><span style={{ fontSize: 12, color: COLORS.muted }}>receita {BRL(a.receita)} · </span><strong style={{ color: COLORS.acao }}>{BRL(a.total)}</strong></div>
+                      <div><span style={{ fontSize: 12, color: COLORS.muted }}>receita {BRL(a.receita)} · </span><strong className="num" style={{ color: COLORS.strong }}>{BRL(a.total)}</strong></div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       {a.tributos.filter((t: any) => t.valor > 0).map((t: any, i: number) => (

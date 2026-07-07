@@ -35,7 +35,7 @@ interface NavGroup { label: string; items: NavItem[] }
 const VISAO: NavItem[] = [
   { href: '/operacao',  icon: Activity,        label: 'Central de Operação' },
   { href: '/gerencial', icon: LayoutDashboard, label: 'Painel Gerencial' },
-  { href: '/farois',    icon: Lightbulb,       label: 'Faróis — Risco & Oportun.' },
+  { href: '/farois',    icon: Lightbulb,       label: 'Faróis' },
   { href: '/meu-dia',   icon: Sun,             label: 'Meu Dia' },
 ];
 
@@ -322,7 +322,7 @@ export function Sidebar() {
                   style={{ height: 22, width: 22, borderRadius: '50%', fontSize: 11, fontWeight: 700, background: `color-mix(in srgb, ${step.cor} 16%, var(--surface))`, color: step.cor, border: `1px solid color-mix(in srgb, ${step.cor} 40%, transparent)` }}>
                   {step.n}
                 </span>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: step.cor }}>{step.label}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{step.label}</span>
               </div>
               <div className="space-y-0.5">
                 {step.items.map((it) => <Item key={it.href} {...it} />)}

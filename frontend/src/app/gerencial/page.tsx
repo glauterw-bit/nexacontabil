@@ -48,7 +48,7 @@ export default function GerencialPage() {
   const inad = p?.inadimplencia;
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
+    <div className="page">
       <PageHeader icon={<LayoutDashboard size={22} color={COLORS.acao} />} title="Painel Gerencial"
         subtitle={`Pulso do escritório em ${fmtCompetencia(torre?.competencia ?? '')} — produção, SLA, gargalos e equipe.`} />
 

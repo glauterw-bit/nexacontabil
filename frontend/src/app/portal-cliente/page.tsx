@@ -6,6 +6,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { Globe, Plus, MessageSquare, Send, Copy, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
+import { PageHeader, EmptyState, COLORS } from '@/components/ui/kit';
 
 const LISTAR = gql`query ListarPortais($companyId: ID!) { listarPortaisCliente(companyId: $companyId) { id clientName clientEmail active lastAccessAt createdAt } }`;
 const MENSAGENS = gql`query Mensagens($portalId: ID!) { listarMensagensPortal(portalId: $portalId) { id sender message readAt createdAt } }`;
@@ -62,28 +63,26 @@ export default function PortalClientePage() {
   }
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-auto">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Globe className="h-7 w-7 text-acao" />
-          <div>
-            <h1 className="text-2xl font-bold text-tx-strong">Portal do Cliente</h1>
-            <p className="text-tx-muted text-sm">Acesso seguro para seus clientes</p>
-          </div>
-        </div>
-        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
-          <Plus className="h-4 w-4" /> Criar Portal
-        </button>
-      </div>
+    <div className="page space-y-6">
+      <PageHeader
+        icon={<Globe size={22} color={COLORS.acao} />}
+        title="Portal do Cliente"
+        subtitle="Acesso seguro para seus clientes"
+        action={
+          <button onClick={() => setShowForm(!showForm)} className="btn-primary">
+            <Plus className="h-4 w-4" /> Criar Portal
+          </button>
+        }
+      />
 
       {msg && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-ok text-sm flex items-center gap-2">
+        <div className="bg-[color-mix(in_srgb,var(--dot-ok)_10%,transparent)] border border-[color-mix(in_srgb,var(--dot-ok)_30%,transparent)] rounded-lg p-3 text-ok text-sm flex items-center gap-2">
           <CheckCircle className="h-4 w-4" /> {msg} <button onClick={() => setMsg('')} className="ml-auto">✕</button>
         </div>
       )}
 
       {linkCriado && (
-        <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-4">
+        <div className="bg-[color-mix(in_srgb,var(--acao)_10%,transparent)] border border-[color-mix(in_srgb,var(--acao)_30%,transparent)] rounded-xl p-4">
           <p className="text-acao font-semibold mb-2">Portal criado! Compartilhe o link com o cliente:</p>
           <div className="flex items-center gap-2 bg-inset rounded-lg px-3 py-2">
             <span className="text-tx text-sm flex-1 truncate font-mono">{linkCriado}</span>
@@ -96,8 +95,8 @@ export default function PortalClientePage() {
 
       {/* Create form */}
       {showForm && (
-        <div className="bg-card border border-indigo-500/30 rounded-xl p-5 space-y-4">
-          <h2 className="text-tx-strong font-semibold">Novo Portal de Cliente</h2>
+        <div className="card-aura space-y-4">
+          <h2 className="text-tx-strong font-semibold text-[15px]">Novo Portal de Cliente</h2>
           <div className="grid md:grid-cols-3 gap-4">
             {[
               { label: 'Nome do Cliente', key: 'clientName', type: 'text' },
@@ -107,16 +106,16 @@ export default function PortalClientePage() {
               <div key={key}>
                 <label className="text-tx-muted text-sm block mb-1">{label}</label>
                 <input type={type} value={(form as any)[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                  className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx text-sm focus:outline-none focus:border-indigo-500" />
+                  className="input-aura w-full" />
               </div>
             ))}
           </div>
           <div className="flex gap-3">
-            <button onClick={() => setShowForm(false)} className="px-4 py-2 border border-line text-tx-muted hover:text-tx-strong rounded-lg text-sm">Cancelar</button>
+            <button onClick={() => setShowForm(false)} className="btn-secondary">Cancelar</button>
             <button
               disabled={!form.clientName || !form.clientEmail}
               onClick={() => criar({ variables: { companyId, ...form } })}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2 rounded-lg text-sm transition-colors">
+              className="btn-primary flex-1 justify-center">
               Criar Portal
             </button>
           </div>
@@ -126,21 +125,20 @@ export default function PortalClientePage() {
       <div className="grid md:grid-cols-3 gap-6">
         {/* Portal list */}
         <div className="md:col-span-1 space-y-3">
-          <h2 className="text-tx-strong font-semibold">Portais ({portais.length})</h2>
+          <h2 className="text-tx-strong font-semibold text-[15px]">Portais ({portais.length})</h2>
           {portais.length === 0 ? (
-            <div className="bg-card border border-line rounded-xl p-6 text-center">
-              <Globe className="h-8 w-8 text-tx-faint mx-auto mb-2" />
-              <p className="text-tx-muted text-sm">Nenhum portal criado</p>
+            <div className="card-aura">
+              <EmptyState icon={<Globe size={28} />} title="Nenhum portal criado" />
             </div>
           ) : portais.map((p: any) => (
             <button
               key={p.id}
               onClick={() => setSelectedPortal(p)}
-              className={`w-full text-left bg-card border rounded-xl p-4 transition-all ${selectedPortal?.id === p.id ? 'border-indigo-500/50' : 'border-line hover:border-indigo-500/40'}`}
+              className={`w-full text-left bg-card border rounded-xl p-4 transition-all ${selectedPortal?.id === p.id ? 'border-[color-mix(in_srgb,var(--acao)_50%,transparent)]' : 'border-line hover:border-[color-mix(in_srgb,var(--acao)_40%,transparent)]'}`}
             >
               <div className="flex items-center justify-between mb-1">
                 <p className="text-tx font-medium text-sm">{p.clientName}</p>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${p.active ? 'bg-green-500/10 text-ok' : 'bg-gray-500/10 text-tx-muted'}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${p.active ? 'bg-[color-mix(in_srgb,var(--dot-ok)_13%,transparent)] text-ok' : 'bg-inset text-tx-muted'}`}>
                   {p.active ? 'Ativo' : 'Inativo'}
                 </span>
               </div>
@@ -158,7 +156,7 @@ export default function PortalClientePage() {
             <div className="p-4 border-b border-line flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-acao" />
               <span className="text-tx-strong font-medium">Chat — {selectedPortal.clientName}</span>
-              {novasMsgs > 0 && <span className="ml-auto text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">{novasMsgs} nova(s)</span>}
+              {novasMsgs > 0 && <span className="ml-auto text-xs bg-err text-white px-2 py-0.5 rounded-full">{novasMsgs} nova(s)</span>}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -166,9 +164,9 @@ export default function PortalClientePage() {
                 <div className="text-center py-8 text-tx-muted text-sm">Nenhuma mensagem ainda.</div>
               ) : mensagens.map((m: any) => (
                 <div key={m.id} className={`flex ${m.sender === 'contador' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-xl px-4 py-2.5 ${m.sender === 'contador' ? 'bg-indigo-600 text-white' : 'bg-inset border border-line text-tx'}`}>
+                  <div className={`max-w-[80%] rounded-xl px-4 py-2.5 ${m.sender === 'contador' ? 'bg-acao text-white' : 'bg-inset border border-line text-tx'}`}>
                     <p className="text-sm">{m.message}</p>
-                    <p className={`text-xs mt-1 ${m.sender === 'contador' ? 'text-indigo-200' : 'text-tx-faint'}`}>
+                    <p className={`text-xs mt-1 ${m.sender === 'contador' ? 'text-white/70' : 'text-tx-faint'}`}>
                       {new Date(m.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
@@ -182,12 +180,12 @@ export default function PortalClientePage() {
                 onChange={e => setResposta(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && resposta.trim() && enviarMsg({ variables: { portalId: selectedPortal.id, conteudo: resposta } })}
                 placeholder="Responder ao cliente..."
-                className="flex-1 bg-inset border border-line rounded-lg px-3 py-2 text-tx text-sm focus:outline-none focus:border-indigo-500"
+                className="input-aura flex-1"
               />
               <button
                 disabled={!resposta.trim()}
                 onClick={() => enviarMsg({ variables: { portalId: selectedPortal.id, conteudo: resposta } })}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white p-2 rounded-lg transition-colors"
+                className="btn-primary px-3"
               >
                 <Send className="h-4 w-4" />
               </button>

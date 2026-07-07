@@ -26,7 +26,7 @@ export default function FaroisPage() {
   if (!d) return <EmptyState icon={<Lightbulb size={32} />} title="Sem dados dos faróis" sub="Verifique a conexão com o backend." />;
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
+    <div className="page">
       <PageHeader icon={<Lightbulb size={22} color={COLORS.atencao} />} title="Faróis — Risco & Oportunidade"
         subtitle="Alertas que o gestor precisa ver: o que pode dar problema e onde há dinheiro na mesa." />
 

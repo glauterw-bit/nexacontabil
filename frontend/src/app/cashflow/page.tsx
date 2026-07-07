@@ -4,12 +4,13 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from 'recharts';
 import {
-  Brain, AlertTriangle, TrendingUp, TrendingDown, Loader2, RefreshCw,
+  Brain, AlertTriangle, TrendingUp, TrendingDown, RefreshCw,
 } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
+import { PageHeader, SectionTitle, EmptyState, Spinner, COLORS } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
@@ -80,10 +81,11 @@ export default function CashflowPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa.</p>
-        <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">Gerenciar</Link>
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione uma empresa." />
+        <div className="flex justify-center">
+          <Link href="/carteira" className="btn-primary">Gerenciar</Link>
+        </div>
       </div>
     );
   }
@@ -114,38 +116,30 @@ export default function CashflowPage() {
   const periodLabel = new Date(ano, mes, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="p-6 md:p-8 max-w-6xl space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <TrendingUp className="h-5 w-5 text-acao" />
-            <h1 className="text-xl font-semibold text-tx-strong">Fluxo de Caixa</h1>
+    <div className="page space-y-5">
+      <PageHeader
+        icon={<TrendingUp size={22} color={COLORS.acao} />}
+        title="Fluxo de Caixa"
+        subtitle={`${selectedCompany.name} · DFC pelo método indireto · ${periodLabel}`}
+        action={
+          <div className="flex items-center gap-2">
+            <input
+              type="month"
+              value={`${ano}-${String(mes + 1).padStart(2, '0')}`}
+              onChange={(e) => {
+                const [y, m] = e.target.value.split('-').map(Number);
+                setAno(y); setMes(m - 1);
+              }}
+              className="input-aura"
+            />
+            <button onClick={generate} className="btn-primary">
+              <RefreshCw className="h-3.5 w-3.5" /> Atualizar
+            </button>
           </div>
-          <p className="text-sm text-tx-muted">
-            {selectedCompany.name} · DFC pelo método indireto · {periodLabel}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="month"
-            value={`${ano}-${String(mes + 1).padStart(2, '0')}`}
-            onChange={(e) => {
-              const [y, m] = e.target.value.split('-').map(Number);
-              setAno(y); setMes(m - 1);
-            }}
-            className="px-3 py-1.5 bg-card border border-line rounded text-xs text-tx-strong outline-none"
-          />
-          <button onClick={generate} className="px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded inline-flex items-center gap-1.5">
-            <RefreshCw className="h-3.5 w-3.5" /> Atualizar
-          </button>
-        </div>
-      </div>
+        }
+      />
 
-      {loading && (
-        <div className="text-center py-20 text-sm text-tx-muted flex items-center justify-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" /> Gerando DFC a partir dos lançamentos…
-        </div>
-      )}
+      {loading && <Spinner />}
 
       {!loading && dfc && (
         <>
@@ -153,11 +147,11 @@ export default function CashflowPage() {
             <KPI label="Operacional (FCO)" value={brl(dfc.fcoOperacionais)} icon={TrendingUp} color={dfc.fcoOperacionais >= 0 ? 'text-ok' : 'text-err'} />
             <KPI label="Investimento (FCI)" value={brl(dfc.fcoInvestimento)} color={dfc.fcoInvestimento >= 0 ? 'text-ok' : 'text-err'} />
             <KPI label="Financiamento (FCF)" value={brl(dfc.fcoFinanciamento)} color={dfc.fcoFinanciamento >= 0 ? 'text-ok' : 'text-err'} />
-            <KPI label="Variação líquida" value={brl(dfc.variacaoCaixa)} icon={dfc.variacaoCaixa >= 0 ? TrendingUp : TrendingDown} color={dfc.variacaoCaixa >= 0 ? 'text-ok' : 'text-err'} highlight />
+            <KPI label="Variação líquida" value={brl(dfc.variacaoCaixa)} icon={dfc.variacaoCaixa >= 0 ? TrendingUp : TrendingDown} color={dfc.variacaoCaixa >= 0 ? 'text-ok' : 'text-err'} />
           </div>
 
-          <div className="rounded-xl border border-line bg-card p-5">
-            <h2 className="text-sm font-medium text-tx-strong mb-3">Caminho do caixa no período</h2>
+          <div className="card-aura">
+            <SectionTitle>Caminho do caixa no período</SectionTitle>
             {chartData.length > 1 ? (
               <div className="h-72">
                 <ResponsiveContainer>
@@ -169,8 +163,8 @@ export default function CashflowPage() {
                       contentStyle={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
                       formatter={(v: any) => brl(v)}
                     />
-                    <ReferenceLine y={0} stroke="#f87171" strokeDasharray="3 3" />
-                    <Line type="monotone" dataKey="valor" stroke="#818cf8" strokeWidth={2} dot={{ r: 4, fill: '#818cf8' }} />
+                    <ReferenceLine y={0} stroke="var(--erro)" strokeDasharray="3 3" />
+                    <Line type="monotone" dataKey="valor" stroke="var(--acao)" strokeWidth={2} dot={{ r: 4, fill: 'var(--acao)' }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -181,8 +175,8 @@ export default function CashflowPage() {
             )}
           </div>
 
-          <div className="rounded-xl border border-line bg-card p-5">
-            <h2 className="text-sm font-medium text-tx-strong mb-3">Estrutura DFC</h2>
+          <div className="card-aura">
+            <SectionTitle>Estrutura DFC</SectionTitle>
             <div className="space-y-2 text-sm">
               <Row label="Saldo inicial" value={dfc.saldoInicial} />
               <Row label="(+/-) Atividades operacionais" value={dfc.fcoOperacionais} bold />
@@ -204,26 +198,26 @@ export default function CashflowPage() {
       )}
 
       {!loading && !dfc && (
-        <div className="rounded-xl border border-line bg-card p-10 text-center">
-          <AlertTriangle className="h-10 w-10 text-warn mx-auto mb-3" />
-          <p className="text-sm font-medium text-tx-strong">Sem dados para gerar fluxo de caixa</p>
-          <p className="text-xs text-tx-muted mt-1">
-            Lance transações em /transactions para o mês selecionado.
-          </p>
+        <div className="card-aura">
+          <EmptyState
+            icon={<AlertTriangle size={40} />}
+            title="Sem dados para gerar fluxo de caixa"
+            sub="Lance transações em /transactions para o mês selecionado."
+          />
         </div>
       )}
     </div>
   );
 }
 
-function KPI({ label, value, icon: Icon, color, highlight }: any) {
+function KPI({ label, value, icon: Icon, color }: any) {
   return (
-    <div className={`rounded-xl border bg-card p-4 ${highlight ? 'border-indigo-500/40' : 'border-line'}`}>
+    <div className="card-aura">
       <div className="flex items-center gap-1.5 mb-1">
-        {Icon && <Icon className={`h-3.5 w-3.5 ${color || 'text-tx-muted'}`} />}
+        {Icon && <Icon className="h-3.5 w-3.5 text-tx-muted" />}
         <p className="text-xs text-tx-muted">{label}</p>
       </div>
-      <p className={`text-lg font-bold ${color || 'text-tx-strong'}`}>{value}</p>
+      <p className={`num text-lg font-bold ${color || 'text-tx-strong'}`}>{value}</p>
     </div>
   );
 }
@@ -232,7 +226,7 @@ function Row({ label, value, bold, highlight }: any) {
   return (
     <div className={`flex justify-between py-1 ${highlight ? 'border-t border-line pt-2 mt-1' : ''}`}>
       <span className={`text-tx-muted ${bold ? 'text-tx-strong font-medium' : ''}`}>{label}</span>
-      <span className={`font-mono ${(value ?? 0) < 0 ? 'text-err' : 'text-ok'} ${bold ? 'font-bold' : ''}`}>{brl(value)}</span>
+      <span className={`num ${(value ?? 0) < 0 ? 'text-err' : 'text-ok'} ${bold ? 'font-bold' : ''}`}>{brl(value)}</span>
     </div>
   );
 }

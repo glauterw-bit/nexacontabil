@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useQuery, gql } from '@apollo/client';
-import { Users, Loader2, UserPlus, ArrowRight } from 'lucide-react';
+import { Users, UserPlus, ArrowRight } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
+import { PageHeader, Spinner, EmptyState, COLORS } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
@@ -113,38 +114,31 @@ export default function GestaoEquipePage() {
   }
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-6xl">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <Users className="h-5 w-5 text-acao" />
-            <h1 className="text-xl font-semibold text-tx-strong">Gestão de Equipe</h1>
-          </div>
-          <p className="text-sm text-tx-muted">{users.length} analista(s) · {assignments.length} cliente(s) atribuído(s)</p>
-        </div>
-        <button
-          onClick={() => setBulkOpen(true)}
-          className="px-3 py-1.5 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded-lg inline-flex items-center gap-1.5"
-        >
-          <ArrowRight className="h-3.5 w-3.5" /> Transferir carteira em massa
-        </button>
-      </div>
+    <div className="page space-y-6">
+      <PageHeader
+        icon={<Users size={22} color={COLORS.acao} />}
+        title="Gestão de Equipe"
+        subtitle={`${users.length} analista(s) · ${assignments.length} cliente(s) atribuído(s)`}
+        action={
+          <button onClick={() => setBulkOpen(true)} className="btn-secondary">
+            <ArrowRight className="h-3.5 w-3.5" /> Transferir carteira em massa
+          </button>
+        }
+      />
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* Não atribuídos */}
-        <div className="rounded-xl border border-line bg-card p-4">
+        <div className="card-aura">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-medium text-tx-strong">Clientes não atribuídos ({unassigned.length})</h2>
+            <h2 className="text-[13px] font-medium text-tx-strong">Clientes não atribuídos ({unassigned.length})</h2>
             {unassigned.length > 0 && (
               <button onClick={selectAll} className="text-[10px] text-acao hover:underline">Selecionar todos</button>
             )}
           </div>
           {lcomp ? (
-            <div className="flex items-center gap-2 text-sm text-tx-muted py-4">
-              <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
-            </div>
+            <Spinner pad={24} />
           ) : unassigned.length === 0 ? (
-            <p className="text-xs text-tx-muted text-center py-6">Todos os clientes têm analista.</p>
+            <EmptyState icon={<Users size={28} />} title="Todos os clientes têm analista." />
           ) : (
             <div className="space-y-1 max-h-80 overflow-y-auto">
               {unassigned.map((c: any) => (
@@ -167,7 +161,7 @@ export default function GestaoEquipePage() {
             <select
               value={analystId}
               onChange={(e) => setAnalystId(e.target.value)}
-              className="w-full px-3 py-1.5 bg-inset border border-line rounded text-xs text-tx-strong outline-none"
+              className="input-aura w-full"
             >
               <option value="">Escolher analista…</option>
               {users.map((u) => (
@@ -178,12 +172,12 @@ export default function GestaoEquipePage() {
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               placeholder="Motivo (opcional)"
-              className="w-full px-3 py-1.5 bg-inset border border-line rounded text-xs text-tx-strong outline-none"
+              className="input-aura w-full"
             />
             <button
               onClick={executeAssign}
               disabled={loading || selected.length === 0 || !analystId}
-              className="w-full px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs rounded inline-flex items-center justify-center gap-1.5"
+              className="btn-primary w-full justify-center"
             >
               <UserPlus className="h-3.5 w-3.5" /> Atribuir
             </button>
@@ -191,10 +185,10 @@ export default function GestaoEquipePage() {
         </div>
 
         {/* Carteiras */}
-        <div className="rounded-xl border border-line bg-card p-4">
-          <h2 className="text-sm font-medium text-tx-strong mb-3">Carteiras ({Object.keys(byAnalyst).length})</h2>
+        <div className="card-aura">
+          <h2 className="text-[13px] font-medium text-tx-strong mb-3">Carteiras ({Object.keys(byAnalyst).length})</h2>
           {Object.keys(byAnalyst).length === 0 ? (
-            <p className="text-xs text-tx-muted text-center py-6">Nenhuma carteira distribuída.</p>
+            <EmptyState icon={<Users size={28} />} title="Nenhuma carteira distribuída." />
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {Object.entries(byAnalyst).map(([analystId, items]) => {
@@ -206,7 +200,7 @@ export default function GestaoEquipePage() {
                         <p className="text-sm text-tx-strong font-medium">{user?.name ?? 'Analista'}</p>
                         <p className="text-[10px] text-tx-muted">{user?.email}</p>
                       </div>
-                      <span className="text-xs text-acao font-mono">{items.length} cliente(s)</span>
+                      <span className="num text-xs text-tx-muted">{items.length} cliente(s)</span>
                     </div>
                     <div className="space-y-0.5">
                       {items.slice(0, 5).map((a: any) => (
@@ -226,11 +220,11 @@ export default function GestaoEquipePage() {
 
       {/* Bulk reassign modal */}
       {bulkOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-card border border-line rounded-2xl p-5 space-y-4">
+        <div className="fixed inset-0 z-50 bg-[rgba(13,17,25,0.45)] flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-card border border-line rounded-xl shadow-pop p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-tx-strong">Transferir carteira em massa</h2>
-              <button onClick={() => setBulkOpen(false)} className="text-tx-muted hover:text-tx-strong text-xs">✕</button>
+              <h2 className="text-[15px] font-semibold text-tx-strong">Transferir carteira em massa</h2>
+              <button onClick={() => setBulkOpen(false)} className="btn-ghost p-1 text-xs">✕</button>
             </div>
             <p className="text-xs text-tx-muted">
               Move TODAS as empresas ativas de um analista para outro, mantendo o histórico das atribuições anteriores.
@@ -238,24 +232,24 @@ export default function GestaoEquipePage() {
             <div className="space-y-2">
               <label className="text-[10px] uppercase text-tx-muted">De</label>
               <select value={bulkFrom} onChange={(e) => setBulkFrom(e.target.value)}
-                className="w-full px-3 py-1.5 bg-inset border border-line rounded text-xs text-tx-strong outline-none">
+                className="input-aura w-full">
                 <option value="">Escolher origem…</option>
                 {users.map((u) => <option key={u.id} value={u.id}>{u.name} ({byAnalyst[u.id]?.length ?? 0} clientes)</option>)}
               </select>
               <label className="text-[10px] uppercase text-tx-muted">Para</label>
               <select value={bulkTo} onChange={(e) => setBulkTo(e.target.value)}
-                className="w-full px-3 py-1.5 bg-inset border border-line rounded text-xs text-tx-strong outline-none">
+                className="input-aura w-full">
                 <option value="">Escolher destino…</option>
                 {users.filter((u) => u.id !== bulkFrom).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
               <label className="text-[10px] uppercase text-tx-muted">Motivo (mín 10 chars)</label>
               <textarea value={bulkMotivo} onChange={(e) => setBulkMotivo(e.target.value)}
                 rows={2} placeholder="Ex: João foi promovido a gerente, carteira passa para Maria"
-                className="w-full px-3 py-1.5 bg-inset border border-line rounded text-xs text-tx-strong outline-none" />
+                className="input-aura w-full" />
             </div>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setBulkOpen(false)} className="px-3 py-1.5 text-xs bg-inset border border-line text-tx rounded">Cancelar</button>
-              <button onClick={bulkReassign} disabled={loading} className="px-3 py-1.5 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded">
+              <button onClick={() => setBulkOpen(false)} className="btn-secondary text-xs">Cancelar</button>
+              <button onClick={bulkReassign} disabled={loading} className="btn-primary text-xs">
                 Confirmar transferência
               </button>
             </div>

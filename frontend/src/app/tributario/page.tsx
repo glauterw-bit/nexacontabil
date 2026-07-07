@@ -5,6 +5,7 @@ import { Brain, Calculator, TrendingDown, CheckCircle } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
+import { PageHeader, COLORS, tint, EmptyState, StatusChip } from '@/components/ui/kit';
 
 interface Inputs {
   faturamento: string;
@@ -119,29 +120,30 @@ export default function TributarioPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa para fazer o planejamento tributário.</p>
-        <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione uma empresa para fazer o planejamento tributário." />
+        <div className="flex justify-center">
+          <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-tx-strong">Planejamento Tributário</h1>
-        <p className="text-tx-muted text-sm mt-1">{selectedCompany.name} · Comparativo de Regimes Fiscais</p>
-      </div>
+    <div className="page space-y-6">
+      <PageHeader
+        icon={<Calculator size={22} color={COLORS.acao} />}
+        title="Planejamento Tributário"
+        subtitle={`${selectedCompany.name} · Comparativo de Regimes Fiscais`}
+      />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Input form */}
         <div className="card-aura space-y-4">
-          <h2 className="text-base font-semibold text-tx-strong flex items-center gap-2">
-            <Calculator className="h-4 w-4 text-acao" />
+          <h3 className="text-[15px] font-semibold text-tx-strong m-0 flex items-center gap-2">
+            <Calculator className="h-4 w-4 text-tx-muted" />
             Parâmetros da Empresa
-          </h2>
+          </h3>
           {[
             { label: 'Faturamento Anual (R$)', key: 'faturamento', placeholder: '1.200.000' },
             { label: 'Custos Anuais (R$)', key: 'custos', placeholder: '360.000' },
@@ -153,13 +155,13 @@ export default function TributarioPage() {
               <input type="number" min="0" value={(inputs as any)[f.key]}
                 onChange={e => setInputs(prev => ({ ...prev, [f.key]: e.target.value }))}
                 placeholder={f.placeholder}
-                className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500" />
+                className="input-aura w-full" />
             </div>
           ))}
           <div>
             <label className="block text-sm text-tx-muted mb-1.5">Tipo de Atividade</label>
             <select value={inputs.atividade} onChange={e => setInputs(prev => ({ ...prev, atividade: e.target.value }))}
-              className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500">
+              className="input-aura w-full">
               <option value="servicos">Serviços (presunção 32%)</option>
               <option value="comercio">Comércio (presunção 8%)</option>
               <option value="industria">Indústria (presunção 8%)</option>
@@ -169,7 +171,7 @@ export default function TributarioPage() {
           <div>
             <label className="block text-sm text-tx-muted mb-1.5">Regime Atual</label>
             <select value={inputs.regimeAtual} onChange={e => setInputs(prev => ({ ...prev, regimeAtual: e.target.value }))}
-              className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500">
+              className="input-aura w-full">
               <option value="simples">Simples Nacional</option>
               <option value="presumido">Lucro Presumido</option>
               <option value="real">Lucro Real</option>
@@ -183,7 +185,8 @@ export default function TributarioPage() {
         {/* Results */}
         <div className="xl:col-span-2 space-y-4">
           {economia > 0 && calculado && (
-            <div className="flex items-start gap-3 bg-green-400/10 border border-green-400/30 rounded-xl p-4">
+            <div className="flex items-start gap-3 rounded-xl p-4"
+              style={{ background: tint(COLORS.dotOk, 10), border: `1px solid ${tint(COLORS.dotOk, 30)}` }}>
               <TrendingDown className="h-5 w-5 text-ok flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-ok font-semibold">Potencial de economia tributária detectado!</p>
@@ -198,20 +201,20 @@ export default function TributarioPage() {
 
           {/* Comparison table */}
           <div className="card-aura overflow-x-auto">
-            <table className="w-full">
+            <table className="table-aura">
               <thead>
-                <tr className="text-left text-xs text-tx-muted border-b border-line">
-                  <th className="pb-3 font-medium">Regime</th>
-                  <th className="pb-3 font-medium text-right">Imposto Anual</th>
-                  <th className="pb-3 font-medium text-right">Imposto Mensal</th>
-                  <th className="pb-3 font-medium text-right">Alíquota Efetiva</th>
-                  <th className="pb-3 font-medium text-center">Indicação</th>
+                <tr>
+                  <th>Regime</th>
+                  <th className="num">Imposto Anual</th>
+                  <th className="num">Imposto Mensal</th>
+                  <th className="num">Alíquota Efetiva</th>
+                  <th className="text-center">Indicação</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {resultados.map(r => (
-                  <tr key={r.regime} className={`hover:bg-inset transition-colors ${r.melhor ? 'bg-green-400/5' : ''}`}>
-                    <td className="py-3">
+                  <tr key={r.regime} style={r.melhor ? { background: tint(COLORS.dotOk, 5) } : undefined}>
+                    <td>
                       <p className={`text-sm font-medium ${r.melhor ? 'text-ok' : 'text-tx-strong'}`}>{r.regime}</p>
                       <div className="flex gap-2 mt-1">
                         {Object.entries(r.detalhes).map(([k, v]) => (
@@ -219,22 +222,20 @@ export default function TributarioPage() {
                         ))}
                       </div>
                     </td>
-                    <td className={`py-3 text-sm text-right font-mono font-semibold ${r.melhor ? 'text-ok' : 'text-tx-strong'}`}>
+                    <td className={`num font-semibold ${r.melhor ? 'text-ok' : 'text-tx-strong'}`}>
                       {r.impostoAnual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </td>
-                    <td className="py-3 text-sm text-right font-mono text-tx">
+                    <td className="num">
                       {r.impostoMensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </td>
-                    <td className={`py-3 text-sm text-right font-mono font-semibold ${r.aliquotaEfetiva < 10 ? 'text-ok' : r.aliquotaEfetiva < 20 ? 'text-warn' : 'text-err'}`}>
+                    <td className={`num font-semibold ${r.aliquotaEfetiva < 10 ? 'text-ok' : r.aliquotaEfetiva < 20 ? 'text-warn' : 'text-err'}`}>
                       {r.aliquotaEfetiva.toFixed(2)}%
                     </td>
-                    <td className="py-3 text-center">
+                    <td className="text-center">
                       {r.melhor ? (
-                        <span className="flex items-center justify-center gap-1 text-xs text-ok bg-green-400/10 border border-green-400/30 px-2 py-0.5 rounded-full">
-                          <CheckCircle className="h-3 w-3" /> Melhor opção
-                        </span>
+                        <StatusChip tone="ok" label="Melhor opção" size="sm" />
                       ) : (
-                        <span className="text-xs text-tx-muted">
+                        <span className="text-xs text-tx-muted num">
                           +{(r.impostoAnual - (melhor?.impostoAnual || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </span>
                       )}
@@ -247,14 +248,14 @@ export default function TributarioPage() {
 
           {/* Chart */}
           <div className="card-aura">
-            <h3 className="text-sm font-semibold text-tx-strong mb-4">Comparativo Visual — Impostos Anuais</h3>
+            <h3 className="text-[15px] font-semibold text-tx-strong m-0 mb-4">Comparativo Visual — Impostos Anuais</h3>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={chartData} margin={{ top: 0, right: 0, left: -10, bottom: 0 }}>
                 <XAxis dataKey="name" tick={{ fill: 'var(--faint)', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: 'var(--faint)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
                 <Tooltip formatter={(v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }} labelStyle={{ color: 'var(--tx-strong)' }} />
                 <Bar dataKey="valor" radius={[4, 4, 0, 0]}>
-                  {chartData.map((entry, i) => (<Cell key={i} fill={entry.melhor ? 'var(--dot-ok)' : '#374151'} />))}
+                  {chartData.map((entry, i) => (<Cell key={i} fill={entry.melhor ? 'var(--dot-ok)' : 'var(--faint)'} />))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -262,8 +263,8 @@ export default function TributarioPage() {
 
           {/* AI recommendation */}
           <div className="card-aura">
-            <h3 className="text-sm font-semibold text-tx-strong mb-3 flex items-center gap-2">
-              <Brain className="h-4 w-4 text-acao" /> Recomendação da IA
+            <h3 className="text-[15px] font-semibold text-tx-strong m-0 mb-3 flex items-center gap-2">
+              <Brain className="h-4 w-4 text-tx-muted" /> Recomendação da IA
             </h3>
             <div className="text-sm text-tx space-y-2 leading-relaxed">
               <p>Com faturamento anual de <strong className="text-tx-strong">{parseFloat(inputs.faturamento || '0').toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong> e atividade de serviços, a análise indica que <strong className="text-ok">{melhor?.regime}</strong> é o regime mais vantajoso com alíquota efetiva de <strong className="text-ok">{melhor?.aliquotaEfetiva.toFixed(2)}%</strong>.</p>

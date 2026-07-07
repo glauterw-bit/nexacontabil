@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { Headset, Loader2, Plus, MessageCircle, Building2, Mail, Phone, X, Send } from 'lucide-react';
-import { tint } from '@/components/ui/kit';
+import { tint, COLORS, PageHeader, Card, Kpi, Spinner, EmptyState } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -58,25 +58,24 @@ export default function AtendimentosPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Headset size={24} color="var(--acao)" /> Central de Atendimento
-          </h1>
-          <p style={{ color: 'var(--muted)', marginTop: 4 }}>Todos os canais num inbox só — MEGA, WhatsApp, e-mail e telefone.</p>
-        </div>
-        <button onClick={() => setNovo(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, border: 'none', background: 'var(--acao)', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>
-          <Plus size={16} /> Novo atendimento
-        </button>
-      </div>
+    <div className="page">
+      <PageHeader
+        icon={<Headset size={22} color={COLORS.acao} />}
+        title="Central de Atendimento"
+        subtitle="Todos os canais num inbox só — MEGA, WhatsApp, e-mail e telefone."
+        action={
+          <button onClick={() => setNovo(true)} className="btn-primary">
+            <Plus size={16} /> Novo atendimento
+          </button>
+        }
+      />
 
       {stats && (
-        <div style={{ display: 'flex', gap: 14, marginTop: 18, flexWrap: 'wrap' }}>
-          <Stat label="Abertos" value={stats.abertos} cor="var(--atencao)" />
-          <Stat label="Em andamento" value={stats.emAndamento} cor="var(--acao)" />
-          <Stat label="Resolvidos" value={stats.resolvidos} cor="var(--ok)" />
-          <Stat label="Urgentes" value={stats.urgentes} cor="var(--erro)" />
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          <Kpi label="Abertos" value={stats.abertos ?? 0} cor="var(--atencao)" />
+          <Kpi label="Em andamento" value={stats.emAndamento ?? 0} cor="var(--acao)" />
+          <Kpi label="Resolvidos" value={stats.resolvidos ?? 0} cor="var(--ok)" />
+          <Kpi label="Urgentes" value={stats.urgentes ?? 0} cor="var(--erro)" />
         </div>
       )}
 
@@ -89,23 +88,23 @@ export default function AtendimentosPage() {
           </Chip>
         ))}
         <div style={{ flex: 1 }} />
-        <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--tx)', fontSize: 13 }}>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="input-aura" style={{ fontSize: 13 }}>
           <option value="">Todos status</option>
           {STATUS.map((s) => <option key={s} value={s}>{stLabel[s]}</option>)}
         </select>
       </div>
 
-      {loading ? <div style={{ textAlign: 'center', padding: 40 }}><Loader2 size={28} className="animate-spin" /></div> :
+      {loading ? <Spinner /> :
         lista.length === 0 ? (
-          <div style={{ marginTop: 20, padding: 30, textAlign: 'center', color: 'var(--faint)', border: '1px dashed var(--border)', borderRadius: 12 }}>
-            Nenhum atendimento{canal ? ` no canal ${CANAIS[canal]?.label}` : ''}. Os tickets do MEGA aparecem aqui assim que a integração estiver ligada.
-          </div>
+          <EmptyState icon={<Headset size={28} />}
+            title={`Nenhum atendimento${canal ? ` no canal ${CANAIS[canal]?.label}` : ''}.`}
+            sub="Os tickets do MEGA aparecem aqui assim que a integração estiver ligada." />
         ) : (
           <div style={{ marginTop: 16 }}>
             {lista.map((a) => {
               const c = CANAIS[a.canal] ?? CANAIS.manual; const Ico = c.icon;
               return (
-                <div key={a.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderLeft: `3px solid ${stCor[a.status]}`, borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
+                <Card key={a.id} accent={stCor[a.status]} style={{ padding: '12px 16px', marginBottom: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                     <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setAberto(a.id)}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -122,10 +121,10 @@ export default function AtendimentosPage() {
                         {STATUS.map((s) => <option key={s} value={s}>{stLabel[s]}</option>)}
                       </select>
                       <input list="resp-at" defaultValue={a.responsavel ?? ''} placeholder="responsável" onBlur={(e) => { const v = e.target.value.trim(); if (v !== (a.responsavel ?? '')) patch(a.id, { responsavel: v }); }}
-                        style={{ width: 150, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--tx)', fontSize: 12 }} />
+                        className="input-aura" style={{ width: 150, padding: '5px 8px', fontSize: 12 }} />
                     </div>
                   </div>
-                </div>
+                </Card>
               );
             })}
           </div>
@@ -173,8 +172,8 @@ function ConversaDrawer({ id, onClose }: { id: string; onClose: () => void }) {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {!data ? <div style={{ textAlign: 'center', paddingTop: 40 }}><Loader2 size={24} className="animate-spin" /></div> :
-            data.mensagens.length === 0 ? <div style={{ color: 'var(--faint)', fontSize: 13, textAlign: 'center', paddingTop: 20 }}>Sem mensagens registradas ainda.</div> :
+          {!data ? <Spinner pad={40} /> :
+            data.mensagens.length === 0 ? <EmptyState icon={<MessageCircle size={24} />} title="Sem mensagens registradas ainda." /> :
             data.mensagens.map((m: any) => (
               <div key={m.id} style={{ alignSelf: m.direcao === 'out' ? 'flex-end' : 'flex-start', maxWidth: '80%', background: m.direcao === 'out' ? 'var(--acao)' : 'var(--surface)', color: m.direcao === 'out' ? '#fff' : 'var(--tx)', padding: '8px 12px', borderRadius: 12, fontSize: 13 }}>
                 {m.texto}
@@ -185,8 +184,8 @@ function ConversaDrawer({ id, onClose }: { id: string; onClose: () => void }) {
 
         <div style={{ padding: 12, borderTop: '1px solid var(--border-soft)', display: 'flex', gap: 8 }}>
           <input value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && enviar()} placeholder="Responder ao cliente…"
-            style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--tx)', fontSize: 14 }} />
-          <button onClick={enviar} disabled={enviando} style={{ padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--dot-ok)', color: '#04240f', cursor: 'pointer' }}>
+            className="input-aura" style={{ flex: 1 }} />
+          <button onClick={enviar} disabled={enviando} className="btn-primary">
             {enviando ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           </button>
         </div>
@@ -203,12 +202,12 @@ function NovoModal({ nomes, onClose, onSaved }: any) {
     try { await fetch(`${API}/api/v1/atendimentos`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(f) }); onSaved(); }
     finally { setBusy(false); }
   }
-  const inp = (k: string, ph: string) => <input value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: e.target.value })} placeholder={ph} style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--tx)', fontSize: 14, marginBottom: 8 }} />;
+  const inp = (k: string, ph: string) => <input value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: e.target.value })} placeholder={ph} className="input-aura w-full" style={{ marginBottom: 8 }} />;
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(13,17,25,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 22, width: 440, maxWidth: '90vw' }}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-card border border-line rounded-xl shadow-pop" style={{ padding: 22, width: 440, maxWidth: '90vw' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <strong style={{ fontSize: 17 }}>Novo atendimento</strong>
+          <strong style={{ fontSize: 15 }}>Novo atendimento</strong>
           <X size={18} style={{ cursor: 'pointer', color: 'var(--faint)' }} onClick={onClose} />
         </div>
         {inp('clienteNome', 'Cliente')}
@@ -216,24 +215,20 @@ function NovoModal({ nomes, onClose, onSaved }: any) {
         {inp('mensagem', 'Descrição / dúvida')}
         {inp('contato', 'Contato (telefone/e-mail)')}
         <div style={{ display: 'flex', gap: 8 }}>
-          <select value={f.categoria} onChange={(e) => setF({ ...f, categoria: e.target.value })} style={{ flex: 1, padding: 9, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--tx)' }}>
+          <select value={f.categoria} onChange={(e) => setF({ ...f, categoria: e.target.value })} className="input-aura" style={{ flex: 1 }}>
             {['fiscal', 'contabil', 'folha', 'financeiro', 'outro'].map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-          <select value={f.prioridade} onChange={(e) => setF({ ...f, prioridade: e.target.value })} style={{ flex: 1, padding: 9, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--tx)' }}>
+          <select value={f.prioridade} onChange={(e) => setF({ ...f, prioridade: e.target.value })} className="input-aura" style={{ flex: 1 }}>
             {['baixa', 'normal', 'alta', 'urgente'].map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
         </div>
-        <input list="resp-at" value={f.responsavel ?? ''} onChange={(e) => setF({ ...f, responsavel: e.target.value })} placeholder="responsável" style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--tx)', fontSize: 14, marginTop: 8 }} />
-        <button onClick={salvar} disabled={busy} style={{ width: '100%', marginTop: 14, padding: 11, borderRadius: 8, border: 'none', background: 'var(--acao)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
+        <input list="resp-at" value={f.responsavel ?? ''} onChange={(e) => setF({ ...f, responsavel: e.target.value })} placeholder="responsável" className="input-aura w-full" style={{ marginTop: 8 }} />
+        <button onClick={salvar} disabled={busy} className="btn-primary w-full justify-center" style={{ marginTop: 14 }}>
           {busy ? 'Salvando…' : 'Criar atendimento'}
         </button>
       </div>
     </div>
   );
-}
-
-function Stat({ label, value, cor }: { label: string; value: any; cor: string }) {
-  return <div style={{ flex: '1 1 120px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}><div style={{ fontSize: 12, color: 'var(--faint)' }}>{label}</div><div style={{ fontSize: 26, fontWeight: 700, color: cor, marginTop: 4 }}>{value ?? 0}</div></div>;
 }
 function Chip({ on, cor = 'var(--acao)', onClick, children }: any) {
   return <button onClick={onClick} style={{ padding: '6px 12px', borderRadius: 20, border: `1px solid ${on ? cor : 'var(--border)'}`, background: on ? tint(cor, 13) : 'var(--surface2)', color: on ? cor : 'var(--muted)', fontSize: 12, cursor: 'pointer' }}>{children}</button>;

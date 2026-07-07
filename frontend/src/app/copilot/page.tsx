@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Send, Bot, User, Loader2, Sparkles, Building2 } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
+import { PageHeader, StatusChip, EmptyState, COLORS } from '@/components/ui/kit';
 import Link from 'next/link';
 
 interface Message {
@@ -88,9 +89,8 @@ export default function CopilotPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa para usar o Copilot.</p>
+      <div className="flex flex-col items-center justify-center h-full gap-2 p-8">
+        <EmptyState icon={<Building2 size={34} />} title="Selecione uma empresa para usar o Copilot." />
         <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
       </div>
     );
@@ -99,18 +99,13 @@ export default function CopilotPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-3 p-6 border-b border-line">
-        <div className="h-10 w-10 rounded-xl bg-indigo-600/20 flex items-center justify-center">
-          <Bot className="h-5 w-5 text-acao" />
-        </div>
-        <div>
-          <h1 className="text-tx-strong font-semibold">Copilot Financeiro</h1>
-          <p className="text-xs text-tx-muted">{selectedCompany.name} · GPT-4o + RAG</p>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-xs text-ok">Online</span>
-        </div>
+      <div className="px-6 pt-6 border-b border-line">
+        <PageHeader
+          icon={<Bot size={22} color={COLORS.acao} />}
+          title="Copilot Financeiro"
+          subtitle={`${selectedCompany.name} · GPT-4o + RAG`}
+          action={<StatusChip tone="ok" label="Online" size="sm" />}
+        />
       </div>
 
       {/* Messages */}
@@ -118,16 +113,16 @@ export default function CopilotPage() {
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
             <div className={`h-8 w-8 rounded-full flex-shrink-0 flex items-center justify-center ${
-              msg.role === 'user' ? 'bg-indigo-600' : 'bg-card border border-line'
+              msg.role === 'user' ? 'bg-acao' : 'bg-card border border-line'
             }`}>
               {msg.role === 'user'
                 ? <User className="h-4 w-4 text-white" />
-                : <Bot className="h-4 w-4 text-acao" />}
+                : <Bot className="h-4 w-4 text-tx-muted" />}
             </div>
             <div className={`max-w-2xl flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
               <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 msg.role === 'user'
-                  ? 'bg-indigo-600 text-white rounded-tr-sm'
+                  ? 'bg-acao text-white rounded-tr-sm'
                   : 'bg-card border border-line text-tx rounded-tl-sm'
               }`}>
                 {msg.content}
@@ -138,7 +133,8 @@ export default function CopilotPage() {
                     <button
                       key={j}
                       onClick={() => send(action)}
-                      className="flex items-center gap-1.5 text-xs bg-indigo-600/10 border border-indigo-500/30 text-acao hover:bg-indigo-600/20 px-3 py-1.5 rounded-full transition-colors"
+                      className="btn-secondary"
+                      style={{ borderRadius: 999, padding: '6px 12px', fontSize: 12 }}
                     >
                       <Sparkles className="h-3 w-3" />
                       {action}
@@ -152,7 +148,7 @@ export default function CopilotPage() {
         {loading && (
           <div className="flex gap-4">
             <div className="h-8 w-8 rounded-full bg-card border border-line flex items-center justify-center">
-              <Bot className="h-4 w-4 text-acao" />
+              <Bot className="h-4 w-4 text-tx-muted" />
             </div>
             <div className="bg-card border border-line rounded-2xl rounded-tl-sm px-4 py-3">
               <Loader2 className="h-4 w-4 text-acao animate-spin" />
@@ -175,9 +171,9 @@ export default function CopilotPage() {
           <button
             onClick={() => send(input)}
             disabled={loading || !input.trim()}
-            className="h-9 w-9 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+            className="btn-primary h-9 w-9 p-0 justify-center"
           >
-            <Send className="h-4 w-4 text-white" />
+            <Send className="h-4 w-4" />
           </button>
         </div>
       </div>

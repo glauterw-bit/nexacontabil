@@ -6,6 +6,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { UserCheck, Calculator, FileText, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
+import { PageHeader, SectionTitle, StatusChip, EmptyState, COLORS } from '@/components/ui/kit';
 
 const GET_EMPLOYEES = gql`query GetEmployees($companyId: ID!) { employees(companyId: $companyId) { id name role baseSalary } }`;
 const LISTAR_FERIAS = gql`query ListarFerias($companyId: ID!) { listarFerias(companyId: $companyId) { id employee { name } periodoAquisitivo dtInicioGozo diasUsufruidos valorTotal inssFerias irrfFerias valorLiquido status } }`;
@@ -57,31 +58,28 @@ export default function FeriasRescisaoPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <Building2 className="h-12 w-12 text-tx-faint mx-auto mb-4" />
-          <p className="text-tx-muted">Selecione uma empresa no menu lateral</p>
-          <Link href="/carteira" className="mt-4 inline-block text-acao hover:underline">Cadastrar empresa</Link>
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione uma empresa no menu lateral" />
+        <div className="flex justify-center">
+          <Link href="/carteira" className="btn-primary">Cadastrar empresa</Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-auto">
-      <div className="flex items-center gap-3">
-        <UserCheck className="h-7 w-7 text-acao" />
-        <div>
-          <h1 className="text-2xl font-bold text-tx-strong">Férias, 13º e Rescisão</h1>
-          <p className="text-tx-muted text-sm">Cálculos trabalhistas com INSS e IRRF</p>
-        </div>
-      </div>
+    <div className="page space-y-6">
+      <PageHeader
+        icon={<UserCheck size={22} color={COLORS.acao} />}
+        title="Férias, 13º e Rescisão"
+        subtitle="Cálculos trabalhistas com INSS e IRRF"
+      />
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-page p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-inset p-1 rounded-xl w-fit">
         {(['ferias', 'rescisao', 'decimo'] as Tab[]).map(t => (
           <button key={t} onClick={() => { setTab(t); setResult(null); setMsg(''); }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${tab === t ? 'bg-indigo-600 text-white' : 'text-tx-muted hover:text-tx-strong'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${tab === t ? 'bg-acao text-white' : 'text-tx-muted hover:text-tx-strong'}`}>
             {t === 'ferias' ? 'Férias' : t === 'rescisao' ? 'Rescisão' : '13º Salário'}
           </button>
         ))}
@@ -95,9 +93,9 @@ export default function FeriasRescisaoPage() {
 
       {/* Form */}
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-card border border-line rounded-xl p-5 space-y-4">
-          <h2 className="text-tx-strong font-semibold flex items-center gap-2">
-            <Calculator className="h-5 w-5 text-acao" />
+        <div className="card-aura space-y-4">
+          <h2 className="text-[15px] font-semibold text-tx-strong flex items-center gap-2 m-0">
+            <Calculator className="h-4 w-4 text-tx-muted" />
             {tab === 'ferias' ? 'Calcular Férias' : tab === 'rescisao' ? 'Calcular Rescisão' : '13º Salário'}
           </h2>
 
@@ -107,7 +105,7 @@ export default function FeriasRescisaoPage() {
               <select
                 value={empId}
                 onChange={e => setEmpId(e.target.value)}
-                className="w-full bg-page border border-line rounded-lg px-3 py-2 text-tx-strong text-sm appearance-none focus:outline-none focus:border-indigo-500"
+                className="input-aura w-full appearance-none"
               >
                 <option value="">Selecionar...</option>
                 {employees.map((e: any) => (
@@ -123,29 +121,29 @@ export default function FeriasRescisaoPage() {
               <div>
                 <label className="text-tx-muted text-sm block mb-1">Período Aquisitivo</label>
                 <input value={periodoAquis} onChange={e => setPeriodoAquis(e.target.value)} placeholder="Ex: 2024-01 a 2025-01"
-                  className="w-full bg-page border border-line rounded-lg px-3 py-2 text-tx-strong text-sm focus:outline-none focus:border-indigo-500" />
+                  className="input-aura w-full" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-tx-muted text-sm block mb-1">Início Gozo</label>
                   <input type="date" value={dtInicio} onChange={e => setDtInicio(e.target.value)}
-                    className="w-full bg-page border border-line rounded-lg px-3 py-2 text-tx-strong text-sm focus:outline-none focus:border-indigo-500" />
+                    className="input-aura w-full" />
                 </div>
                 <div>
                   <label className="text-tx-muted text-sm block mb-1">Fim Gozo</label>
                   <input type="date" value={dtFim} onChange={e => setDtFim(e.target.value)}
-                    className="w-full bg-page border border-line rounded-lg px-3 py-2 text-tx-strong text-sm focus:outline-none focus:border-indigo-500" />
+                    className="input-aura w-full" />
                 </div>
               </div>
               <div>
                 <label className="text-tx-muted text-sm block mb-1">Dias de Gozo: {diasGozo}</label>
                 <input type="range" min={10} max={30} value={diasGozo} onChange={e => setDiasGozo(Number(e.target.value))}
-                  className="w-full accent-indigo-600" />
+                  className="w-full accent-acao" />
               </div>
               <button
                 disabled={!empId || !periodoAquis || !dtInicio || !dtFim}
                 onClick={() => calcFerias({ variables: { employeeId: empId, periodoAquisitivo: periodoAquis, dtInicioGozo: dtInicio, dtFimGozo: dtFim, diasGozo } })}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white py-2.5 rounded-lg text-sm transition-colors"
+                className="btn-primary w-full justify-center"
               >
                 Calcular Férias
               </button>
@@ -157,13 +155,13 @@ export default function FeriasRescisaoPage() {
               <div>
                 <label className="text-tx-muted text-sm block mb-1">Data de Demissão</label>
                 <input type="date" value={dtDemissao} onChange={e => setDtDemissao(e.target.value)}
-                  className="w-full bg-page border border-line rounded-lg px-3 py-2 text-tx-strong text-sm focus:outline-none focus:border-indigo-500" />
+                  className="input-aura w-full" />
               </div>
               <div>
                 <label className="text-tx-muted text-sm block mb-1">Tipo de Rescisão</label>
                 <div className="relative">
                   <select value={tipoRescisao} onChange={e => setTipoRescisao(e.target.value)}
-                    className="w-full bg-page border border-line rounded-lg px-3 py-2 text-tx-strong text-sm appearance-none focus:outline-none focus:border-indigo-500">
+                    className="input-aura w-full appearance-none">
                     <option value="sem_justa_causa">Sem Justa Causa</option>
                     <option value="com_justa_causa">Com Justa Causa</option>
                     <option value="pedido_demissao">Pedido de Demissão</option>
@@ -175,13 +173,13 @@ export default function FeriasRescisaoPage() {
                 </div>
               </div>
               <label className="flex items-center gap-2 text-tx-muted text-sm cursor-pointer">
-                <input type="checkbox" checked={avisoPrev} onChange={e => setAvisoPrev(e.target.checked)} className="rounded accent-indigo-600" />
+                <input type="checkbox" checked={avisoPrev} onChange={e => setAvisoPrev(e.target.checked)} className="rounded accent-acao" />
                 Aviso prévio trabalhado
               </label>
               <button
                 disabled={!empId || !dtDemissao}
                 onClick={() => calcRescisao({ variables: { employeeId: empId, dataDemissao: dtDemissao, tipoRescisao, avisoPrevioTrabalhado: avisoPrev } })}
-                className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white py-2.5 rounded-lg text-sm transition-colors"
+                className="btn-primary w-full justify-center"
               >
                 Calcular Rescisão
               </button>
@@ -193,10 +191,9 @@ export default function FeriasRescisaoPage() {
               <div>
                 <label className="text-tx-muted text-sm block mb-1">Ano</label>
                 <input type="number" value={ano} onChange={e => setAno(Number(e.target.value))} min={2020} max={2030}
-                  className="w-full bg-page border border-line rounded-lg px-3 py-2 text-tx-strong text-sm focus:outline-none focus:border-indigo-500" />
+                  className="input-aura w-full" />
               </div>
-              <button onClick={() => refetchDecimo()}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-sm transition-colors">
+              <button onClick={() => refetchDecimo()} className="btn-primary w-full justify-center">
                 Calcular 13º Salário
               </button>
             </>
@@ -205,8 +202,8 @@ export default function FeriasRescisaoPage() {
 
         {/* Result */}
         {result && (
-          <div className="bg-card border border-green-500/30 rounded-xl p-5 space-y-3">
-            <h2 className="text-tx-strong font-semibold">Resultado do Cálculo</h2>
+          <div className="card-aura space-y-3">
+            <h2 className="text-[15px] font-semibold text-tx-strong m-0">Resultado do Cálculo</h2>
             {tab === 'ferias' && (
               <div className="space-y-2">
                 <Row label="Total Bruto" value={fmt(result.valorTotal)} />
@@ -232,7 +229,7 @@ export default function FeriasRescisaoPage() {
                     <ul className="space-y-1">
                       {result.direitos.map((d: string, i: number) => (
                         <li key={i} className="text-xs text-tx flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full" /> {d}
+                          <span className="w-1.5 h-1.5 bg-ok rounded-full" /> {d}
                         </li>
                       ))}
                     </ul>
@@ -246,83 +243,105 @@ export default function FeriasRescisaoPage() {
 
       {/* 13º Table */}
       {tab === 'decimo' && decimoData?.calcularDecimoTerceiro && (
-        <div className="bg-card border border-line rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-line">
-            <h2 className="text-tx-strong font-semibold">13º Salário {ano} — Todos os Funcionários</h2>
-          </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line text-tx-muted">
-                <th className="px-4 py-3 text-left">Funcionário</th>
-                <th className="px-4 py-3 text-center num">Avos</th>
-                <th className="px-4 py-3 text-right num">Bruto</th>
-                <th className="px-4 py-3 text-right num">1ª Parcela</th>
-                <th className="px-4 py-3 text-right num">INSS</th>
-                <th className="px-4 py-3 text-right num">IRRF</th>
-                <th className="px-4 py-3 text-right num">2ª Parcela</th>
-                <th className="px-4 py-3 text-right num">Líquido</th>
-              </tr>
-            </thead>
-            <tbody>
-              {decimoData.calcularDecimoTerceiro.map((d: any) => (
-                <tr key={d.employeeId || d.employeeNome} className="border-b border-line hover:bg-inset">
-                  <td className="px-4 py-3 text-tx-strong">{d.employeeNome}</td>
-                  <td className="px-4 py-3 text-tx-muted text-center num">{d.avosAquisitivos}/12</td>
-                  <td className="px-4 py-3 text-tx-muted text-right num">{fmt(d.totalBruto)}</td>
-                  <td className="px-4 py-3 text-tx-muted text-right num">{fmt(d.primeiraParcela)}</td>
-                  <td className="px-4 py-3 text-err text-right num">{fmt(d.inss)}</td>
-                  <td className="px-4 py-3 text-err text-right num">{fmt(d.irrf)}</td>
-                  <td className="px-4 py-3 text-tx-muted text-right num">{fmt(d.segundaParcela)}</td>
-                  <td className="px-4 py-3 text-ok font-bold text-right num">{fmt(d.totalLiquido)}</td>
+        <div>
+          <SectionTitle>13º Salário {ano} — Todos os Funcionários</SectionTitle>
+          <div className="card-aura overflow-x-auto">
+            <table className="table-aura">
+              <thead>
+                <tr>
+                  <th>Funcionário</th>
+                  <th className="text-center">Avos</th>
+                  <th className="num">Bruto</th>
+                  <th className="num">1ª Parcela</th>
+                  <th className="num">INSS</th>
+                  <th className="num">IRRF</th>
+                  <th className="num">2ª Parcela</th>
+                  <th className="num">Líquido</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {decimoData.calcularDecimoTerceiro.map((d: any) => (
+                  <tr key={d.employeeId || d.employeeNome}>
+                    <td className="text-tx-strong">{d.employeeNome}</td>
+                    <td className="text-tx-muted text-center">{d.avosAquisitivos}/12</td>
+                    <td className="num">{fmt(d.totalBruto)}</td>
+                    <td className="num">{fmt(d.primeiraParcela)}</td>
+                    <td className="num">{fmt(d.inss)}</td>
+                    <td className="num">{fmt(d.irrf)}</td>
+                    <td className="num">{fmt(d.segundaParcela)}</td>
+                    <td className="num text-tx-strong font-semibold">{fmt(d.totalLiquido)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {/* History tables */}
       {tab === 'ferias' && (
-        <div className="bg-card border border-line rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-line"><h2 className="text-tx-strong font-semibold flex items-center gap-2"><FileText className="h-5 w-5" /> Histórico de Férias</h2></div>
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-line text-tx-muted"><th className="px-4 py-3 text-left">Funcionário</th><th className="px-4 py-3 text-left">Período</th><th className="px-4 py-3 text-left">Início</th><th className="px-4 py-3 text-center num">Dias</th><th className="px-4 py-3 text-right num">Líquido</th><th className="px-4 py-3 text-left">Status</th></tr></thead>
-            <tbody>
-              {(feriasData?.listarFerias ?? []).length === 0 ? (<tr><td colSpan={6} className="px-4 py-8 text-center text-tx-muted">Nenhum cálculo de férias.</td></tr>) :
-              (feriasData?.listarFerias ?? []).map((f: any) => (
-                <tr key={f.id} className="border-b border-line hover:bg-inset">
-                  <td className="px-4 py-3 text-tx-strong">{f.employee?.name}</td>
-                  <td className="px-4 py-3 text-tx-muted text-xs">{f.periodoAquisitivo}</td>
-                  <td className="px-4 py-3 text-tx-muted">{new Date(f.dtInicioGozo).toLocaleDateString('pt-BR')}</td>
-                  <td className="px-4 py-3 text-tx-muted text-center num">{f.diasUsufruidos}</td>
-                  <td className="px-4 py-3 text-ok font-bold text-right num">{fmt(f.valorLiquido)}</td>
-                  <td className="px-4 py-3"><span className="text-xs bg-blue-500/10 text-info px-2 py-1 rounded-full">{f.status}</span></td>
+        <div>
+          <SectionTitle><FileText className="h-4 w-4 text-tx-muted" /> Histórico de Férias</SectionTitle>
+          <div className="card-aura overflow-x-auto">
+            <table className="table-aura">
+              <thead>
+                <tr>
+                  <th>Funcionário</th>
+                  <th>Período</th>
+                  <th>Início</th>
+                  <th className="text-center">Dias</th>
+                  <th className="num">Líquido</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(feriasData?.listarFerias ?? []).length === 0 ? (<tr><td colSpan={6} className="text-center text-tx-muted py-8">Nenhum cálculo de férias.</td></tr>) :
+                (feriasData?.listarFerias ?? []).map((f: any) => (
+                  <tr key={f.id}>
+                    <td className="text-tx-strong">{f.employee?.name}</td>
+                    <td className="text-tx-muted text-xs">{f.periodoAquisitivo}</td>
+                    <td className="text-tx-muted">{new Date(f.dtInicioGozo).toLocaleDateString('pt-BR')}</td>
+                    <td className="text-tx-muted text-center">{f.diasUsufruidos}</td>
+                    <td className="num text-tx-strong font-semibold">{fmt(f.valorLiquido)}</td>
+                    <td><StatusChip size="sm" tone="processando" label={f.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {tab === 'rescisao' && (
-        <div className="bg-card border border-line rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-line"><h2 className="text-tx-strong font-semibold">Histórico de Rescisões</h2></div>
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-line text-tx-muted"><th className="px-4 py-3 text-left">Funcionário</th><th className="px-4 py-3 text-left">Tipo</th><th className="px-4 py-3 text-left">Data</th><th className="px-4 py-3 text-right num">Bruto</th><th className="px-4 py-3 text-right num">Multa</th><th className="px-4 py-3 text-right num">Líquido</th></tr></thead>
-            <tbody>
-              {(rescData?.listarRescisoes ?? []).length === 0 ? (<tr><td colSpan={6} className="px-4 py-8 text-center text-tx-muted">Nenhuma rescisão calculada.</td></tr>) :
-              (rescData?.listarRescisoes ?? []).map((r: any) => (
-                <tr key={r.id} className="border-b border-line hover:bg-inset">
-                  <td className="px-4 py-3 text-tx-strong">{r.employee?.name}</td>
-                  <td className="px-4 py-3 text-tx-muted text-xs">{r.tipoRescisao.replace(/_/g, ' ')}</td>
-                  <td className="px-4 py-3 text-tx-muted">{new Date(r.dataDemissao).toLocaleDateString('pt-BR')}</td>
-                  <td className="px-4 py-3 text-tx-muted text-right num">{fmt(r.totalBruto)}</td>
-                  <td className="px-4 py-3 text-warn text-right num">{fmt(r.multa40Fgts)}</td>
-                  <td className="px-4 py-3 text-ok font-bold text-right num">{fmt(r.totalLiquido)}</td>
+        <div>
+          <SectionTitle>Histórico de Rescisões</SectionTitle>
+          <div className="card-aura overflow-x-auto">
+            <table className="table-aura">
+              <thead>
+                <tr>
+                  <th>Funcionário</th>
+                  <th>Tipo</th>
+                  <th>Data</th>
+                  <th className="num">Bruto</th>
+                  <th className="num">Multa</th>
+                  <th className="num">Líquido</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(rescData?.listarRescisoes ?? []).length === 0 ? (<tr><td colSpan={6} className="text-center text-tx-muted py-8">Nenhuma rescisão calculada.</td></tr>) :
+                (rescData?.listarRescisoes ?? []).map((r: any) => (
+                  <tr key={r.id}>
+                    <td className="text-tx-strong">{r.employee?.name}</td>
+                    <td className="text-tx-muted text-xs">{r.tipoRescisao.replace(/_/g, ' ')}</td>
+                    <td className="text-tx-muted">{new Date(r.dataDemissao).toLocaleDateString('pt-BR')}</td>
+                    <td className="num">{fmt(r.totalBruto)}</td>
+                    <td className="num">{fmt(r.multa40Fgts)}</td>
+                    <td className="num text-tx-strong font-semibold">{fmt(r.totalLiquido)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -333,7 +352,7 @@ function Row({ label, value, red, big }: { label: string; value: string; red?: b
   return (
     <div className="flex justify-between items-center">
       <span className={`text-sm ${big ? 'text-tx-strong font-bold' : 'text-tx-muted'}`}>{label}</span>
-      <span className={`font-mono ${big ? 'text-ok font-bold text-lg' : red ? 'text-err' : 'text-tx-strong'}`}>{value}</span>
+      <span className={`num ${big ? 'text-ok font-bold text-lg' : red ? 'text-err' : 'text-tx-strong'}`}>{value}</span>
     </div>
   );
 }

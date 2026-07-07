@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { useCompany } from '@/contexts/CompanyContext';
-import { Calculator, CheckCircle, AlertTriangle, TrendingUp, DollarSign } from 'lucide-react';
+import { Calculator, CheckCircle, AlertTriangle, TrendingUp, DollarSign, Building2 } from 'lucide-react';
+import { PageHeader, SectionTitle, COLORS, tint, EmptyState, Spinner, StatusChip } from '@/components/ui/kit';
 
 const GET_MEI = gql`
   query GetMei($companyId: String!) {
@@ -37,7 +38,13 @@ export default function MeiPage() {
   const [calcular] = useMutation(CALCULAR, { onCompleted: () => { setShowForm(false); refetch(); } });
   const [pagar] = useMutation(PAGAR, { onCompleted: () => refetch() });
 
-  if (!selectedCompany) return <div className="p-8 text-center text-tx-muted">Selecione uma empresa</div>;
+  if (!selectedCompany) {
+    return (
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione uma empresa" />
+      </div>
+    );
+  }
 
   const resumo = data?.meiResumo;
   const apuracoes = data?.meiApuracoes ?? [];
@@ -57,21 +64,23 @@ export default function MeiPage() {
   const pct = resumo ? parseFloat(resumo.percentualUsado) : 0;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-tx-strong">MEI — DAS / DASN-SIMEI</h1>
-          <p className="text-tx-muted text-sm mt-0.5">Apuração mensal e DASN anual do Microempreendedor Individual</p>
-        </div>
-        <button onClick={() => setShowForm(true)} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-          <Calculator className="h-4 w-4" /> Calcular DAS
-        </button>
-      </div>
+    <div className="page space-y-6">
+      <PageHeader
+        icon={<Calculator size={22} color={COLORS.acao} />}
+        title="MEI — DAS / DASN-SIMEI"
+        subtitle="Apuração mensal e DASN anual do Microempreendedor Individual"
+        action={
+          <button onClick={() => setShowForm(true)} className="btn-primary">
+            <Calculator className="h-4 w-4" /> Calcular DAS
+          </button>
+        }
+      />
 
       {/* Resumo anual */}
       {resumo && (
         <div className="grid grid-cols-3 gap-4">
-          <div className={`col-span-1 bg-card border rounded-xl p-4 ${resumo.emRisco ? 'border-red-500/40' : 'border-line'}`}>
+          <div className="col-span-1 card-aura"
+            style={resumo.emRisco ? { borderColor: 'var(--dot-erro)' } : undefined}>
             <div className="flex items-center gap-2 mb-3">
               {resumo.emRisco ? <AlertTriangle className="h-4 w-4 text-err" /> : <TrendingUp className="h-4 w-4 text-ok" />}
               <p className="text-xs text-tx-muted">Limite Anual (R$ 81.000)</p>
@@ -79,22 +88,25 @@ export default function MeiPage() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-tx-muted">Utilizado</span>
-                <span className={`font-bold ${resumo.emRisco ? 'text-err' : 'text-tx-strong'}`}>{resumo.percentualUsado}%</span>
+                <span className={`font-bold num ${resumo.emRisco ? 'text-err' : 'text-tx-strong'}`}>{resumo.percentualUsado}%</span>
               </div>
               <div className="h-2 bg-inset rounded-full overflow-hidden">
-                <div className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-red-500' : pct >= 60 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                  style={{ width: `${Math.min(pct, 100)}%` }} />
+                <div className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${Math.min(pct, 100)}%`,
+                    background: pct >= 80 ? 'var(--dot-erro)' : pct >= 60 ? 'var(--dot-atencao)' : 'var(--dot-ok)',
+                  }} />
               </div>
-              <p className="text-xs text-tx-muted">Restante: R$ {resumo.limiteRestante.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              <p className="text-xs text-tx-muted num">Restante: R$ {resumo.limiteRestante.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
             </div>
           </div>
-          <div className="bg-card border border-line rounded-xl p-4">
+          <div className="card-aura">
             <div className="flex items-center gap-2 mb-2"><CheckCircle className="h-4 w-4 text-ok" /><p className="text-xs text-tx-muted">DAS Pago (ano)</p></div>
-            <p className="text-2xl font-bold text-ok">R$ {resumo.dasPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+            <p className="text-2xl font-bold text-ok num">R$ {resumo.dasPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
           </div>
-          <div className="bg-card border border-line rounded-xl p-4">
+          <div className="card-aura">
             <div className="flex items-center gap-2 mb-2"><DollarSign className="h-4 w-4 text-warn" /><p className="text-xs text-tx-muted">DAS Pendente</p></div>
-            <p className="text-2xl font-bold text-warn">R$ {resumo.dasPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+            <p className="text-2xl font-bold text-warn num">R$ {resumo.dasPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
           </div>
         </div>
       )}
@@ -102,32 +114,33 @@ export default function MeiPage() {
       {/* Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-[rgba(13,17,25,0.45)] flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-line rounded-xl p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold text-tx-strong mb-4">Calcular DAS MEI</h2>
+          <div className="bg-card border border-line rounded-xl shadow-pop p-6 w-full max-w-md">
+            <h2 className="text-[15px] font-semibold text-tx-strong mb-4">Calcular DAS MEI</h2>
             <form onSubmit={handleCalc} className="space-y-4">
               <div>
                 <label className="block text-xs text-tx-muted mb-1">Competência (YYYY-MM)</label>
                 <input type="text" placeholder="2025-01" value={form.competencia} onChange={e => setForm(f => ({ ...f, competencia: e.target.value }))}
-                  className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm focus:outline-none focus:border-indigo-500" required />
+                  className="input-aura w-full" required />
               </div>
               <div>
                 <label className="block text-xs text-tx-muted mb-1">Receita Comércio (R$)</label>
                 <input type="number" step="0.01" placeholder="0,00" value={form.receitaComercio} onChange={e => setForm(f => ({ ...f, receitaComercio: e.target.value }))}
-                  className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm focus:outline-none focus:border-indigo-500" />
+                  className="input-aura w-full" />
               </div>
               <div>
                 <label className="block text-xs text-tx-muted mb-1">Receita Serviços (R$)</label>
                 <input type="number" step="0.01" placeholder="0,00" value={form.receitaServicos} onChange={e => setForm(f => ({ ...f, receitaServicos: e.target.value }))}
-                  className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm focus:outline-none focus:border-indigo-500" />
+                  className="input-aura w-full" />
               </div>
-              <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-lg p-3 text-xs text-acao space-y-1">
+              <div className="rounded-lg p-3 text-xs text-tx space-y-1"
+                style={{ background: tint(COLORS.info, 8), border: `1px solid ${tint(COLORS.info, 25)}` }}>
                 <p>INSS: R$ 75,90 (fixo)</p>
                 <p>ISS: R$ 5,00 (se serviços &gt; 0)</p>
                 <p>ICMS: R$ 1,00 (se comércio &gt; 0)</p>
               </div>
               <div className="flex gap-2">
-                <button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-medium transition-colors">Calcular</button>
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 bg-inset border border-line text-tx py-2 rounded-lg text-sm transition-colors">Cancelar</button>
+                <button type="submit" className="btn-primary flex-1 justify-center">Calcular</button>
+                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1 justify-center">Cancelar</button>
               </div>
             </form>
           </div>
@@ -135,47 +148,53 @@ export default function MeiPage() {
       )}
 
       {/* Histórico */}
-      <div className="bg-card border border-line rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-line"><h2 className="text-sm font-medium text-tx-strong">Histórico DAS</h2></div>
-        {loading ? <div className="p-8 text-center text-tx-muted">Carregando...</div> : apuracoes.length === 0 ? (
-          <div className="p-8 text-center text-tx-muted">Nenhuma apuração encontrada</div>
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="text-xs text-tx-muted border-b border-line">
-                {['Competência', 'Receita Total', 'DAS Total', 'INSS', 'ISS', 'ICMS', 'Limite %', 'Status', ''].map(h => (
-                  <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {apuracoes.map((a: any) => (
-                <tr key={a.id} className="hover:bg-inset transition-colors">
-                  <td className="px-4 py-3 text-sm text-tx-strong font-mono">{a.competencia}</td>
-                  <td className="px-4 py-3 text-sm text-tx">R$ {a.receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                  <td className="px-4 py-3 text-sm font-bold text-tx-strong">R$ {a.dasValor.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-sm text-tx-muted">R$ {a.dasInss.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-sm text-tx-muted">R$ {a.dasIss.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-sm text-tx-muted">R$ {a.dasIcms.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-sm text-tx-muted">{a.percentualUsado.toFixed(1)}%</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded-full border font-medium ${a.status === 'pago' ? 'text-ok bg-green-400/10 border-green-400/20' : 'text-warn bg-yellow-400/10 border-yellow-400/20'}`}>
-                      {a.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {a.status !== 'pago' && (
-                      <button onClick={() => pagar({ variables: { id: a.id } })}
-                        className="text-xs bg-green-600/20 hover:bg-green-600/30 text-ok border border-green-500/20 px-2 py-1 rounded transition-colors">
-                        Pagar
-                      </button>
-                    )}
-                  </td>
+      <div>
+        <SectionTitle>Histórico DAS</SectionTitle>
+        <div className="card-aura overflow-x-auto" style={{ padding: 0 }}>
+          {loading ? <Spinner /> : apuracoes.length === 0 ? (
+            <EmptyState icon={<Calculator size={32} />} title="Nenhuma apuração encontrada" />
+          ) : (
+            <table className="table-aura">
+              <thead>
+                <tr>
+                  <th>Competência</th>
+                  <th className="num">Receita Total</th>
+                  <th className="num">DAS Total</th>
+                  <th className="num">INSS</th>
+                  <th className="num">ISS</th>
+                  <th className="num">ICMS</th>
+                  <th className="num">Limite %</th>
+                  <th>Status</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {apuracoes.map((a: any) => (
+                  <tr key={a.id}>
+                    <td className="text-tx-strong font-mono">{a.competencia}</td>
+                    <td className="num">R$ {a.receitaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                    <td className="num font-bold text-tx-strong">R$ {a.dasValor.toFixed(2)}</td>
+                    <td className="num text-tx-muted">R$ {a.dasInss.toFixed(2)}</td>
+                    <td className="num text-tx-muted">R$ {a.dasIss.toFixed(2)}</td>
+                    <td className="num text-tx-muted">R$ {a.dasIcms.toFixed(2)}</td>
+                    <td className="num text-tx-muted">{a.percentualUsado.toFixed(1)}%</td>
+                    <td>
+                      <StatusChip tone={a.status === 'pago' ? 'ok' : 'atencao'} label={a.status} size="sm" />
+                    </td>
+                    <td>
+                      {a.status !== 'pago' && (
+                        <button onClick={() => pagar({ variables: { id: a.id } })}
+                          className="btn-secondary text-xs px-2 py-1">
+                          Pagar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );

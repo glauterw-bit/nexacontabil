@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { CalendarClock, Loader2, AlertTriangle } from 'lucide-react';
-import { tint } from '@/components/ui/kit';
+import { CalendarClock, AlertTriangle } from 'lucide-react';
+import { tint, PageHeader, COLORS, Kpi, Card, SectionTitle, Spinner } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -23,25 +23,26 @@ export default function PrazosPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}><Loader2 size={32} className="animate-spin" /></div>;
+  if (loading) return <Spinner />;
   const hoje = new Date().toISOString().slice(0, 10);
   const maxTotal = Math.max(1, ...(data?.timeline ?? []).map((d: any) => d.tipos.reduce((s: number, t: any) => s + t.total, 0)));
 
   return (
-    <div style={{ maxWidth: 1050, margin: '0 auto', padding: 24 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <CalendarClock size={24} color="var(--acao)" /> Mapa de Prazos & SLA
-      </h1>
-      <p style={{ color: 'var(--muted)', marginTop: 4 }}>Todas as obrigações da carteira na linha do tempo, com alerta de atraso.</p>
+    <div className="page">
+      <PageHeader
+        icon={<CalendarClock size={22} color={COLORS.acao} />}
+        title="Mapa de Prazos & SLA"
+        subtitle="Todas as obrigações da carteira na linha do tempo, com alerta de atraso."
+      />
 
-      <div style={{ display: 'flex', gap: 14, marginTop: 20, flexWrap: 'wrap' }}>
-        <Stat label="Obrigações" value={data?.total} cor="var(--tx-strong)" />
-        <Stat label="Atrasadas" value={data?.atrasadas} cor="var(--erro)" />
-        <Stat label="Vencem em 7 dias" value={data?.proximas7dias} cor="var(--atencao)" />
-        <Stat label="Entregues" value={data?.entregues} cor="var(--ok)" />
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+        <Kpi label="Obrigações" value={data?.total ?? 0} cor="var(--tx-strong)" />
+        <Kpi label="Atrasadas" value={data?.atrasadas ?? 0} cor="var(--erro)" />
+        <Kpi label="Vencem em 7 dias" value={data?.proximas7dias ?? 0} cor="var(--atencao)" />
+        <Kpi label="Entregues" value={data?.entregues ?? 0} cor="var(--ok)" />
       </div>
 
-      <h2 style={{ fontSize: 16, fontWeight: 600, marginTop: 28, marginBottom: 12 }}>Linha do tempo</h2>
+      <SectionTitle>Linha do tempo</SectionTitle>
       {(data?.timeline ?? []).map((d: any) => {
         const total = d.tipos.reduce((s: number, t: any) => s + t.total, 0);
         const atras = d.tipos.reduce((s: number, t: any) => s + t.atrasadas, 0);
@@ -62,24 +63,15 @@ export default function PrazosPage() {
         );
       })}
 
-      <h2 style={{ fontSize: 16, fontWeight: 600, marginTop: 28, marginBottom: 12 }}>Por tipo</h2>
+      <SectionTitle>Por tipo</SectionTitle>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         {(data?.porTipo ?? []).map((t: any) => (
-          <div key={t.type} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}>
+          <Card key={t.type} style={{ padding: '10px 14px' }}>
             <div style={{ fontWeight: 600 }}>{t.type}</div>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t.total} total{t.atrasadas ? ` · ${t.atrasadas} atrasadas` : ''}</div>
-          </div>
+          </Card>
         ))}
       </div>
-    </div>
-  );
-}
-
-function Stat({ label, value, cor }: { label: string; value: any; cor: string }) {
-  return (
-    <div style={{ flex: '1 1 150px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-      <div style={{ fontSize: 12, color: 'var(--faint)' }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 700, color: cor, marginTop: 4 }}>{value ?? 0}</div>
     </div>
   );
 }

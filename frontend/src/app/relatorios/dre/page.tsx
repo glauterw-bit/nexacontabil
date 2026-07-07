@@ -2,10 +2,11 @@
 import { useState, useMemo } from 'react';
 import { useQuery, gql } from '@apollo/client';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { TrendingUp, Download, Brain, Loader2 } from 'lucide-react';
+import { TrendingUp, Download, Brain } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
+import { PageHeader, SectionTitle, EmptyState, Spinner, COLORS } from '@/components/ui/kit';
 
 const GET_DRE = gql`
   query GetDRE($companyId: String!, $from: String!, $to: String!) {
@@ -50,12 +51,11 @@ export default function DREPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa para gerar o DRE.</p>
-        <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">
-          Gerenciar Empresas
-        </Link>
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione uma empresa para gerar o DRE." />
+        <div className="flex justify-center">
+          <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
+        </div>
       </div>
     );
   }
@@ -69,43 +69,40 @@ export default function DREPage() {
   }));
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-6xl">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-tx-strong">Demonstração do Resultado (DRE)</h1>
-          <p className="text-tx-muted text-sm mt-0.5">{selectedCompany.name} · {periodLabel}</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <input
-            type="month"
-            value={`${ano}-${String(mes + 1).padStart(2, '0')}`}
-            onChange={(e) => {
-              const [y, m] = e.target.value.split('-').map(Number);
-              setAno(y); setMes(m - 1);
-            }}
-            className="px-3 py-1.5 bg-inset border border-line rounded-lg text-xs text-tx-strong outline-none focus:border-indigo-500/50"
-          />
-          <button disabled className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-tx-muted bg-inset rounded-lg cursor-not-allowed" title="Em breve">
-            <Download className="h-3.5 w-3.5" />
-            PDF
-          </button>
-        </div>
-      </div>
+    <div className="page space-y-6">
+      <PageHeader
+        icon={<TrendingUp size={22} color={COLORS.acao} />}
+        title="Demonstração do Resultado (DRE)"
+        subtitle={`${selectedCompany.name} · ${periodLabel}`}
+        action={
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              type="month"
+              value={`${ano}-${String(mes + 1).padStart(2, '0')}`}
+              onChange={(e) => {
+                const [y, m] = e.target.value.split('-').map(Number);
+                setAno(y); setMes(m - 1);
+              }}
+              className="input-aura"
+            />
+            <button disabled className="btn-secondary" title="Em breve">
+              <Download className="h-3.5 w-3.5" />
+              PDF
+            </button>
+          </div>
+        }
+      />
 
       {loading ? (
-        <div className="text-center py-20 text-sm text-tx-muted flex items-center justify-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Calculando DRE com base nos lançamentos…
-        </div>
+        <Spinner />
       ) : error ? (
         <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 text-sm text-err">
           Erro ao gerar DRE: {error.message}
         </div>
       ) : !dre || (dre.groups?.length ?? 0) === 0 ? (
-        <div className="rounded-xl border border-line bg-card p-10 text-center">
-          <Brain className="h-10 w-10 text-tx-faint mx-auto mb-3" />
-          <p className="text-sm font-medium text-tx-strong">Sem lançamentos no período</p>
-          <p className="text-xs text-tx-muted mt-1 max-w-md mx-auto">
+        <div className="card-aura text-center">
+          <EmptyState icon={<Brain size={40} />} title="Sem lançamentos no período" />
+          <p className="text-xs text-tx-muted -mt-6 pb-6 max-w-md mx-auto">
             Não há transações contábeis aprovadas neste mês. Lance documentos em <Link href="/transactions" className="text-acao hover:underline">Lançamentos</Link> ou
             use a <Link href="/insights" className="text-acao hover:underline">Análise IA em lote</Link>.
           </p>
@@ -113,14 +110,14 @@ export default function DREPage() {
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <KPI label="Receita Bruta" value={brl(dre.grossRevenue)} icon={TrendingUp} color="text-ok" />
-            <KPI label="Lucro Bruto" value={brl(dre.grossProfit)} color="text-info" />
+            <KPI label="Receita Bruta" value={brl(dre.grossRevenue)} icon={TrendingUp} />
+            <KPI label="Lucro Bruto" value={brl(dre.grossProfit)} />
             <KPI label="EBIT" value={brl(dre.ebit)} color={dre.ebit >= 0 ? 'text-ok' : 'text-err'} />
-            <KPI label="Lucro Líquido" value={brl(dre.netIncome)} color={dre.netIncome >= 0 ? 'text-ok' : 'text-err'} highlight />
+            <KPI label="Lucro Líquido" value={brl(dre.netIncome)} color={dre.netIncome >= 0 ? 'text-ok' : 'text-err'} />
           </div>
 
-          <div className="rounded-xl border border-line bg-card p-5">
-            <h2 className="text-sm font-medium text-tx-strong mb-3">Resumo do período</h2>
+          <div className="card-aura">
+            <SectionTitle>Resumo do período</SectionTitle>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
               <Row label="(=) Receita Bruta" value={dre.grossRevenue} />
               <Row label="(-) Custos" value={-dre.totalCosts} negative />
@@ -134,8 +131,8 @@ export default function DREPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-line bg-card p-5">
-            <h2 className="text-sm font-medium text-tx-strong mb-3">Composição por grupo de contas</h2>
+          <div className="card-aura">
+            <SectionTitle>Composição por grupo de contas</SectionTitle>
             <div className="h-64">
               <ResponsiveContainer>
                 <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 30 }}>
@@ -144,7 +141,7 @@ export default function DREPage() {
                   <Tooltip contentStyle={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--tx)' }} formatter={(v: any) => brl(v)} />
                   <Bar dataKey="valor">
                     {chartData.map((d: any, i: number) => (
-                      <Cell key={i} fill={d.isNegative ? '#f87171' : '#818cf8'} />
+                      <Cell key={i} fill={d.isNegative ? 'var(--erro)' : 'var(--acao)'} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -152,18 +149,18 @@ export default function DREPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-line bg-card p-5">
-            <h2 className="text-sm font-medium text-tx-strong mb-3">Detalhamento por conta</h2>
-            <table className="w-full text-sm">
+          <div className="card-aura">
+            <SectionTitle>Detalhamento por conta</SectionTitle>
+            <table className="table-aura">
               <thead>
-                <tr className="text-left text-xs text-tx-muted border-b border-line">
-                  <th className="pb-2 font-medium">Conta</th>
-                  <th className="pb-2 font-medium text-right num">Débito</th>
-                  <th className="pb-2 font-medium text-right num">Crédito</th>
-                  <th className="pb-2 font-medium text-right num">Saldo</th>
+                <tr>
+                  <th>Conta</th>
+                  <th className="num">Débito</th>
+                  <th className="num">Crédito</th>
+                  <th className="num">Saldo</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {dre.groups.map((g: any) => (
                   <Bloco key={g.code} group={g} />
                 ))}
@@ -184,34 +181,34 @@ function Bloco({ group }: { group: any }) {
   return (
     <>
       <tr className="bg-inset">
-        <td className="py-2 font-medium text-acao">{group.name}</td>
-        <td className="py-2 text-right font-mono text-xs text-tx-muted num">{brl(group.totalDebit)}</td>
-        <td className="py-2 text-right font-mono text-xs text-tx-muted num">{brl(group.totalCredit)}</td>
-        <td className="py-2 text-right font-mono text-tx-strong font-semibold num">{brl(group.net)}</td>
+        <td className="font-medium text-tx-strong">{group.name}</td>
+        <td className="num text-xs text-tx-muted">{brl(group.totalDebit)}</td>
+        <td className="num text-xs text-tx-muted">{brl(group.totalCredit)}</td>
+        <td className="num text-tx-strong font-semibold">{brl(group.net)}</td>
       </tr>
       {(group.accounts ?? []).map((a: any) => (
-        <tr key={a.code} className="hover:bg-inset">
-          <td className="py-2 pl-4 text-tx text-xs">
-            <span className="text-tx-faint font-mono mr-2">{a.code}</span>
+        <tr key={a.code}>
+          <td className="pl-4 text-tx text-xs">
+            <span className="num text-tx-faint mr-2">{a.code}</span>
             {a.name}
           </td>
-          <td className="py-2 text-right font-mono text-xs text-tx-muted num">{brl(a.debit)}</td>
-          <td className="py-2 text-right font-mono text-xs text-tx-muted num">{brl(a.credit)}</td>
-          <td className="py-2 text-right font-mono text-xs text-tx num">{brl(a.net)}</td>
+          <td className="num text-xs text-tx-muted">{brl(a.debit)}</td>
+          <td className="num text-xs text-tx-muted">{brl(a.credit)}</td>
+          <td className="num text-xs text-tx">{brl(a.net)}</td>
         </tr>
       ))}
     </>
   );
 }
 
-function KPI({ label, value, icon: Icon, color, highlight }: any) {
+function KPI({ label, value, icon: Icon, color }: any) {
   return (
-    <div className={`rounded-xl border bg-card p-4 ${highlight ? 'border-indigo-500/40' : 'border-line'}`}>
+    <div className="card-aura">
       <div className="flex items-center gap-2 mb-1.5">
-        {Icon && <Icon className={`h-4 w-4 ${color || 'text-tx-muted'}`} />}
+        {Icon && <Icon className="h-4 w-4 text-tx-muted" />}
         <p className="text-xs text-tx-muted">{label}</p>
       </div>
-      <p className={`text-lg font-bold ${color || 'text-tx-strong'}`}>{value}</p>
+      <p className={`num text-lg font-bold ${color || 'text-tx-strong'}`}>{value}</p>
     </div>
   );
 }
@@ -220,7 +217,7 @@ function Row({ label, value, bold, negative, highlight }: any) {
   return (
     <div className={`flex justify-between py-1 ${highlight ? 'pt-2 border-t border-line text-base' : ''}`}>
       <span className={`text-tx-muted ${bold ? 'text-tx-strong font-medium' : ''}`}>{label}</span>
-      <span className={`font-mono num ${negative ? 'text-err' : bold ? 'text-tx-strong' : 'text-tx'} ${bold ? 'font-bold' : ''}`}>
+      <span className={`num ${negative ? 'text-err' : bold ? 'text-tx-strong' : 'text-tx'} ${bold ? 'font-bold' : ''}`}>
         {brl(value)}
       </span>
     </div>

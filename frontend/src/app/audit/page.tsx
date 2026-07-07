@@ -7,6 +7,7 @@ import {
   Bot, User, Hash, ChevronDown, ChevronRight, CheckCircle2, XCircle,
   Filter
 } from 'lucide-react';
+import { PageHeader, Spinner, EmptyState, COLORS, tint } from '@/components/ui/kit';
 
 const GET_AUDIT = gql`
   query GetAuditTrail($companyId: String!, $entityType: String) {
@@ -44,12 +45,14 @@ const ENTITY_TYPES = [
   { value: 'user', label: 'Usuários' },
 ];
 
-function actionColor(action: string) {
-  if (action.includes('create') || action.includes('CREATE')) return 'text-ok bg-green-400/10 border-green-400/20';
-  if (action.includes('update') || action.includes('UPDATE')) return 'text-info bg-blue-400/10 border-blue-400/20';
-  if (action.includes('delete') || action.includes('DELETE') || action.includes('deactivate')) return 'text-err bg-red-400/10 border-red-400/20';
-  if (action.includes('approve') || action.includes('APPROVE')) return 'text-warn bg-yellow-400/10 border-yellow-400/20';
-  return 'text-tx-muted bg-gray-400/10 border-gray-400/20';
+function actionStyle(action: string) {
+  const cor =
+    action.includes('create') || action.includes('CREATE') ? COLORS.ok
+    : action.includes('update') || action.includes('UPDATE') ? COLORS.info
+    : action.includes('delete') || action.includes('DELETE') || action.includes('deactivate') ? COLORS.erro
+    : action.includes('approve') || action.includes('APPROVE') ? COLORS.atencao
+    : COLORS.muted;
+  return { color: cor, background: tint(cor, 10), border: `1px solid ${tint(cor, 20)}` };
 }
 
 function ago(dateStr: string) {
@@ -67,19 +70,19 @@ function EntryRow({ entry }: { entry: any }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="border border-line rounded-xl overflow-hidden">
+    <div className="card-aura !p-0 overflow-hidden">
       <button
         onClick={() => setOpen(v => !v)}
         className="w-full flex items-center gap-4 p-4 hover:bg-inset transition-colors text-left"
       >
         <div className="h-8 w-8 rounded-lg bg-inset flex items-center justify-center flex-shrink-0">
           {entry.performedBy.startsWith('agent:') || entry.agentType
-            ? <Bot className="h-4 w-4 text-acao" />
+            ? <Bot className="h-4 w-4 text-tx-muted" />
             : <User className="h-4 w-4 text-tx-muted" />}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${actionColor(entry.action)}`}>
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={actionStyle(entry.action)}>
               {entry.action}
             </span>
             <span className="text-tx-muted text-xs">{entry.entityType}</span>
@@ -87,7 +90,7 @@ function EntryRow({ entry }: { entry: any }) {
           </div>
           <p className="text-tx-muted text-xs mt-0.5">
             {entry.performedBy.replace('agent:', '')}
-            {entry.agentType && <span className="text-acao"> · {entry.agentType}</span>}
+            {entry.agentType && <span className="text-tx-muted"> · {entry.agentType}</span>}
           </p>
         </div>
         <span className="text-tx-faint text-xs flex-shrink-0">{ago(entry.createdAt)}</span>
@@ -106,7 +109,7 @@ function EntryRow({ entry }: { entry: any }) {
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-tx-faint w-14 flex-shrink-0">atual:</span>
-                <span className="break-all text-acao">{entry.currentHash}</span>
+                <span className="break-all text-tx-strong">{entry.currentHash}</span>
               </div>
             </div>
           </div>
@@ -117,7 +120,7 @@ function EntryRow({ entry }: { entry: any }) {
               {entry.oldValues && (
                 <div>
                   <p className="text-tx-muted mb-1.5">Valores anteriores</p>
-                  <pre className="bg-red-400/5 border border-red-400/10 rounded-lg p-3 text-err overflow-auto max-h-32 text-xs">
+                  <pre className="rounded-lg p-3 text-err overflow-auto max-h-32 text-xs" style={{ background: tint(COLORS.erro, 5), border: `1px solid ${tint(COLORS.erro, 10)}` }}>
                     {JSON.stringify(entry.oldValues, null, 2)}
                   </pre>
                 </div>
@@ -125,7 +128,7 @@ function EntryRow({ entry }: { entry: any }) {
               {entry.newValues && (
                 <div>
                   <p className="text-tx-muted mb-1.5">Novos valores</p>
-                  <pre className="bg-green-400/5 border border-green-400/10 rounded-lg p-3 text-ok overflow-auto max-h-32 text-xs">
+                  <pre className="rounded-lg p-3 text-ok overflow-auto max-h-32 text-xs" style={{ background: tint(COLORS.ok, 5), border: `1px solid ${tint(COLORS.ok, 10)}` }}>
                     {JSON.stringify(entry.newValues, null, 2)}
                   </pre>
                 </div>
@@ -172,38 +175,36 @@ export default function AuditPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa para ver a trilha de auditoria.</p>
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione uma empresa" sub="Escolha uma empresa para ver a trilha de auditoria." />
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-tx-strong">Trilha de Auditoria</h1>
-          <p className="text-tx-muted text-sm mt-1">{selectedCompany.name} · Hash chain SHA-256 imutável</p>
-        </div>
-        <button
-          onClick={() => recheck()}
-          disabled={integrityLoading}
-          className="btn-ghost flex items-center gap-2"
-        >
-          {integrityLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-          Verificar Integridade
-        </button>
-      </div>
+    <div className="page space-y-6">
+      <PageHeader
+        icon={<ShieldCheck size={22} color={COLORS.acao} />}
+        title="Trilha de Auditoria"
+        subtitle={`${selectedCompany.name} · Hash chain SHA-256 imutável`}
+        action={
+          <button
+            onClick={() => recheck()}
+            disabled={integrityLoading}
+            className="btn-secondary"
+          >
+            {integrityLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+            Verificar Integridade
+          </button>
+        }
+      />
 
       {/* Integrity Status */}
       {integrity && (
-        <div className={`flex items-start gap-4 rounded-xl p-5 border ${
-          integrity.valid
-            ? 'bg-green-500/10 border-green-500/20'
-            : 'bg-red-500/10 border-red-500/20'
-        }`}>
+        <div className="flex items-start gap-4 rounded-xl p-5"
+          style={integrity.valid
+            ? { background: tint(COLORS.ok, 10), border: `1px solid ${tint(COLORS.ok, 20)}` }
+            : { background: tint(COLORS.erro, 10), border: `1px solid ${tint(COLORS.erro, 20)}` }}>
           {integrity.valid
             ? <CheckCircle2 className="h-5 w-5 text-ok flex-shrink-0 mt-0.5" />
             : <XCircle className="h-5 w-5 text-err flex-shrink-0 mt-0.5" />}
@@ -231,11 +232,10 @@ export default function AuditPage() {
             <button
               key={t.value}
               onClick={() => setEntityType(t.value)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                entityType === t.value
-                  ? 'bg-indigo-600/20 border-indigo-500/40 text-acao'
-                  : 'border-line text-tx-muted hover:text-tx-strong hover:border-gray-500'
-              }`}
+              className="text-xs px-3 py-1.5 rounded-full border transition-colors"
+              style={entityType === t.value
+                ? { background: tint(COLORS.acao, 12), borderColor: COLORS.acao, color: COLORS.acao }
+                : { borderColor: 'var(--border)', color: 'var(--muted)' }}
             >
               {t.label}
             </button>
@@ -246,14 +246,14 @@ export default function AuditPage() {
 
       {/* Entries */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-acao" />
-        </div>
+        <Spinner />
       ) : entries.length === 0 ? (
-        <div className="card-aura text-center py-16">
-          <Hash className="h-12 w-12 text-tx-faint mx-auto mb-3" />
-          <p className="text-tx-muted text-sm">Nenhum registro de auditoria encontrado.</p>
-          <p className="text-tx-faint text-xs mt-1">As ações do sistema serão registradas aqui automaticamente.</p>
+        <div className="card-aura">
+          <EmptyState
+            icon={<Hash size={40} />}
+            title="Nenhum registro de auditoria encontrado."
+            sub="As ações do sistema serão registradas aqui automaticamente."
+          />
         </div>
       ) : (
         <div className="space-y-2">

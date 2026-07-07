@@ -7,6 +7,7 @@ import {
 import { useCompany } from '@/contexts/CompanyContext';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/Toast';
+import { PageHeader, SectionTitle, StatusChip, EmptyState, Spinner, COLORS } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
@@ -115,10 +116,11 @@ export default function FechamentoPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa.</p>
-        <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">Gerenciar</Link>
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione uma empresa." />
+        <div className="flex justify-center">
+          <Link href="/carteira" className="btn-primary">Gerenciar</Link>
+        </div>
       </div>
     );
   }
@@ -129,31 +131,27 @@ export default function FechamentoPage() {
   const isClosed = closing?.status === 'fechado';
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <CalendarCheck className="h-5 w-5 text-acao" />
-            <h1 className="text-xl font-semibold text-tx-strong">Fechamento mensal</h1>
-          </div>
-          <p className="text-sm text-tx-muted">{selectedCompany.name}</p>
-        </div>
-        <input
-          type="month"
-          value={`${ano}-${String(mes).padStart(2, '0')}`}
-          onChange={(e) => {
-            const [y, m] = e.target.value.split('-').map(Number);
-            setAno(y); setMes(m);
-          }}
-          className="px-3 py-1.5 bg-card border border-line rounded-lg text-xs text-tx-strong outline-none focus:border-indigo-500/50"
-        />
-      </div>
+    <div className="page space-y-6">
+      <PageHeader
+        icon={<CalendarCheck size={22} color={COLORS.acao} />}
+        title="Fechamento mensal"
+        subtitle={selectedCompany.name}
+        action={
+          <input
+            type="month"
+            value={`${ano}-${String(mes).padStart(2, '0')}`}
+            onChange={(e) => {
+              const [y, m] = e.target.value.split('-').map(Number);
+              setAno(y); setMes(m);
+            }}
+            className="input-aura"
+          />
+        }
+      />
 
       {/* Header com status */}
       {loading ? (
-        <div className="text-sm text-tx-muted flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
-        </div>
+        <Spinner />
       ) : closing ? (
         <>
           <div className={`rounded-xl border p-5 ${isClosed ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-line bg-card'}`}>
@@ -192,20 +190,12 @@ export default function FechamentoPage() {
               </div>
               <div>
                 {isClosed ? (
-                  <button
-                    onClick={reabrirPeriodo}
-                    disabled={working}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-lg"
-                  >
+                  <button onClick={reabrirPeriodo} disabled={working} className="btn-secondary">
                     {working ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
                     Reabrir período
                   </button>
                 ) : (
-                  <button
-                    onClick={() => fecharPeriodo(false)}
-                    disabled={working}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg"
-                  >
+                  <button onClick={() => fecharPeriodo(false)} disabled={working} className="btn-primary">
                     {working ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
                     Fechar período
                   </button>
@@ -217,7 +207,7 @@ export default function FechamentoPage() {
             {!isClosed && total > 0 && (
               <div className="mt-4 h-2 bg-inset rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all"
+                  className="h-full bg-acao transition-all"
                   style={{ width: `${pct}%` }}
                 />
               </div>
@@ -225,8 +215,8 @@ export default function FechamentoPage() {
           </div>
 
           {/* Checklist */}
-          <div className="rounded-xl border border-line bg-card p-5">
-            <h3 className="text-sm font-medium text-tx-strong mb-3">Checklist do fechamento</h3>
+          <div className="card-aura">
+            <SectionTitle>Checklist do fechamento</SectionTitle>
             <div className="space-y-2">
               {(closing.checklist ?? []).map((item) => (
                 <Link
@@ -272,36 +262,34 @@ export default function FechamentoPage() {
 
       {/* Histórico */}
       {history.length > 0 && (
-        <div className="rounded-xl border border-line bg-card p-5">
-          <h3 className="text-sm font-medium text-tx-strong mb-3">Histórico</h3>
-          <table className="w-full text-sm">
+        <div className="card-aura">
+          <SectionTitle>Histórico</SectionTitle>
+          <table className="table-aura">
             <thead>
-              <tr className="text-left text-xs text-tx-muted border-b border-line">
-                <th className="pb-2 font-medium">Período</th>
-                <th className="pb-2 font-medium">Status</th>
-                <th className="pb-2 font-medium">Fechado por</th>
-                <th className="pb-2 font-medium">Data</th>
-                <th className="pb-2 font-medium">Hash</th>
+              <tr>
+                <th>Período</th>
+                <th>Status</th>
+                <th>Fechado por</th>
+                <th>Data</th>
+                <th>Hash</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody>
               {history.map((h) => (
-                <tr key={h.id} className="hover:bg-inset">
-                  <td className="py-2 text-tx">{String(h.mes).padStart(2, '0')}/{h.ano}</td>
-                  <td className="py-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      h.status === 'fechado' ? 'bg-emerald-500/15 text-ok' :
-                      h.status === 'reaberto' ? 'bg-amber-500/15 text-warn' :
-                      'bg-gray-500/15 text-tx'
-                    }`}>
-                      {h.status}
-                    </span>
+                <tr key={h.id}>
+                  <td className="num text-tx" style={{ textAlign: 'left' }}>{String(h.mes).padStart(2, '0')}/{h.ano}</td>
+                  <td>
+                    <StatusChip
+                      size="sm"
+                      tone={h.status === 'fechado' ? 'ok' : h.status === 'reaberto' ? 'atencao' : 'pendente'}
+                      label={h.status}
+                    />
                   </td>
-                  <td className="py-2 text-xs text-tx-muted">{h.closedBy ?? '—'}</td>
-                  <td className="py-2 text-xs text-tx-muted">
+                  <td className="text-xs text-tx-muted">{h.closedBy ?? '—'}</td>
+                  <td className="text-xs text-tx-muted">
                     {h.closedAt ? new Date(h.closedAt).toLocaleDateString('pt-BR') : '—'}
                   </td>
-                  <td className="py-2 text-[10px] text-tx-faint font-mono">
+                  <td className="text-[10px] text-tx-faint font-mono">
                     {h.hash ? h.hash.slice(0, 12) + '…' : '—'}
                   </td>
                 </tr>

@@ -44,7 +44,7 @@ export default function MeuDiaPage() {
   const ico = (t: string) => t === 'obrigacao' ? <CalendarClock size={16} /> : t === 'inconsistencia' ? <FileWarning size={16} /> : <Building2 size={16} />;
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto', padding: 24 }}>
+    <div className="page">
       <PageHeader icon={<Sun size={22} color={COLORS.atencao} />} title="Meu Dia"
         subtitle={`Tudo que precisa de ação agora, priorizado.${ehAnalista && data?.responsavel ? ` (${data.responsavel})` : ''}`}
         action={!ehAnalista && (

@@ -7,6 +7,7 @@ import {
   ChevronRight, ChevronLeft, Loader2, AlertTriangle, CheckCircle2, RotateCw,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
+import { PageHeader, COLORS, tint } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
@@ -171,11 +172,12 @@ export default function OnboardingClientePage() {
   }
 
   return (
-    <div className="p-6 md:p-10 max-w-3xl">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-tx-strong">Onboarding de novo cliente</h1>
-        <p className="text-sm text-tx-muted mt-1">5 passos rápidos. O sistema cria a empresa, popula o plano de contas e gera o calendário fiscal automaticamente.</p>
-      </div>
+    <div className="page-narrow">
+      <PageHeader
+        icon={<Building2 size={22} color={COLORS.acao} />}
+        title="Onboarding de novo cliente"
+        subtitle="5 passos rápidos. O sistema cria a empresa, popula o plano de contas e gera o calendário fiscal automaticamente."
+      />
 
       {/* Stepper */}
       <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
@@ -186,13 +188,14 @@ export default function OnboardingClientePage() {
           return (
             <div key={s.id} className="flex items-center gap-2 flex-shrink-0">
               <div
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors"
+                style={
                   current
-                    ? 'bg-indigo-600/20 border-indigo-500/50 text-acao'
+                    ? { background: tint(COLORS.acao, 12), borderColor: COLORS.acao, color: COLORS.acao }
                     : done
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-ok'
-                    : 'bg-card border-line text-tx-muted'
-                }`}
+                    ? { background: tint(COLORS.ok, 10), borderColor: tint(COLORS.ok, 30), color: COLORS.ok }
+                    : { background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--muted)' }
+                }
               >
                 {done ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                 <div>
@@ -206,10 +209,10 @@ export default function OnboardingClientePage() {
         })}
       </div>
 
-      <div className="rounded-xl border border-line bg-card p-6 space-y-4">
+      <div className="card-aura space-y-4">
         {step === 1 && (
           <>
-            <h2 className="text-sm font-medium text-tx-strong">Dados da empresa</h2>
+            <h2 className="text-[15px] font-semibold text-tx-strong">Dados da empresa</h2>
             <p className="text-xs text-tx-muted">Digite o CNPJ — o resto é puxado da Receita.</p>
             <Field label="CNPJ">
               <div className="relative">
@@ -218,7 +221,7 @@ export default function OnboardingClientePage() {
                   value={maskCnpj(s1.cnpj)}
                   onChange={(e) => setS1({ ...s1, cnpj: e.target.value })}
                   placeholder="00.000.000/0000-00"
-                  className="w-full px-3 py-2 bg-page border border-line rounded-lg text-sm text-tx-strong outline-none focus:border-indigo-500/50 font-mono"
+                  className="w-full input-aura font-mono"
                 />
                 {lookingUp && (
                   <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-acao animate-spin" />
@@ -229,7 +232,7 @@ export default function OnboardingClientePage() {
               <input
                 value={s1.name}
                 onChange={(e) => setS1({ ...s1, name: e.target.value })}
-                className="w-full px-3 py-2 bg-page border border-line rounded-lg text-sm text-tx-strong outline-none focus:border-indigo-500/50"
+                className="w-full input-aura"
               />
             </Field>
             <div className="grid grid-cols-2 gap-3">
@@ -238,14 +241,14 @@ export default function OnboardingClientePage() {
                   type="email"
                   value={s1.email}
                   onChange={(e) => setS1({ ...s1, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-page border border-line rounded-lg text-sm text-tx-strong outline-none focus:border-indigo-500/50"
+                  className="w-full input-aura"
                 />
               </Field>
               <Field label="Telefone">
                 <input
                   value={s1.phone}
                   onChange={(e) => setS1({ ...s1, phone: e.target.value })}
-                  className="w-full px-3 py-2 bg-page border border-line rounded-lg text-sm text-tx-strong outline-none focus:border-indigo-500/50"
+                  className="w-full input-aura"
                 />
               </Field>
             </div>
@@ -253,7 +256,7 @@ export default function OnboardingClientePage() {
               <input
                 value={s1.address}
                 onChange={(e) => setS1({ ...s1, address: e.target.value })}
-                className="w-full px-3 py-2 bg-page border border-line rounded-lg text-sm text-tx-strong outline-none focus:border-indigo-500/50"
+                className="w-full input-aura"
               />
             </Field>
           </>
@@ -261,18 +264,19 @@ export default function OnboardingClientePage() {
 
         {step === 2 && (
           <>
-            <h2 className="text-sm font-medium text-tx-strong">Regime tributário</h2>
+            <h2 className="text-[15px] font-semibold text-tx-strong">Regime tributário</h2>
             <p className="text-xs text-tx-muted">Define o calendário fiscal automático que o sistema vai gerar.</p>
             <div className="grid grid-cols-2 gap-2">
               {(['MEI', 'SIMPLES_NACIONAL', 'LUCRO_PRESUMIDO', 'LUCRO_REAL'] as Regime[]).map((r) => (
                 <button
                   key={r}
                   onClick={() => setS2({ ...s2, taxRegime: r })}
-                  className={`text-left p-3 rounded-lg border transition-colors ${
+                  className="text-left p-3 rounded-lg border transition-colors"
+                  style={
                     s2.taxRegime === r
-                      ? 'border-indigo-500/50 bg-indigo-600/15 text-tx-strong'
-                      : 'border-line bg-page text-tx hover:border-indigo-500/30'
-                  }`}
+                      ? { borderColor: COLORS.acao, background: tint(COLORS.acao, 10), color: 'var(--tx-strong)' }
+                      : { borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--tx)' }
+                  }
                 >
                   <p className="text-sm font-medium">{r.replace('_', ' ')}</p>
                   <p className="text-xs text-tx-muted mt-1">{
@@ -296,7 +300,7 @@ export default function OnboardingClientePage() {
 
         {step === 3 && (
           <>
-            <h2 className="text-sm font-medium text-tx-strong">Quadro societário</h2>
+            <h2 className="text-[15px] font-semibold text-tx-strong">Quadro societário</h2>
             <p className="text-xs text-tx-muted">Sócios e percentuais — usado em distribuição de lucros e pro-labore.</p>
             {s3.socios.map((so, i) => (
               <div key={i} className="grid grid-cols-12 gap-2 items-start">
@@ -309,7 +313,7 @@ export default function OnboardingClientePage() {
                       copy[i] = { ...so, nome: e.target.value };
                       setS3({ socios: copy });
                     }}
-                    className="w-full px-3 py-2 bg-page border border-line rounded-lg text-xs text-tx-strong outline-none focus:border-indigo-500/50"
+                    className="w-full input-aura"
                   />
                 </div>
                 <div className="col-span-3">
@@ -321,7 +325,7 @@ export default function OnboardingClientePage() {
                       copy[i] = { ...so, cpf: e.target.value };
                       setS3({ socios: copy });
                     }}
-                    className="w-full px-3 py-2 bg-page border border-line rounded-lg text-xs text-tx-strong outline-none focus:border-indigo-500/50 font-mono"
+                    className="w-full input-aura font-mono"
                   />
                 </div>
                 <div className="col-span-2">
@@ -336,7 +340,7 @@ export default function OnboardingClientePage() {
                       copy[i] = { ...so, percentual: Number(e.target.value) };
                       setS3({ socios: copy });
                     }}
-                    className="w-full px-3 py-2 bg-page border border-line rounded-lg text-xs text-tx-strong outline-none focus:border-indigo-500/50 font-mono text-right"
+                    className="w-full input-aura font-mono text-right"
                   />
                 </div>
                 <div className="col-span-2 flex items-center gap-1">
@@ -347,7 +351,7 @@ export default function OnboardingClientePage() {
                       copy[i] = { ...so, funcao: e.target.value };
                       setS3({ socios: copy });
                     }}
-                    className="w-full px-2 py-2 bg-page border border-line rounded-lg text-xs text-tx-strong outline-none focus:border-indigo-500/50"
+                    className="w-full input-aura"
                   >
                     <option>Administrador</option>
                     <option>Sócio</option>
@@ -378,7 +382,7 @@ export default function OnboardingClientePage() {
 
         {step === 4 && (
           <>
-            <h2 className="text-sm font-medium text-tx-strong">Acessos e certificados</h2>
+            <h2 className="text-[15px] font-semibold text-tx-strong">Acessos e certificados</h2>
             <div className="space-y-3">
               <label className="flex items-start gap-3 p-3 bg-page border border-line rounded-lg cursor-pointer">
                 <input
@@ -423,11 +427,12 @@ export default function OnboardingClientePage() {
                               : [...s4.bancos, b.code],
                           })
                         }
-                        className={`text-left p-2 rounded-lg border text-xs ${
+                        className="text-left p-2 rounded-lg border text-xs transition-colors"
+                        style={
                           sel
-                            ? 'border-indigo-500/50 bg-indigo-600/15 text-tx-strong'
-                            : 'border-line bg-page text-tx hover:border-indigo-500/30'
-                        }`}
+                            ? { borderColor: COLORS.acao, background: tint(COLORS.acao, 10), color: 'var(--tx-strong)' }
+                            : { borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--tx)' }
+                        }
                       >
                         <span className="font-mono text-tx-muted mr-2">{b.code}</span>
                         {b.name}
@@ -442,7 +447,7 @@ export default function OnboardingClientePage() {
 
         {step === 5 && (
           <>
-            <h2 className="text-sm font-medium text-tx-strong">Revisão final</h2>
+            <h2 className="text-[15px] font-semibold text-tx-strong">Revisão final</h2>
             <div className="space-y-3">
               <Review label="CNPJ" value={maskCnpj(s1.cnpj)} />
               <Review label="Razão social" value={s1.name} />
@@ -452,7 +457,7 @@ export default function OnboardingClientePage() {
               <Review label="Bancos a conectar" value={s4.bancos.length > 0 ? `${s4.bancos.length} banco(s)` : 'Nenhum'} />
             </div>
 
-            <div className="p-4 bg-indigo-500/5 border border-indigo-500/30 rounded-lg mt-4">
+            <div className="p-4 rounded-lg mt-4" style={{ background: tint(COLORS.acao, 5), border: `1px solid ${tint(COLORS.acao, 30)}` }}>
               <p className="text-xs font-medium text-acao mb-2">O sistema vai executar:</p>
               <ul className="text-xs text-tx space-y-1">
                 <li>✓ Criar registro da empresa</li>
@@ -486,7 +491,7 @@ export default function OnboardingClientePage() {
         <button
           onClick={() => setStep((s) => Math.max(1, s - 1))}
           disabled={step === 1 || creating}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-inset hover:bg-card disabled:opacity-50 text-tx-strong rounded-lg"
+          className="btn-secondary"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
           Voltar
@@ -495,7 +500,7 @@ export default function OnboardingClientePage() {
           <button
             onClick={() => setStep((s) => s + 1)}
             disabled={!canAdvance()}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg"
+            className="btn-primary"
           >
             Avançar
             <ChevronRight className="h-3.5 w-3.5" />
@@ -504,7 +509,7 @@ export default function OnboardingClientePage() {
           <button
             onClick={finish}
             disabled={creating}
-            className="inline-flex items-center gap-1.5 px-5 py-2 text-sm font-medium bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg"
+            className="btn-primary"
           >
             {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             {creating ? 'Criando…' : 'Criar cliente'}

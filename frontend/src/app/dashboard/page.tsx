@@ -6,7 +6,7 @@ import {
   FileText, Brain, ShieldAlert, HeartPulse, Users, CalendarClock,
 } from 'lucide-react';
 import Link from 'next/link';
-import { tint } from '@/components/ui/kit';
+import { tint, PageHeader, COLORS, Spinner, EmptyState } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -18,7 +18,7 @@ const dataBR = (d: any) => d ? new Date(d).toLocaleDateString('pt-BR', { day: '2
 
 const ST: Record<string, { c: string; label: string }> = {
   concluida:    { c: 'var(--ok)', label: 'Concluída' },
-  em_andamento: { c: 'var(--acao)', label: 'Em andamento' },
+  em_andamento: { c: 'var(--info)', label: 'Em andamento' },
   bloqueada:    { c: 'var(--erro)', label: 'Bloqueada' },
   pendente:     { c: 'var(--faint)', label: 'Pendente' },
   sem_tarefa:   { c: 'var(--faint)', label: '—' },
@@ -61,10 +61,9 @@ export default function DashboardPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione um cliente na barra lateral para ver o painel.</p>
-        <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">Ver carteira</Link>
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione um cliente na barra lateral para ver o painel." />
+        <div className="flex justify-center"><Link href="/carteira" className="btn-primary">Ver carteira</Link></div>
       </div>
     );
   }
@@ -73,27 +72,27 @@ export default function DashboardPage() {
   const ia = data?.analiseIA;
 
   return (
-    <div className="p-5 md:p-8 max-w-6xl space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-tx-strong">{selectedCompany.name}</h1>
-          <p className="text-sm text-tx-muted">{selectedCompany.taxRegime?.replace(/_/g, ' ')} · competência {data?.competencia ?? '—'}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={analisarSharepoint} disabled={analisando}
-            className="px-3 py-2 text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg inline-flex items-center gap-1.5">
-            {analisando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
-            Analisar XMLs do SharePoint
-          </button>
-          <button onClick={load} disabled={loading} className="p-2 bg-card border border-line rounded-lg text-tx-muted hover:text-tx-strong">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          </button>
-        </div>
-      </div>
-      {msg && <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/5 px-3 py-2 text-xs text-acao">{msg}</div>}
+    <div className="page space-y-5">
+      <PageHeader
+        icon={<Building2 size={22} color={COLORS.acao} />}
+        title={selectedCompany.name}
+        subtitle={`${selectedCompany.taxRegime?.replace(/_/g, ' ') ?? ''} · competência ${data?.competencia ?? '—'}`}
+        action={
+          <div className="flex items-center gap-2">
+            <button onClick={analisarSharepoint} disabled={analisando} className="btn-primary">
+              {analisando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
+              Analisar XMLs do SharePoint
+            </button>
+            <button onClick={load} disabled={loading} className="btn-ghost" aria-label="Atualizar">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            </button>
+          </div>
+        }
+      />
+      {msg && <div className="rounded-lg px-3 py-2 text-xs text-acao" style={{ border: `1px solid ${tint('var(--acao)', 30)}`, background: tint('var(--acao)', 6) }}>{msg}</div>}
 
       {loading && !data ? (
-        <div className="text-center py-24 text-sm text-tx-muted flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Carregando o painel…</div>
+        <Spinner />
       ) : data && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -195,7 +194,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               {data.documentos.resumoFiscal.inconsistencias.length > 0 && (
-                <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <div className="mt-4 rounded-lg p-3" style={{ border: `1px solid ${tint('var(--atencao)', 30)}`, background: tint('var(--atencao)', 6) }}>
                   <p className="text-xs font-medium text-warn mb-1.5 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5" /> Inconsistências fiscais detectadas</p>
                   <div className="space-y-1 max-h-40 overflow-y-auto">
                     {data.documentos.resumoFiscal.inconsistencias.map((inc: any, i: number) => (
@@ -277,9 +276,9 @@ function Kpi({ label, value, sub, icon: Icon, color }: any) {
 }
 function Card({ title, icon: Icon, action, children }: any) {
   return (
-    <div className="rounded-xl border border-line bg-card p-4">
+    <div className="card-aura">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-medium text-tx-strong flex items-center gap-2"><Icon className="h-4 w-4 text-tx-muted" /> {title}</h2>
+        <h2 className="text-[15px] font-semibold text-tx-strong flex items-center gap-2"><Icon className="h-4 w-4 text-tx-muted" /> {title}</h2>
         {action}
       </div>
       {children}
@@ -295,5 +294,5 @@ function Mini({ label, value, color = 'var(--tx-strong)' }: { label: string; val
   );
 }
 function Empty({ msg }: { msg: string }) {
-  return <p className="text-xs text-tx-faint text-center py-6">{msg}</p>;
+  return <EmptyState title={msg} />;
 }

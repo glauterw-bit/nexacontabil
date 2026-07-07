@@ -2,9 +2,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Inbox, HardDrive, Mail, Search, Play, Loader2, Copy, Check, CheckCircle2,
-  Circle, ExternalLink, FolderOpen, Sparkles, ArrowRight, AlertTriangle,
-  Upload, FileText, Brain,
+  Sparkles, ArrowRight, AlertTriangle, Upload, FileText, Brain,
 } from 'lucide-react';
+import { PageHeader, StatusChip, COLORS, tint } from '@/components/ui/kit';
 import { useToast } from '@/components/ui/Toast';
 import Link from 'next/link';
 
@@ -130,18 +130,12 @@ export default function CapturaXmlPage() {
   const folderForScript = folderId || conns.find((c) => c.id === connId)?.rootFolderId || '';
 
   return (
-    <div className="p-5 md:p-8 max-w-3xl space-y-5">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <Inbox className="h-5 w-5 text-acao" />
-          <h1 className="text-xl font-semibold text-tx-strong">Central de Captura de XMLs</h1>
-        </div>
-        <p className="text-sm text-tx-muted max-w-2xl">
-          Faça as 3 fontes de XML (buscador, Drive e e-mail dos clientes) caírem numa pasta só.
-          A Esteira lê tudo de lá, valida a tributação e envia o relatório ao cliente — automático.
-        </p>
-      </div>
+    <div className="page-narrow space-y-5">
+      <PageHeader
+        icon={<Inbox size={22} color={COLORS.acao} />}
+        title="Central de Captura de XMLs"
+        subtitle="Faça as 3 fontes de XML (buscador, Drive e e-mail dos clientes) caírem numa pasta só. A Esteira lê tudo de lá, valida a tributação e envia o relatório ao cliente — automático."
+      />
 
       {/* Prontidão */}
       <div className="flex flex-wrap gap-2">
@@ -151,17 +145,17 @@ export default function CapturaXmlPage() {
       </div>
 
       {/* TESTAR AGORA — sem Drive */}
-      <div className="rounded-xl border border-indigo-500/40 bg-indigo-500/5 p-5 space-y-3">
+      <div className="card-aura space-y-3">
         <div className="flex items-center gap-2">
-          <Brain className="h-5 w-5 text-acao" />
-          <h2 className="text-sm font-semibold text-tx-strong">Testar a análise da IA agora</h2>
-          <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-emerald-500/15 text-ok border border-emerald-500/30 rounded">Sem Drive</span>
+          <Brain className="h-5 w-5 text-tx-muted" />
+          <h2 className="text-sm font-semibold text-tx-strong m-0">Testar a análise da IA agora</h2>
+          <StatusChip tone="ok" label="Sem Drive" size="sm" />
         </div>
         <p className="text-xs text-tx-muted">
           Não precisa esperar o Drive: suba alguns XMLs (ou PDFs de NF) e a IA analisa na hora —
           tipo, emitente, valores, impostos e NCM. É o jeito de testar hoje mesmo.
         </p>
-        <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-indigo-500/30 rounded-xl py-7 cursor-pointer hover:bg-indigo-500/5 transition-colors">
+        <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl py-7 cursor-pointer hover:bg-inset transition-colors" style={{ borderColor: tint(COLORS.acao, 30) }}>
           <Upload className="h-6 w-6 text-acao" />
           <span className="text-sm text-tx">Clique pra escolher arquivos (.xml, .pdf, imagem)</span>
           <span className="text-[11px] text-tx-faint">pode selecionar vários de uma vez</span>
@@ -198,7 +192,7 @@ export default function CapturaXmlPage() {
                       </div>
                     )}
                     {Array.isArray(a.dados.sugestoesContabeis) && a.dados.sugestoesContabeis.length > 0 && (
-                      <div className="text-[11px] text-acao">
+                      <div className="text-[11px] text-tx">
                         <span className="text-tx-muted">Sugestão contábil: </span>{a.dados.sugestoesContabeis[0]}
                       </div>
                     )}
@@ -217,7 +211,7 @@ export default function CapturaXmlPage() {
         {!driveOk ? (
           <div className="space-y-2">
             <p className="text-sm text-tx-muted">Nenhum Drive conectado ainda. Conecte a pasta onde os XMLs vão cair.</p>
-            <Link href="/drive-conectado" className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">
+            <Link href="/drive-conectado" className="btn-primary">
               Conectar Drive <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -226,7 +220,7 @@ export default function CapturaXmlPage() {
             <div>
               <label className="block text-xs text-tx-muted mb-1">Conexão</label>
               <select value={connId} onChange={(e) => { setConnId(e.target.value); const c = conns.find((x) => x.id === e.target.value); setFolderId(c?.rootFolderId || ''); }}
-                className="w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500">
+                className="input-aura w-full">
                 {conns.map((c) => <option key={c.id} value={c.id}>{c.label} · {c.accountEmail}</option>)}
               </select>
             </div>
@@ -234,9 +228,9 @@ export default function CapturaXmlPage() {
               <label className="block text-xs text-tx-muted mb-1">ID da pasta (onde tudo cai)</label>
               <div className="flex gap-2">
                 <input value={folderId} onChange={(e) => setFolderId(e.target.value)} placeholder="cole o ID da pasta do Drive"
-                  className="flex-1 bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm font-mono outline-none focus:border-indigo-500" />
+                  className="input-aura flex-1 font-mono" />
                 {folderForScript && (
-                  <button onClick={() => copy(folderForScript, 'folder')} className="px-3 bg-inset hover:bg-line text-tx rounded-lg">
+                  <button onClick={() => copy(folderForScript, 'folder')} className="btn-secondary">
                     {copied === 'folder' ? <Check className="h-4 w-4 text-ok" /> : <Copy className="h-4 w-4" />}
                   </button>
                 )}
@@ -256,7 +250,7 @@ export default function CapturaXmlPage() {
         {folderForScript && (
           <div className="flex items-center gap-2 text-xs">
             <span className="text-tx-muted">Pasta destino:</span>
-            <code className="text-acao font-mono">{folderForScript}</code>
+            <code className="text-tx font-mono">{folderForScript}</code>
             <button onClick={() => copy(folderForScript, 'f2')} className="text-tx-muted hover:text-tx-strong">{copied === 'f2' ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}</button>
           </div>
         )}
@@ -271,12 +265,12 @@ export default function CapturaXmlPage() {
         <ol className="text-xs text-tx-muted space-y-1 mb-3 list-decimal list-inside">
           <li>Abra <a href="https://script.google.com" target="_blank" rel="noreferrer" className="text-acao hover:underline">script.google.com</a> → <b>Novo projeto</b></li>
           <li>Apague tudo, cole o código abaixo (o ID da pasta já vem preenchido)</li>
-          <li>Clique no ⏰ <b>Acionadores</b> → Adicionar → função <code className="text-acao">salvarXmlsNoDrive</code> → A cada 15 minutos → Salvar → autorize a conta</li>
+          <li>Clique no ⏰ <b>Acionadores</b> → Adicionar → função <code className="text-tx">salvarXmlsNoDrive</code> → A cada 15 minutos → Salvar → autorize a conta</li>
         </ol>
         <div className="relative">
           <pre className="bg-inset border border-line rounded-lg p-3 text-[11px] text-tx overflow-x-auto max-h-64">{appsScript(folderForScript)}</pre>
           <button onClick={() => copy(appsScript(folderForScript), 'script')}
-            className="absolute top-2 right-2 px-2.5 py-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded inline-flex items-center gap-1.5">
+            className="btn-primary absolute top-2 right-2" style={{ padding: '4px 10px', fontSize: 12 }}>
             {copied === 'script' ? <><Check className="h-3.5 w-3.5" /> Copiado</> : <><Copy className="h-3.5 w-3.5" /> Copiar script</>}
           </button>
         </div>
@@ -292,11 +286,10 @@ export default function CapturaXmlPage() {
           valida a tributação (Banco de NCM) e envia o relatório por e-mail/WhatsApp.
         </p>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={rodar} disabled={running || !driveOk}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm rounded-lg inline-flex items-center gap-2">
+          <button onClick={rodar} disabled={running || !driveOk} className="btn-primary">
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} Rodar Esteira agora
           </button>
-          <Link href="/esteira-fiscal" className="px-3 py-2 text-sm text-acao hover:underline inline-flex items-center gap-1">
+          <Link href="/esteira-fiscal" className="btn-ghost">
             Ver execuções <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -311,8 +304,8 @@ export default function CapturaXmlPage() {
         )}
       </Step>
 
-      <div className="rounded-xl border border-line bg-card p-4 flex gap-3">
-        <Sparkles className="h-4 w-4 text-acao flex-shrink-0 mt-0.5" />
+      <div className="card-aura flex gap-3">
+        <Sparkles className="h-4 w-4 text-tx-muted flex-shrink-0 mt-0.5" />
         <p className="text-xs text-tx-muted leading-relaxed">
           Depois de configurado, a Esteira pode rodar sozinha todo dia (já tem o agendamento noturno).
           O lançamento no Domínio segue manual por enquanto: importe os XMLs limpos no Domínio e use
@@ -325,13 +318,16 @@ export default function CapturaXmlPage() {
 
 function Step({ n, done, icon: Icon, title, children }: any) {
   return (
-    <div className="rounded-xl border border-line bg-card p-5">
+    <div className="card-aura">
       <div className="flex items-center gap-3 mb-3">
-        <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${done ? 'bg-emerald-500/20 text-ok' : 'bg-indigo-500/15 text-acao border border-indigo-500/30'}`}>
+        <div className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+          style={done
+            ? { background: tint(COLORS.ok, 18), color: COLORS.ok }
+            : { background: tint(COLORS.acao, 12), color: COLORS.acao, border: `1px solid ${tint(COLORS.acao, 30)}` }}>
           {done ? <CheckCircle2 className="h-4 w-4" /> : n}
         </div>
         <Icon className="h-4 w-4 text-tx-muted" />
-        <h2 className="text-sm font-medium text-tx-strong">{title}</h2>
+        <h2 className="text-sm font-medium text-tx-strong m-0">{title}</h2>
       </div>
       <div className="pl-10">{children}</div>
     </div>
@@ -339,18 +335,14 @@ function Step({ n, done, icon: Icon, title, children }: any) {
 }
 
 function Chip({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${ok ? 'bg-emerald-500/10 border-emerald-500/30 text-ok' : 'bg-card border-line text-tx-muted'}`}>
-      {ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />} {label}
-    </span>
-  );
+  return <StatusChip tone={ok ? 'ok' : 'pendente'} label={label} size="sm" />;
 }
 
 function Mini({ label, v, c = 'text-tx-strong' }: { label: string; v: number; c?: string }) {
   return (
     <div className="rounded-lg border border-line bg-inset p-2.5 text-center">
       <p className="text-[11px] text-tx-muted">{label}</p>
-      <p className={`text-lg font-bold ${c}`}>{v}</p>
+      <p className={`num text-lg font-bold ${c}`}>{v}</p>
     </div>
   );
 }

@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useQuery, gql } from '@apollo/client';
-import { Download, ChevronRight, ChevronDown, Building2, Loader2, AlertCircle } from 'lucide-react';
+import { Download, ChevronRight, ChevronDown, Building2, Loader2, AlertCircle, Scale } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import Link from 'next/link';
+import { PageHeader, SectionTitle, EmptyState, COLORS } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
@@ -66,12 +67,11 @@ export default function BalancoPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa para ver o Balanço Patrimonial.</p>
-        <Link href="/carteira" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg">
-          Gerenciar Empresas
-        </Link>
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione uma empresa para ver o Balanço Patrimonial." />
+        <div className="flex justify-center">
+          <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
+        </div>
       </div>
     );
   }
@@ -83,21 +83,18 @@ export default function BalancoPage() {
   const s = summary?.balanceSummary;
 
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-6xl">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-tx-strong">Balanço Patrimonial</h1>
-          <p className="text-tx-muted text-sm mt-0.5">{selectedCompany.name}</p>
-        </div>
-        <button
-          disabled
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-tx-muted bg-inset border border-line rounded-lg cursor-not-allowed"
-          title="Em breve"
-        >
-          <Download className="h-3.5 w-3.5" />
-          PDF
-        </button>
-      </div>
+    <div className="page space-y-6">
+      <PageHeader
+        icon={<Scale size={22} color={COLORS.acao} />}
+        title="Balanço Patrimonial"
+        subtitle={selectedCompany.name}
+        action={
+          <button disabled className="btn-secondary" title="Em breve">
+            <Download className="h-3.5 w-3.5" />
+            PDF
+          </button>
+        }
+      />
 
       {/* Summary KPIs */}
       {s ? (
@@ -135,7 +132,7 @@ export default function BalancoPage() {
                   });
                   window.location.reload();
                 }}
-                className="mt-3 px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg"
+                className="btn-primary mt-3"
               >
                 Popular plano de contas (PCASP)
               </button>
@@ -147,17 +144,17 @@ export default function BalancoPage() {
       {/* Saldos: tree do plano de contas com saldos zerados (saldos vêm de Transactions futuro) */}
       {tree.length > 0 && (
         <div className="grid md:grid-cols-2 gap-4">
-          <div className="rounded-xl border border-line bg-card p-5">
-            <h2 className="text-sm font-medium text-tx-strong mb-3">ATIVO</h2>
+          <div className="card-aura">
+            <SectionTitle>ATIVO</SectionTitle>
             <Tree nodes={ativos} expanded={expanded} onToggle={toggle} />
           </div>
-          <div className="rounded-xl border border-line bg-card p-5 space-y-4">
+          <div className="card-aura space-y-4">
             <div>
-              <h2 className="text-sm font-medium text-tx-strong mb-3">PASSIVO</h2>
+              <SectionTitle>PASSIVO</SectionTitle>
               <Tree nodes={passivos} expanded={expanded} onToggle={toggle} />
             </div>
             <div className="pt-3 border-t border-line">
-              <h2 className="text-sm font-medium text-tx-strong mb-3">PATRIMÔNIO LÍQUIDO</h2>
+              <SectionTitle>PATRIMÔNIO LÍQUIDO</SectionTitle>
               <Tree nodes={patrimonio} expanded={expanded} onToggle={toggle} />
             </div>
           </div>
@@ -198,12 +195,12 @@ function Tree({
                 ) : (
                   <span className="w-3" />
                 )}
-                <span className="text-xs font-mono text-tx-faint">{n.codigo}</span>
+                <span className="num text-xs text-tx-faint">{n.codigo}</span>
                 <span className={`text-xs ${depth === 0 ? 'font-semibold text-tx-strong' : 'text-tx'}`}>
                   {n.nome}
                 </span>
               </span>
-              <span className="text-xs text-tx-faint font-mono">{brl(0)}</span>
+              <span className="num text-xs text-tx-faint">{brl(0)}</span>
             </button>
             {hasChildren && isExpanded && (
               <Tree
@@ -222,9 +219,9 @@ function Tree({
 
 function KPI({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="rounded-xl border border-line bg-card p-3">
+    <div className="card-aura">
       <p className="text-xs text-tx-muted">{label}</p>
-      <p className={`text-base font-bold ${color || 'text-tx-strong'}`}>{value}</p>
+      <p className={`num text-base font-bold ${color || 'text-tx-strong'}`}>{value}</p>
     </div>
   );
 }

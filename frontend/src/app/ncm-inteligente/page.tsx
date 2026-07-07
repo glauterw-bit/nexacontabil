@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import {
-  Boxes, Sparkles, Download, RefreshCw, Loader2, Plus, Search, X, Brain, GraduationCap,
+  Boxes, Download, RefreshCw, Loader2, Plus, Search, X, Brain, GraduationCap,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
+import { PageHeader, Kpi, Spinner, EmptyState, COLORS } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
@@ -74,38 +75,35 @@ export default function NcmInteligentePage() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-6xl space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <Boxes className="h-5 w-5 text-acao" />
-            <h1 className="text-xl font-semibold text-tx-strong">Banco de NCM Inteligente</h1>
-            <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-emerald-500/15 text-ok border border-emerald-500/30 rounded">Padronização</span>
+    <div className="page space-y-5">
+      <PageHeader
+        icon={<Boxes size={22} color={COLORS.acao} />}
+        title="Banco de NCM Inteligente"
+        subtitle="Base única de NCM + tributação por segmento. Alimentada pelos XMLs reais de todos os clientes."
+        action={
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-inset border border-line text-tx-muted">Padronização</span>
+            <button onClick={aprenderXmls} disabled={aprendendo} className="btn-primary">
+              {aprendendo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GraduationCap className="h-3.5 w-3.5" />}
+              Aprender dos XMLs
+            </button>
+            <button onClick={exportar} className="btn-secondary">
+              <Download className="h-3.5 w-3.5" /> Exportar CSV
+            </button>
+            <button onClick={() => setShowForm(true)} className="btn-secondary">
+              <Plus className="h-3.5 w-3.5" /> Nova regra
+            </button>
           </div>
-          <p className="text-sm text-tx-muted">Base única de NCM + tributação por segmento. Alimentada pelos XMLs reais de todos os clientes.</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={aprenderXmls} disabled={aprendendo}
-            className="px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded inline-flex items-center gap-1.5">
-            {aprendendo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GraduationCap className="h-3.5 w-3.5" />}
-            Aprender dos XMLs
-          </button>
-          <button onClick={exportar} className="px-3 py-1.5 text-xs bg-inset hover:bg-line text-tx rounded inline-flex items-center gap-1.5">
-            <Download className="h-3.5 w-3.5" /> Exportar CSV
-          </button>
-          <button onClick={() => setShowForm(true)} className="px-3 py-1.5 text-xs bg-inset hover:bg-line text-tx rounded inline-flex items-center gap-1.5">
-            <Plus className="h-3.5 w-3.5" /> Nova regra
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="Total de regras" value={stats.total} />
-          <StatCard label="Aprendidas de XML" value={stats.aprendidas} color="text-acao" />
-          <StatCard label="Com Subst. Tributária" value={stats.comSt} color="text-warn" />
-          <StatCard label="Segmentos" value={stats.porSegmento?.length ?? 0} color="text-ok" />
+        <div className="flex flex-wrap gap-3">
+          <Kpi label="Total de regras" value={stats.total} />
+          <Kpi label="Aprendidas de XML" value={stats.aprendidas} />
+          <Kpi label="Com Subst. Tributária" value={stats.comSt} cor={COLORS.atencao} />
+          <Kpi label="Segmentos" value={stats.porSegmento?.length ?? 0} />
         </div>
       )}
 
@@ -114,53 +112,51 @@ export default function NcmInteligentePage() {
         <div className="relative flex-1 min-w-[240px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tx-muted" />
           <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar NCM ou descrição…"
-            className="w-full bg-card border border-line rounded-lg pl-10 pr-4 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500 placeholder-tx-faint" />
+            className="input-aura w-full" style={{ paddingLeft: 38 }} />
         </div>
-        <select value={segmento} onChange={(e) => setSegmento(e.target.value)}
-          className="bg-card border border-line rounded-lg px-3 py-2.5 text-tx-strong text-sm outline-none focus:border-indigo-500">
+        <select value={segmento} onChange={(e) => setSegmento(e.target.value)} className="input-aura">
           <option value="">Todos segmentos</option>
           {SEGMENTOS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <button onClick={load} className="px-3 bg-card border border-line rounded-lg text-tx-muted hover:text-tx-strong"><RefreshCw className="h-4 w-4" /></button>
+        <button onClick={load} className="btn-secondary" aria-label="Atualizar"><RefreshCw className="h-4 w-4" /></button>
       </div>
 
       {/* Tabela */}
-      <div className="rounded-xl border border-line bg-card overflow-x-auto">
+      <div className="card-aura overflow-x-auto" style={{ padding: 0 }}>
         {loading ? (
-          <div className="text-center py-12 text-sm text-tx-muted flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
+          <Spinner />
         ) : rules.length === 0 ? (
-          <div className="text-center py-12 text-sm text-tx-muted">
-            Nenhuma regra. Clique em <span className="text-acao">"Aprender dos XMLs"</span> para popular a base automaticamente.
-          </div>
+          <EmptyState icon={<Boxes size={28} />} title="Nenhuma regra."
+            sub={'Clique em "Aprender dos XMLs" para popular a base automaticamente.'} />
         ) : (
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="table-aura min-w-[760px]">
             <thead>
-              <tr className="text-left text-xs text-tx-muted border-b border-line">
-                <th className="px-4 py-3 font-medium">NCM</th>
-                <th className="px-4 py-3 font-medium">Descrição</th>
-                <th className="px-4 py-3 font-medium">Segmento</th>
-                <th className="px-4 py-3 font-medium text-right">ICMS</th>
-                <th className="px-4 py-3 font-medium text-center">ST</th>
-                <th className="px-4 py-3 font-medium text-right">IPI</th>
-                <th className="px-4 py-3 font-medium text-right">PIS</th>
-                <th className="px-4 py-3 font-medium text-right">COFINS</th>
-                <th className="px-4 py-3 font-medium">CFOP</th>
-                <th className="px-4 py-3 font-medium text-right">Usos</th>
+              <tr>
+                <th>NCM</th>
+                <th>Descrição</th>
+                <th>Segmento</th>
+                <th className="num">ICMS</th>
+                <th className="text-center">ST</th>
+                <th className="num">IPI</th>
+                <th className="num">PIS</th>
+                <th className="num">COFINS</th>
+                <th>CFOP</th>
+                <th className="num">Usos</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody>
               {rules.map((r) => (
-                <tr key={r.id} className="hover:bg-inset">
-                  <td className="px-4 py-2.5 font-mono text-tx-strong">{r.ncm}</td>
-                  <td className="px-4 py-2.5 text-tx max-w-[220px] truncate" title={r.descricao}>{r.descricao}</td>
-                  <td className="px-4 py-2.5"><span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-acao">{r.segmento}</span></td>
-                  <td className="px-4 py-2.5 text-right font-mono text-tx-strong">{r.icmsAliquota}%</td>
-                  <td className="px-4 py-2.5 text-center">{r.icmsSt ? <span className="text-warn text-xs">SIM</span> : <span className="text-tx-faint text-xs">—</span>}</td>
-                  <td className="px-4 py-2.5 text-right font-mono text-tx">{r.ipiAliquota}%</td>
-                  <td className="px-4 py-2.5 text-right font-mono text-tx">{r.pisAliquota}%</td>
-                  <td className="px-4 py-2.5 text-right font-mono text-tx">{r.cofinsAliquota}%</td>
-                  <td className="px-4 py-2.5 font-mono text-tx-muted">{r.cfopPadrao ?? '—'}</td>
-                  <td className="px-4 py-2.5 text-right text-tx-muted">{r.usosContador}</td>
+                <tr key={r.id}>
+                  <td className="font-mono text-tx-strong">{r.ncm}</td>
+                  <td className="max-w-[220px] truncate" title={r.descricao}>{r.descricao}</td>
+                  <td><span className="text-[10px] px-2 py-0.5 rounded-full bg-inset border border-line-soft text-tx-muted">{r.segmento}</span></td>
+                  <td className="num font-mono text-tx-strong">{r.icmsAliquota}%</td>
+                  <td className="text-center">{r.icmsSt ? <span className="text-warn text-xs">SIM</span> : <span className="text-tx-faint text-xs">—</span>}</td>
+                  <td className="num font-mono">{r.ipiAliquota}%</td>
+                  <td className="num font-mono">{r.pisAliquota}%</td>
+                  <td className="num font-mono">{r.cofinsAliquota}%</td>
+                  <td className="font-mono text-tx-muted">{r.cfopPadrao ?? '—'}</td>
+                  <td className="num text-tx-muted">{r.usosContador}</td>
                 </tr>
               ))}
             </tbody>
@@ -169,15 +165,6 @@ export default function NcmInteligentePage() {
       </div>
 
       {showForm && <FormModal onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); load(); }} toast={toast} />}
-    </div>
-  );
-}
-
-function StatCard({ label, value, color = 'text-tx-strong' }: { label: string; value: number; color?: string }) {
-  return (
-    <div className="rounded-xl border border-line bg-card p-4">
-      <p className="text-xs text-tx-muted mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
     </div>
   );
 }
@@ -225,13 +212,13 @@ function FormModal({ onClose, onSaved, toast }: { onClose: () => void; onSaved: 
     finally { setSaving(false); }
   }
 
-  const inp = 'w-full bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm outline-none focus:border-indigo-500';
+  const inp = 'input-aura w-full';
   return (
     <div className="fixed inset-0 bg-[rgba(13,17,25,0.45)] backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-card border border-line rounded-2xl p-6 w-full max-w-xl shadow-pop" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card border border-line rounded-xl p-6 w-full max-w-xl shadow-pop" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-tx-strong">Nova regra NCM</h2>
-          <button onClick={onClose} className="text-tx-muted hover:text-tx-strong"><X className="h-5 w-5" /></button>
+          <h2 className="text-[15px] font-semibold text-tx-strong m-0">Nova regra NCM</h2>
+          <button onClick={onClose} className="btn-ghost" aria-label="Fechar"><X className="h-5 w-5" /></button>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div><label className="block text-xs text-tx-muted mb-1">NCM (8 dígitos)</label><input value={f.ncm} onChange={(e) => setF({ ...f, ncm: e.target.value })} className={inp} placeholder="84713012" /></div>
@@ -242,7 +229,7 @@ function FormModal({ onClose, onSaved, toast }: { onClose: () => void; onSaved: 
           </div>
           <div className="col-span-2"><label className="block text-xs text-tx-muted mb-1">Descrição</label><input value={f.descricao} onChange={(e) => setF({ ...f, descricao: e.target.value })} className={inp} /></div>
           <div className="col-span-2">
-            <button onClick={classificarIA} disabled={iaLoading} className="w-full px-3 py-2 bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/30 text-acao text-sm rounded-lg inline-flex items-center justify-center gap-2">
+            <button onClick={classificarIA} disabled={iaLoading} className="btn-secondary w-full justify-center">
               {iaLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
               Preencher tributação com IA
             </button>
@@ -254,8 +241,8 @@ function FormModal({ onClose, onSaved, toast }: { onClose: () => void; onSaved: 
           <div className="col-span-2"><label className="block text-xs text-tx-muted mb-1">CFOP padrão</label><input value={f.cfopPadrao} onChange={(e) => setF({ ...f, cfopPadrao: e.target.value })} className={inp} placeholder="5102" /></div>
         </div>
         <div className="flex gap-3 mt-5">
-          <button onClick={onClose} className="flex-1 px-4 py-2 bg-inset text-tx text-sm rounded-lg">Cancelar</button>
-          <button onClick={salvar} disabled={saving} className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm rounded-lg inline-flex items-center justify-center gap-2">
+          <button onClick={onClose} className="btn-secondary flex-1 justify-center">Cancelar</button>
+          <button onClick={salvar} disabled={saving} className="btn-primary flex-1 justify-center">
             {saving && <Loader2 className="h-4 w-4 animate-spin" />} Salvar
           </button>
         </div>

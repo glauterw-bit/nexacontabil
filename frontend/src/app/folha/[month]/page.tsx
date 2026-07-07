@@ -3,8 +3,9 @@ import { useState, Fragment } from 'react';
 import { useParams } from 'next/navigation';
 import {
   ChevronDown, ChevronUp, Download, CheckCircle, Brain, AlertTriangle,
-  ArrowLeft, Loader2, Calculator, Building2,
+  ArrowLeft, Loader2, Calculator, Building2, DollarSign,
 } from 'lucide-react';
+import { PageHeader, SectionTitle, StatusChip, EmptyState, Spinner, COLORS } from '@/components/ui/kit';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { useToast } from '@/components/ui/Toast';
@@ -129,61 +130,63 @@ export default function FolhaDetalhesMesPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa.</p>
-        <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione uma empresa." />
+        <div className="flex justify-center">
+          <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Link href="/folha" className="btn-ghost p-2"><ArrowLeft className="h-4 w-4" /></Link>
-          <div>
-            <h1 className="text-2xl font-bold text-tx-strong">Folha de Pagamento — {titulo}</h1>
-            <p className="text-tx-muted text-sm mt-1">{selectedCompany.name} · {payslips.length} holerites</p>
-          </div>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={calculateAllMissing} disabled={calculating} className="btn-ghost text-sm border border-line inline-flex items-center gap-1.5">
-            {calculating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}
-            Calcular faltantes
-          </button>
-          <button className="btn-ghost text-sm border border-line">
-            <Download className="h-4 w-4" /> PDF
-          </button>
-          <button onClick={aprovarTodos} className="btn-primary text-sm">
-            <CheckCircle className="h-4 w-4" /> Aprovar Todos
-          </button>
+    <div className="page space-y-6">
+      <div className="flex items-start gap-3">
+        <Link href="/folha" className="btn-ghost mt-2"><ArrowLeft className="h-4 w-4" /></Link>
+        <div className="flex-1">
+          <PageHeader
+            icon={<DollarSign size={22} color={COLORS.acao} />}
+            title={`Folha de Pagamento — ${titulo}`}
+            subtitle={`${selectedCompany.name} · ${payslips.length} holerites`}
+            action={
+              <div className="flex gap-2 flex-wrap">
+                <button onClick={calculateAllMissing} disabled={calculating} className="btn-secondary">
+                  {calculating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}
+                  Calcular faltantes
+                </button>
+                <button className="btn-secondary">
+                  <Download className="h-4 w-4" /> PDF
+                </button>
+                <button onClick={aprovarTodos} className="btn-primary">
+                  <CheckCircle className="h-4 w-4" /> Aprovar Todos
+                </button>
+              </div>
+            }
+          />
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: 'Total Bruto', value: totalBruto, color: 'text-tx-strong' },
-          { label: 'INSS', value: totalInss, color: 'text-warn' },
-          { label: 'IRRF', value: totalIrrf, color: 'text-err' },
-          { label: 'FGTS', value: totalFgts, color: 'text-purple-400' },
-          { label: 'Líquido', value: totalLiquido, color: 'text-ok' },
+          { label: 'Total Bruto', value: totalBruto },
+          { label: 'INSS', value: totalInss },
+          { label: 'IRRF', value: totalIrrf },
+          { label: 'FGTS', value: totalFgts },
+          { label: 'Líquido', value: totalLiquido },
         ].map(t => (
           <div key={t.label} className="card-aura text-center">
             <p className="text-xs text-tx-muted mb-1">{t.label}</p>
-            <p className={`text-lg font-bold ${t.color}`}>{Number(t.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <p className="num text-lg font-bold text-tx-strong">{Number(t.value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
           </div>
         ))}
       </div>
 
       <div className="card-aura overflow-x-auto">
         {loading && payslips.length === 0 ? (
-          <div className="text-center py-12 text-sm text-tx-muted flex items-center justify-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" /> Carregando holerites…
-          </div>
+          <Spinner />
         ) : payslips.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-tx-muted text-sm mb-3">Nenhum holerite calculado para {titulo}.</p>
+          <div className="text-center py-6">
+            <EmptyState icon={<Calculator size={32} />} title={`Nenhum holerite calculado para ${titulo}.`} />
             <button onClick={calculateAllMissing} disabled={calculating || allEmployees.length === 0} className="btn-primary inline-flex items-center gap-2">
               <Calculator className="h-4 w-4" />
               Calcular folha do mês
@@ -195,44 +198,42 @@ export default function FolhaDetalhesMesPage() {
             )}
           </div>
         ) : (
-          <table className="w-full min-w-[800px]">
+          <table className="table-aura min-w-[800px]">
             <thead>
-              <tr className="text-left text-xs text-tx-muted border-b border-line">
-                <th className="pb-3 font-medium">Funcionário</th>
-                <th className="pb-3 font-medium text-right num">Bruto</th>
-                <th className="pb-3 font-medium text-right num">INSS</th>
-                <th className="pb-3 font-medium text-right num">IRRF</th>
-                <th className="pb-3 font-medium text-right num">FGTS</th>
-                <th className="pb-3 font-medium text-right num">H.Ex.</th>
-                <th className="pb-3 font-medium text-right num">Líquido</th>
-                <th className="pb-3 font-medium text-center">Status</th>
-                <th className="pb-3 font-medium text-center"></th>
+              <tr>
+                <th>Funcionário</th>
+                <th className="num">Bruto</th>
+                <th className="num">INSS</th>
+                <th className="num">IRRF</th>
+                <th className="num">FGTS</th>
+                <th className="num">H.Ex.</th>
+                <th className="num">Líquido</th>
+                <th className="text-center">Status</th>
+                <th className="text-center"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody>
               {payslips.map((p: any) => (
                 <Fragment key={p.id}>
-                  <tr className="hover:bg-inset transition-colors">
-                    <td className="py-3">
-                      <p className="text-tx-strong text-sm font-medium">{p.employee?.name ?? p.employeeId}</p>
+                  <tr>
+                    <td>
+                      <p className="text-tx-strong font-medium">{p.employee?.name ?? p.employeeId}</p>
                       <p className="text-tx-muted text-xs">{p.employee?.role}</p>
                     </td>
-                    <td className="py-3 text-sm text-right font-mono text-tx-strong">{Number(p.grossSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                    <td className="py-3 text-sm text-right font-mono text-warn">{Number(p.inssEmployee).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                    <td className="py-3 text-sm text-right font-mono text-err">{Number(p.irrf).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                    <td className="py-3 text-sm text-right font-mono text-purple-400">{Number(p.fgts).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                    <td className="py-3 text-sm text-right font-mono text-info">{p.overtimeHours > 0 ? `${p.overtimeHours}h` : '—'}</td>
-                    <td className="py-3 text-sm text-right font-mono text-ok font-semibold">{Number(p.netSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                    <td className="py-3 text-center">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        p.status === 'approved' || p.status === 'paid'
-                          ? 'bg-green-400/10 text-ok'
-                          : 'bg-yellow-400/10 text-warn'
-                      }`}>
-                        {p.status === 'approved' ? 'Aprovado' : p.status === 'paid' ? 'Pago' : 'Pendente'}
-                      </span>
+                    <td className="num text-tx-strong">{Number(p.grossSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    <td className="num">{Number(p.inssEmployee).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    <td className="num">{Number(p.irrf).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    <td className="num">{Number(p.fgts).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    <td className="num">{p.overtimeHours > 0 ? `${p.overtimeHours}h` : '—'}</td>
+                    <td className="num text-tx-strong font-semibold">{Number(p.netSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    <td className="text-center">
+                      <StatusChip
+                        size="sm"
+                        tone={p.status === 'approved' || p.status === 'paid' ? 'ok' : 'pendente'}
+                        label={p.status === 'approved' ? 'Aprovado' : p.status === 'paid' ? 'Pago' : 'Pendente'}
+                      />
                     </td>
-                    <td className="py-3 text-center">
+                    <td className="text-center">
                       <button onClick={() => setExpanded(expanded === p.id ? null : p.id)} className="btn-ghost p-1">
                         {expanded === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </button>
@@ -243,22 +244,22 @@ export default function FolhaDetalhesMesPage() {
                       <td colSpan={9} className="bg-inset px-4 py-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                           <div className="space-y-2">
-                            <p className="text-tx-muted text-xs font-medium uppercase tracking-wide">Proventos</p>
-                            <div className="flex justify-between"><span className="text-tx-muted">Salário Base</span><span className="text-tx-strong font-mono">{Number(p.baseSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
-                            {p.overtimeValue > 0 && <div className="flex justify-between"><span className="text-tx-muted">Horas Extras ({p.overtimeHours}h)</span><span className="text-info font-mono">+{Number(p.overtimeValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
-                            {p.bonuses > 0 && <div className="flex justify-between"><span className="text-tx-muted">Bonificações</span><span className="text-ok font-mono">+{Number(p.bonuses).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
+                            <p className="text-tx-faint text-[11px] font-semibold uppercase tracking-wide">Proventos</p>
+                            <div className="flex justify-between"><span className="text-tx-muted">Salário Base</span><span className="num text-tx-strong">{Number(p.baseSalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                            {p.overtimeValue > 0 && <div className="flex justify-between"><span className="text-tx-muted">Horas Extras ({p.overtimeHours}h)</span><span className="num text-ok">+{Number(p.overtimeValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
+                            {p.bonuses > 0 && <div className="flex justify-between"><span className="text-tx-muted">Bonificações</span><span className="num text-ok">+{Number(p.bonuses).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
                           </div>
                           <div className="space-y-2">
-                            <p className="text-tx-muted text-xs font-medium uppercase tracking-wide">Descontos</p>
-                            <div className="flex justify-between"><span className="text-tx-muted">INSS</span><span className="text-warn font-mono">-{Number(p.inssEmployee).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
-                            <div className="flex justify-between"><span className="text-tx-muted">IRRF</span><span className="text-err font-mono">-{Number(p.irrf).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
-                            {p.otherDeductions > 0 && <div className="flex justify-between"><span className="text-tx-muted">Outros</span><span className="text-err font-mono">-{Number(p.otherDeductions).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
+                            <p className="text-tx-faint text-[11px] font-semibold uppercase tracking-wide">Descontos</p>
+                            <div className="flex justify-between"><span className="text-tx-muted">INSS</span><span className="num text-err">-{Number(p.inssEmployee).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                            <div className="flex justify-between"><span className="text-tx-muted">IRRF</span><span className="num text-err">-{Number(p.irrf).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                            {p.otherDeductions > 0 && <div className="flex justify-between"><span className="text-tx-muted">Outros</span><span className="num text-err">-{Number(p.otherDeductions).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>}
                           </div>
                           <div className="space-y-2">
-                            <p className="text-tx-muted text-xs font-medium uppercase tracking-wide">Encargos Patronais</p>
-                            <div className="flex justify-between"><span className="text-tx-muted">FGTS (8%)</span><span className="text-purple-400 font-mono">{Number(p.fgts).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
-                            <div className="flex justify-between"><span className="text-tx-muted">INSS Patronal</span><span className="text-purple-400 font-mono">{Number(p.inssEmployer).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
-                            <div className="flex justify-between pt-2 border-t border-line"><span className="text-tx font-medium">Custo Total</span><span className="text-tx-strong font-mono font-semibold">{(Number(p.grossSalary) + Number(p.fgts) + Number(p.inssEmployer)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                            <p className="text-tx-faint text-[11px] font-semibold uppercase tracking-wide">Encargos Patronais</p>
+                            <div className="flex justify-between"><span className="text-tx-muted">FGTS (8%)</span><span className="num text-tx">{Number(p.fgts).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                            <div className="flex justify-between"><span className="text-tx-muted">INSS Patronal</span><span className="num text-tx">{Number(p.inssEmployer).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+                            <div className="flex justify-between pt-2 border-t border-line"><span className="text-tx font-medium">Custo Total</span><span className="num text-tx-strong font-semibold">{(Number(p.grossSalary) + Number(p.fgts) + Number(p.inssEmployer)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
                           </div>
                         </div>
                       </td>
@@ -267,14 +268,14 @@ export default function FolhaDetalhesMesPage() {
                 </Fragment>
               ))}
               <tr className="bg-inset font-semibold">
-                <td className="py-3 text-sm text-tx">TOTAIS</td>
-                <td className="py-3 text-sm text-right font-mono text-tx-strong">{totalBruto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                <td className="py-3 text-sm text-right font-mono text-warn">{totalInss.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                <td className="py-3 text-sm text-right font-mono text-err">{totalIrrf.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                <td className="py-3 text-sm text-right font-mono text-purple-400">{totalFgts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td className="text-tx">TOTAIS</td>
+                <td className="num text-tx-strong">{totalBruto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td className="num">{totalInss.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td className="num">{totalIrrf.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td className="num">{totalFgts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                 <td></td>
-                <td className="py-3 text-sm text-right font-mono text-ok">{totalLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                <td colSpan={2} className="py-3 text-xs text-right text-tx-muted">+ INSS patronal: {totalInssEmpresa.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td className="num text-tx-strong">{totalLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td colSpan={2} className="text-xs text-right text-tx-muted">+ INSS patronal: {totalInssEmpresa.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
               </tr>
             </tbody>
           </table>
@@ -283,10 +284,10 @@ export default function FolhaDetalhesMesPage() {
 
       {anomalias.length > 0 && (
         <div className="card-aura">
-          <h3 className="text-base font-semibold text-tx-strong mb-4 flex items-center gap-2">
-            <Brain className="h-4 w-4 text-acao" />
+          <SectionTitle>
+            <Brain className="h-4 w-4 text-tx-muted" />
             Análise de IA — Anomalias Detectadas
-          </h3>
+          </SectionTitle>
           <div className="space-y-3">
             {anomalias.map((a, i) => (
               <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${

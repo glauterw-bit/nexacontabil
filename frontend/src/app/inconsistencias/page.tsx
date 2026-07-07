@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { FileWarning, Loader2, AlertTriangle, ChevronRight } from 'lucide-react';
+import { FileWarning, AlertTriangle, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { PageHeader, COLORS, Kpi, Card, Spinner } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -25,20 +26,21 @@ export default function InconsistenciasPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}><Loader2 size={32} className="animate-spin" /></div>;
+  if (loading) return <Spinner />;
 
   return (
-    <div style={{ maxWidth: 1050, margin: '0 auto', padding: 24 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <FileWarning size={24} color="var(--atencao)" /> Central de Inconsistências
-      </h1>
-      <p style={{ color: 'var(--muted)', marginTop: 4 }}>Malha fina: os erros fiscais reais, priorizados por valor envolvido.</p>
+    <div className="page">
+      <PageHeader
+        icon={<FileWarning size={22} color={COLORS.acao} />}
+        title="Central de Inconsistências"
+        subtitle="Malha fina: os erros fiscais reais, priorizados por valor envolvido."
+      />
 
-      <div style={{ display: 'flex', gap: 14, marginTop: 20, flexWrap: 'wrap' }}>
-        <Stat label="Notas com erro" value={data?.totalNotas} cor="var(--atencao)" />
-        <Stat label="Erros (total)" value={data?.totalErros} cor="var(--erro)" />
-        <Stat label="Clientes afetados" value={data?.clientesAfetados} cor="var(--acao)" />
-        <Stat label="Valor envolvido" value={BRL(data?.valorEnvolvido)} cor="var(--tx-strong)" />
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+        <Kpi label="Notas com erro" value={data?.totalNotas ?? 0} cor="var(--atencao)" />
+        <Kpi label="Erros (total)" value={data?.totalErros ?? 0} cor="var(--erro)" />
+        <Kpi label="Clientes afetados" value={data?.clientesAfetados ?? 0} cor="var(--tx-strong)" />
+        <Kpi label="Valor envolvido" value={BRL(data?.valorEnvolvido)} cor="var(--tx-strong)" />
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginTop: 24, marginBottom: 12 }}>
@@ -48,23 +50,25 @@ export default function InconsistenciasPage() {
 
       {tab === 'ranking' && (data?.ranking ?? []).map((c: any, i: number) => (
         <Link key={i} href={`/cliente-erros?companyId=${c.companyId}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginBottom: 8, cursor: 'pointer' }}>
-            <span style={{ width: 24, color: 'var(--faint)', fontWeight: 700 }}>{i + 1}</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{c.cliente}</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{c.responsavel ?? 'sem responsável'}</div>
+          <Card style={{ marginBottom: 8, padding: '12px 16px', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ width: 24, color: 'var(--faint)', fontWeight: 700 }}>{i + 1}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{c.cliente}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>{c.responsavel ?? 'sem responsável'}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="num" style={{ color: 'var(--erro)', fontWeight: 700 }}>{c.erros} erros</div>
+                <div className="num" style={{ fontSize: 12, color: 'var(--faint)' }}>{BRL(c.valor)}</div>
+              </div>
+              <ChevronRight size={16} color="var(--acao)" />
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ color: 'var(--erro)', fontWeight: 700 }}>{c.erros} erros</div>
-              <div style={{ fontSize: 12, color: 'var(--faint)' }}>{BRL(c.valor)}</div>
-            </div>
-            <ChevronRight size={16} color="var(--acao)" />
-          </div>
+          </Card>
         </Link>
       ))}
 
       {tab === 'notas' && (data?.itens ?? []).map((it: any, i: number) => (
-        <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
+        <Card key={i} style={{ marginBottom: 8, padding: '12px 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
             <div><strong>{it.cliente}</strong> <span style={{ fontSize: 12, color: 'var(--faint)' }}>NF {it.nota} · {dataBR(it.data)}</span></div>
             <strong>{BRL(it.valor)}</strong>
@@ -74,20 +78,12 @@ export default function InconsistenciasPage() {
               <AlertTriangle size={13} /> {p}
             </div>
           ))}
-        </div>
+        </Card>
       ))}
     </div>
   );
 }
 
-function Stat({ label, value, cor }: { label: string; value: any; cor: string }) {
-  return (
-    <div style={{ flex: '1 1 150px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-      <div style={{ fontSize: 12, color: 'var(--faint)' }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 700, color: cor, marginTop: 4 }}>{value ?? 0}</div>
-    </div>
-  );
-}
 function Tab({ on, onClick, children }: any) {
-  return <button onClick={onClick} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: on ? 'var(--acao)' : 'var(--surface2)', color: on ? '#fff' : 'var(--muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{children}</button>;
+  return <button onClick={onClick} className={on ? 'btn-primary' : 'btn-secondary'}>{children}</button>;
 }

@@ -54,7 +54,7 @@ export default function OperacaoPage() {
     .filter((c: any) => !busca || (c.cliente || '').toLowerCase().includes(busca.toLowerCase()));
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
+    <div className="page">
       <PageHeader icon={<Activity size={22} color={COLORS.acao} />} title="Central de Operação"
         subtitle={`Situação da carteira em ${fmtCompetencia(d.competencia)} — clique num indicador para filtrar, num cliente para o detalhe.`}
         action={<SyncBadge sync={sync} />} />

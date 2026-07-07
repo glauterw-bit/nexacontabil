@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { FolderTree, Loader2, ArrowDownUp, MapPin, Receipt, Boxes, Calendar, Building2, ChevronRight } from 'lucide-react';
-import { PageHeader, Kpi, Card, SectionTitle, Bar, COLORS, tint } from '@/components/ui/kit';
+import { FolderTree, ArrowDownUp, MapPin, Receipt, Boxes, Calendar, Building2, ChevronRight } from 'lucide-react';
+import { PageHeader, Kpi, Card, SectionTitle, Bar, COLORS, tint, Spinner, EmptyState } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -29,8 +29,8 @@ export default function OrganizacaoPage() {
       .then((r) => r.ok ? r.json() : null).then(setD).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 60, color: COLORS.muted }}><Loader2 size={32} className="animate-spin" /></div>;
-  if (!d) return <div style={{ padding: 40, textAlign: 'center', color: COLORS.faint }}>Sem dados.</div>;
+  if (loading) return <Spinner />;
+  if (!d) return <EmptyState icon={<FolderTree size={32} />} title="Sem dados." />;
 
   const Distrib = ({ titulo, icon, dados }: { titulo: string; icon: any; dados: any[] }) => {
     const max = Math.max(1, ...dados.map((x: any) => x.valor));
@@ -51,8 +51,8 @@ export default function OrganizacaoPage() {
   };
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: 24 }}>
-      <PageHeader icon={<FolderTree size={24} color={COLORS.acao} />} title="Organização Documental"
+    <div className="page">
+      <PageHeader icon={<FolderTree size={22} color={COLORS.acao} />} title="Organização Documental"
         subtitle="Todos os documentos organizados por natureza fiscal, contábil e cliente." />
 
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
@@ -64,9 +64,9 @@ export default function OrganizacaoPage() {
 
       <SectionTitle>Natureza fiscal</SectionTitle>
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <Distrib titulo="Entrada × Saída" icon={<ArrowDownUp size={16} color={COLORS.acao} />} dados={d.fiscal.porDirecao} />
-        <Distrib titulo="Âmbito (UF)" icon={<MapPin size={16} color={COLORS.acao} />} dados={d.fiscal.porAmbito} />
-        <Distrib titulo="Tributação" icon={<Receipt size={16} color={COLORS.acao} />} dados={d.fiscal.porTributacao} />
+        <Distrib titulo="Entrada × Saída" icon={<ArrowDownUp size={16} color={COLORS.muted} />} dados={d.fiscal.porDirecao} />
+        <Distrib titulo="Âmbito (UF)" icon={<MapPin size={16} color={COLORS.muted} />} dados={d.fiscal.porAmbito} />
+        <Distrib titulo="Tributação" icon={<Receipt size={16} color={COLORS.muted} />} dados={d.fiscal.porTributacao} />
       </div>
 
       {d.fiscal.monofasico?.grupos?.length > 0 && (
@@ -88,15 +88,15 @@ export default function OrganizacaoPage() {
       <SectionTitle>Natureza contábil</SectionTitle>
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <Card style={{ flex: '1 1 320px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, marginBottom: 10 }}><Receipt size={16} color={COLORS.ok} /> Receita × Custo</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, marginBottom: 10 }}><Receipt size={16} color={COLORS.muted} /> Receita × Custo</div>
           {d.contabil.receitaVsCusto.filter((x: any) => x.chave !== 'indef').map((x: any) => (
             <div key={x.chave} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
               <span>{x.natureza}</span><strong style={{ color: x.chave === 'saida' ? COLORS.ok : COLORS.info }}>{BRL(x.valor)}</strong>
             </div>
           ))}
         </Card>
-        <Distrib titulo="Por segmento" icon={<Boxes size={16} color={COLORS.acao} />} dados={d.contabil.porSegmento} />
-        <Distrib titulo="Por regime" icon={<Building2 size={16} color={COLORS.acao} />} dados={d.contabil.porRegime} />
+        <Distrib titulo="Por segmento" icon={<Boxes size={16} color={COLORS.muted} />} dados={d.contabil.porSegmento} />
+        <Distrib titulo="Por regime" icon={<Building2 size={16} color={COLORS.muted} />} dados={d.contabil.porRegime} />
       </div>
 
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>

@@ -4,7 +4,7 @@ import {
   Briefcase, Loader2, RefreshCw, Search, Building2, FileText, AlertTriangle, FolderOpen,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, PieChart, Pie } from 'recharts';
-import { tint } from '@/components/ui/kit';
+import { tint, PageHeader, COLORS, Spinner } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -13,7 +13,7 @@ function authHeaders(): Record<string, string> {
 }
 const CORES: Record<string, string> = {
   'Simples Nacional': 'var(--dot-ok)', 'Lucro Presumido': 'var(--acao)', 'Lucro Real': 'var(--dot-atencao)',
-  'MEI': '#06b6d4', 'Não identificado': 'var(--faint)',
+  'MEI': 'var(--info)', 'Não identificado': 'var(--faint)',
 };
 
 export default function CarteiraPage() {
@@ -50,18 +50,18 @@ export default function CarteiraPage() {
   }, [data, busca, regimeFiltro]);
 
   return (
-    <div className="p-5 md:p-8 max-w-6xl space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <Briefcase className="h-5 w-5 text-acao" />
-            <h1 className="text-xl font-semibold text-tx-strong">Carteira de Clientes</h1>
-            <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-emerald-500/15 text-ok border border-emerald-500/30 rounded">SharePoint ao vivo</span>
+    <div className="page space-y-5">
+      <PageHeader
+        icon={<Briefcase size={22} color={COLORS.acao} />}
+        title="Carteira de Clientes"
+        subtitle={`Análise da carteira lida direto do SharePoint do escritório · ${data?.totalClientes ?? 0} clientes`}
+        action={
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider rounded text-ok" style={{ background: tint('var(--dot-ok)', 15), border: `1px solid ${tint('var(--dot-ok)', 30)}` }}>SharePoint ao vivo</span>
+            <button onClick={load} className="btn-ghost" aria-label="Atualizar"><RefreshCw className="h-4 w-4" /></button>
           </div>
-          <p className="text-sm text-tx-muted">Análise da carteira lida direto do SharePoint do escritório · {data?.totalClientes ?? 0} clientes</p>
-        </div>
-        <button onClick={load} className="p-2 bg-card border border-line rounded-lg text-tx-muted hover:text-tx-strong"><RefreshCw className="h-4 w-4" /></button>
-      </div>
+        }
+      />
 
       {/* Barra de progresso da análise */}
       {prog && (
@@ -81,9 +81,9 @@ export default function CarteiraPage() {
       )}
 
       {loading ? (
-        <div className="text-center py-24 text-sm text-tx-muted flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Lendo o SharePoint…</div>
+        <Spinner />
       ) : data?.erro ? (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 text-sm text-warn">
+        <div className="rounded-xl p-5 text-sm text-warn" style={{ border: `1px solid ${tint('var(--atencao)', 30)}`, background: tint('var(--atencao)', 6) }}>
           <AlertTriangle className="h-4 w-4 inline mr-2" /> {data.erro}
         </div>
       ) : data && (
@@ -127,9 +127,9 @@ export default function CarteiraPage() {
             <div className="relative flex-1 min-w-[240px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tx-muted" />
               <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente ou código…"
-                className="w-full bg-card border border-line rounded-lg pl-10 pr-4 py-2.5 text-tx text-sm outline-none focus:border-indigo-500 placeholder:text-tx-faint" />
+                className="input-aura w-full pl-10" />
             </div>
-            <select value={regimeFiltro} onChange={(e) => setRegimeFiltro(e.target.value)} className="bg-card border border-line rounded-lg px-3 py-2.5 text-tx text-sm outline-none focus:border-indigo-500">
+            <select value={regimeFiltro} onChange={(e) => setRegimeFiltro(e.target.value)} className="input-aura">
               <option value="">Todos os regimes</option>
               {data.porRegime.map((r: any) => <option key={r.regime} value={r.regime}>{r.regime} ({r.clientes})</option>)}
             </select>
@@ -137,26 +137,26 @@ export default function CarteiraPage() {
 
           {/* Tabela */}
           <div className="rounded-xl border border-line bg-card overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="table-aura min-w-[640px]">
               <thead>
-                <tr className="text-left text-xs text-tx-muted border-b border-line">
-                  <th className="px-4 py-3 font-medium">Cód.</th>
-                  <th className="px-4 py-3 font-medium">Cliente</th>
-                  <th className="px-4 py-3 font-medium">Regime</th>
-                  <th className="px-4 py-3 font-medium text-right">Documentos</th>
-                  <th className="px-4 py-3 font-medium text-center">Situação</th>
+                <tr>
+                  <th>Cód.</th>
+                  <th>Cliente</th>
+                  <th>Regime</th>
+                  <th className="num">Documentos</th>
+                  <th className="text-center">Situação</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {clientes.slice(0, 300).map((c: any, i: number) => (
-                  <tr key={i} className="hover:bg-inset">
-                    <td className="px-4 py-2.5 text-tx-muted font-mono">{c.codigo ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-tx-strong">{c.nome}</td>
-                    <td className="px-4 py-2.5">
+                  <tr key={i}>
+                    <td className="text-tx-muted font-mono">{c.codigo ?? '—'}</td>
+                    <td className="text-tx-strong">{c.nome}</td>
+                    <td>
                       <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: tint(CORES[c.regime] ?? 'var(--faint)', 13), color: CORES[c.regime] ?? 'var(--muted)' }}>{c.regimeSigla ?? '?'}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-right font-mono text-tx">{c.docs}</td>
-                    <td className="px-4 py-2.5 text-center">
+                    <td className="num font-mono text-tx">{c.docs}</td>
+                    <td className="text-center">
                       <span className={`text-[10px] ${c.ativo ? 'text-ok' : 'text-tx-muted'}`}>{c.ativo ? 'Ativa' : 'Inativa'}</span>
                     </td>
                   </tr>
@@ -181,8 +181,8 @@ function Kpi({ label, value, icon: Icon, color = 'text-tx-strong' }: any) {
 }
 function Card({ title, children }: any) {
   return (
-    <div className="rounded-xl border border-line bg-card p-4">
-      <h2 className="text-sm font-medium text-tx-strong mb-3">{title}</h2>
+    <div className="card-aura">
+      <h2 className="text-[15px] font-semibold text-tx-strong mb-3">{title}</h2>
       {children}
     </div>
   );

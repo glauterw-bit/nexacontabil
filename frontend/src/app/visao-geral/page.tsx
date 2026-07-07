@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
-import { LayoutGrid, Loader2, RefreshCw, Search, Building2, AlertTriangle, TrendingUp, FileText } from 'lucide-react';
+import { LayoutGrid, RefreshCw, Search, Building2, AlertTriangle, TrendingUp, FileText } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCompany } from '@/contexts/CompanyContext';
+import { PageHeader, COLORS, Spinner, tint } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
@@ -41,21 +42,21 @@ export default function VisaoGeralPage() {
   }
 
   return (
-    <div className="p-5 md:p-8 max-w-[1400px] space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <LayoutGrid className="h-5 w-5 text-acao" />
-            <h1 className="text-xl font-semibold text-tx-strong">Visão Geral — Todos os Clientes</h1>
-            <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider bg-indigo-500/15 text-acao border border-indigo-500/30 rounded">Admin</span>
+    <div className="page space-y-5">
+      <PageHeader
+        icon={<LayoutGrid size={22} color={COLORS.acao} />}
+        title="Visão Geral — Todos os Clientes"
+        subtitle="Panorama de toda a carteira · clique num cliente pra abrir o painel dele"
+        action={
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider rounded text-acao" style={{ background: tint('var(--acao)', 15), border: `1px solid ${tint('var(--acao)', 30)}` }}>Admin</span>
+            <button onClick={load} className="btn-ghost" aria-label="Atualizar"><RefreshCw className="h-4 w-4" /></button>
           </div>
-          <p className="text-sm text-tx-muted">Panorama de toda a carteira · clique num cliente pra abrir o painel dele</p>
-        </div>
-        <button onClick={load} className="p-2 bg-card border border-line rounded-lg text-tx-muted hover:text-tx-strong"><RefreshCw className="h-4 w-4" /></button>
-      </div>
+        }
+      />
 
       {loading ? (
-        <div className="text-center py-24 text-sm text-tx-muted flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Carregando carteira…</div>
+        <Spinner />
       ) : data && (
         <>
           {/* KPIs */}
@@ -71,9 +72,9 @@ export default function VisaoGeralPage() {
             <div className="relative flex-1 min-w-[240px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tx-muted" />
               <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente ou código…"
-                className="w-full bg-card border border-line rounded-lg pl-10 pr-4 py-2.5 text-tx text-sm outline-none focus:border-indigo-500 placeholder:text-tx-faint" />
+                className="input-aura w-full pl-10" />
             </div>
-            <select value={ordem} onChange={(e) => setOrdem(e.target.value as any)} className="bg-card border border-line rounded-lg px-3 py-2.5 text-tx text-sm outline-none focus:border-indigo-500">
+            <select value={ordem} onChange={(e) => setOrdem(e.target.value as any)} className="input-aura">
               <option value="pendencias">Ordenar: pendências</option>
               <option value="faturamento">Ordenar: faturamento</option>
               <option value="docs">Ordenar: documentos</option>
@@ -82,29 +83,29 @@ export default function VisaoGeralPage() {
 
           {/* Tabela */}
           <div className="rounded-xl border border-line bg-card overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
+            <table className="table-aura min-w-[760px]">
               <thead>
-                <tr className="text-left text-xs text-tx-muted border-b border-line">
-                  <th className="px-4 py-3 font-medium">Cód.</th>
-                  <th className="px-4 py-3 font-medium">Cliente</th>
-                  <th className="px-4 py-3 font-medium">Regime</th>
-                  <th className="px-4 py-3 font-medium">Segmento</th>
-                  <th className="px-4 py-3 font-medium text-right">Faturamento</th>
-                  <th className="px-4 py-3 font-medium text-right">Docs</th>
-                  <th className="px-4 py-3 font-medium text-center">Cronograma</th>
-                  <th className="px-4 py-3 font-medium text-center">Pendências</th>
+                <tr>
+                  <th>Cód.</th>
+                  <th>Cliente</th>
+                  <th>Regime</th>
+                  <th>Segmento</th>
+                  <th className="num">Faturamento</th>
+                  <th className="num">Docs</th>
+                  <th className="text-center">Cronograma</th>
+                  <th className="text-center">Pendências</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
+              <tbody>
                 {clientes.slice(0, 400).map((c: any) => (
-                  <tr key={c.id} onClick={() => abrir(c)} className="hover:bg-inset cursor-pointer">
-                    <td className="px-4 py-2.5 text-tx-muted font-mono">{c.codigo ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-tx-strong">{c.nome}</td>
-                    <td className="px-4 py-2.5"><span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600/20 text-acao">{REG[c.regime] ?? c.regime}</span></td>
-                    <td className="px-4 py-2.5 text-tx-muted text-xs capitalize">{c.segmento ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-right font-mono text-ok">{c.faturamento ? BRL(c.faturamento) : '—'}</td>
-                    <td className="px-4 py-2.5 text-right text-tx-muted">{c.docs}</td>
-                    <td className="px-4 py-2.5 text-center">
+                  <tr key={c.id} onClick={() => abrir(c)} className="cursor-pointer">
+                    <td className="text-tx-muted font-mono">{c.codigo ?? '—'}</td>
+                    <td className="text-tx-strong">{c.nome}</td>
+                    <td><span className="text-[10px] px-2 py-0.5 rounded-full bg-inset text-tx-muted">{REG[c.regime] ?? c.regime}</span></td>
+                    <td className="text-tx-muted text-xs capitalize">{c.segmento ?? '—'}</td>
+                    <td className="num font-mono text-ok">{c.faturamento ? BRL(c.faturamento) : '—'}</td>
+                    <td className="num text-tx-muted">{c.docs}</td>
+                    <td className="text-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span className="w-12 h-1.5 bg-inset rounded-full inline-block overflow-hidden">
                           <span className="h-full block rounded-full" style={{ width: `${c.cronograma}%`, background: c.cronograma >= 80 ? 'var(--dot-ok)' : c.cronograma >= 40 ? 'var(--dot-atencao)' : 'var(--dot-erro)' }} />
@@ -112,8 +113,8 @@ export default function VisaoGeralPage() {
                         <span className="text-[10px] text-tx-muted">{c.cronograma}%</span>
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-center">
-                      {c.pendencias > 0 ? <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-500/15 text-err">{c.pendencias}</span> : <span className="text-ok text-xs">✓</span>}
+                    <td className="text-center">
+                      {c.pendencias > 0 ? <span className="text-[11px] px-1.5 py-0.5 rounded text-err" style={{ background: tint('var(--erro)', 15) }}>{c.pendencias}</span> : <span className="text-ok text-xs">✓</span>}
                     </td>
                   </tr>
                 ))}

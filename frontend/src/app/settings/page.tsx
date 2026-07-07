@@ -4,9 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
   User, Key, Bell, Brain, Shield, Loader2,
-  CheckCircle2, Eye, EyeOff, Save, LogOut
+  CheckCircle2, Eye, EyeOff, Save, LogOut, Settings as SettingsIcon
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { PageHeader, COLORS } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
@@ -16,9 +17,9 @@ function TabBtn({ id, label, icon: Icon, active, onClick }: any) {
   return (
     <button
       onClick={() => onClick(id)}
-      className={`flex items-center gap-2.5 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+      className={`flex items-center gap-2.5 w-full px-4 py-3 rounded-lg text-sm font-medium transition-all ${
         active
-          ? 'bg-indigo-600/10 text-acao border border-indigo-500/30'
+          ? 'bg-[color-mix(in_srgb,var(--acao)_10%,transparent)] text-acao border border-[color-mix(in_srgb,var(--acao)_30%,transparent)]'
           : 'text-tx-muted hover:text-tx-strong hover:bg-inset'
       }`}
     >
@@ -31,7 +32,7 @@ function TabBtn({ id, label, icon: Icon, active, onClick }: any) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="card-aura space-y-5">
-      <h3 className="font-semibold text-tx-strong text-base">{title}</h3>
+      <h3 className="font-semibold text-tx-strong text-[15px]">{title}</h3>
       {children}
     </div>
   );
@@ -54,7 +55,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
     <button
       onClick={() => onChange(!value)}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        value ? 'bg-indigo-600' : 'bg-line'
+        value ? 'bg-acao' : 'bg-line'
       }`}
     >
       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -168,13 +169,12 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-tx-strong">Configurações</h1>
-        <p className="text-tx-muted text-sm mt-1">
-          {user?.name} · {user?.email} · {user?.role}
-        </p>
-      </div>
+    <div className="page-narrow">
+      <PageHeader
+        icon={<SettingsIcon size={22} color={COLORS.acao} />}
+        title="Configurações"
+        subtitle={`${user?.name ?? ''} · ${user?.email ?? ''} · ${user?.role ?? ''}`}
+      />
 
       <div className="flex gap-8">
         {/* Sidebar */}
@@ -186,7 +186,7 @@ export default function SettingsPage() {
           <div className="pt-4 border-t border-line mt-4">
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2.5 w-full px-4 py-3 rounded-xl text-sm font-medium text-err hover:bg-red-400/5 transition-all"
+              className="flex items-center gap-2.5 w-full px-4 py-3 rounded-lg text-sm font-medium text-err hover:bg-[color-mix(in_srgb,var(--erro)_8%,transparent)] transition-all"
             >
               <LogOut className="h-4 w-4" />
               Sair
@@ -206,7 +206,7 @@ export default function SettingsPage() {
                     <input
                       value={name}
                       onChange={e => setName(e.target.value)}
-                      className="input-aura w-full rounded-xl"
+                      className="input-aura w-full"
                     />
                   </div>
                   <div>
@@ -214,7 +214,7 @@ export default function SettingsPage() {
                     <input
                       value={user?.email ?? ''}
                       disabled
-                      className="w-full bg-inset border border-line rounded-xl px-4 py-2.5 text-tx-muted text-sm cursor-not-allowed"
+                      className="w-full bg-inset border border-line rounded-lg px-4 py-2.5 text-tx-muted text-sm cursor-not-allowed"
                     />
                     <p className="text-xs text-tx-faint mt-1">E-mail não pode ser alterado</p>
                   </div>
@@ -223,7 +223,7 @@ export default function SettingsPage() {
                     <input
                       value={user?.role ?? ''}
                       disabled
-                      className="w-full bg-inset border border-line rounded-xl px-4 py-2.5 text-tx-muted text-sm cursor-not-allowed capitalize"
+                      className="w-full bg-inset border border-line rounded-lg px-4 py-2.5 text-tx-muted text-sm cursor-not-allowed capitalize"
                     />
                   </div>
                   {profileMsg && (
@@ -275,7 +275,7 @@ export default function SettingsPage() {
                       value={passwords.newPass}
                       onChange={e => setPasswords(p => ({ ...p, newPass: e.target.value }))}
                       placeholder="Mínimo 6 caracteres"
-                      className="input-aura w-full rounded-xl pr-11"
+                      className="input-aura w-full pr-11"
                     />
                     <button type="button" onClick={() => setShowPass(v => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-tx-faint hover:text-tx">
@@ -290,7 +290,7 @@ export default function SettingsPage() {
                     value={passwords.confirm}
                     onChange={e => setPasswords(p => ({ ...p, confirm: e.target.value }))}
                     placeholder="Repita a senha"
-                    className="input-aura w-full rounded-xl"
+                    className="input-aura w-full"
                   />
                 </div>
                 {passError && <p className="text-err text-sm">{passError}</p>}
@@ -318,7 +318,7 @@ export default function SettingsPage() {
                     <label className="block text-xs text-tx-muted mb-1.5">Modelo padrão</label>
                     <select value={iaSettings.model}
                       onChange={e => setIaSettings(s => ({ ...s, model: e.target.value }))}
-                      className="input-aura w-full rounded-xl">
+                      className="input-aura w-full">
                       <option value="gpt-4o">GPT-4o (OpenAI)</option>
                       <option value="gpt-4o-mini">GPT-4o Mini (mais rápido)</option>
                       <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (Anthropic)</option>
@@ -330,7 +330,7 @@ export default function SettingsPage() {
                       <input type="range" min="0" max="1" step="0.1"
                         value={iaSettings.temperature}
                         onChange={e => setIaSettings(s => ({ ...s, temperature: e.target.value }))}
-                        className="w-full accent-indigo-500" />
+                        className="w-full accent-acao" />
                       <div className="flex justify-between text-xs text-tx-faint mt-1">
                         <span>Preciso</span><span>Criativo</span>
                       </div>
@@ -339,7 +339,7 @@ export default function SettingsPage() {
                       <label className="block text-xs text-tx-muted mb-1.5">Max Tokens</label>
                       <input type="number" value={iaSettings.maxTokens}
                         onChange={e => setIaSettings(s => ({ ...s, maxTokens: e.target.value }))}
-                        className="input-aura w-full rounded-xl" />
+                        className="input-aura w-full" />
                     </div>
                   </div>
                 </div>

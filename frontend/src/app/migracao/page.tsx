@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Upload, Loader2, CheckCircle2, AlertTriangle, FileText, ArrowRight } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
+import { PageHeader, COLORS, tint } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
@@ -69,37 +70,31 @@ export default function MigracaoPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-4xl space-y-5">
-      <div>
-        <div className="flex items-center gap-2 mb-0.5">
-          <Upload className="h-5 w-5 text-acao" />
-          <h1 className="text-xl font-semibold text-tx-strong">Migração em massa</h1>
-        </div>
-        <p className="text-sm text-tx-muted max-w-2xl">
-          Importe clientes em lote a partir de CSV/Excel ou exportação de outros sistemas contábeis.
-        </p>
-      </div>
+    <div className="page-narrow space-y-5">
+      <PageHeader
+        icon={<Upload size={22} color={COLORS.acao} />}
+        title="Migração em massa"
+        subtitle="Importe clientes em lote a partir de CSV/Excel ou exportação de outros sistemas contábeis."
+      />
 
       {/* Tipo */}
-      <div className="rounded-xl border border-line bg-card p-4 space-y-3">
+      <div className="card-aura space-y-3">
         <div className="flex gap-2">
           <button
             onClick={() => setTipo('csv')}
-            className={`flex-1 px-3 py-2 text-xs font-medium rounded border ${
-              tipo === 'csv'
-                ? 'bg-indigo-500/20 border-indigo-500/50 text-acao'
-                : 'bg-inset border-line text-tx-muted hover:text-tx-strong'
-            }`}
+            className="flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-colors"
+            style={tipo === 'csv'
+              ? { background: tint(COLORS.acao, 12), borderColor: COLORS.acao, color: COLORS.acao }
+              : { background: 'var(--surface2)', borderColor: 'var(--border)', color: 'var(--muted)' }}
           >
             CSV / Excel (genérico)
           </button>
           <button
             onClick={() => setTipo('dominio')}
-            className={`flex-1 px-3 py-2 text-xs font-medium rounded border ${
-              tipo === 'dominio'
-                ? 'bg-indigo-500/20 border-indigo-500/50 text-acao'
-                : 'bg-inset border-line text-tx-muted hover:text-tx-strong'
-            }`}
+            className="flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-colors"
+            style={tipo === 'dominio'
+              ? { background: tint(COLORS.acao, 12), borderColor: COLORS.acao, color: COLORS.acao }
+              : { background: 'var(--surface2)', borderColor: 'var(--border)', color: 'var(--muted)' }}
           >
             Domínio Sistemas (.txt export)
           </button>
@@ -107,7 +102,7 @@ export default function MigracaoPage() {
 
         {tipo === 'csv' && (
           <p className="text-[11px] text-tx-muted">
-            Formato esperado: colunas <code className="text-acao">cnpj, razao_social, regime, email, telefone</code>{' '}
+            Formato esperado: colunas <code className="text-tx">cnpj, razao_social, regime, email, telefone</code>{' '}
             (variantes aceitas). Separador vírgula ou ponto-e-vírgula.
           </p>
         )}
@@ -133,7 +128,7 @@ export default function MigracaoPage() {
                 : 'Cole o conteúdo do arquivo de exportação aqui…'
             }
             rows={8}
-            className="w-full px-3 py-2 bg-inset border border-line rounded text-xs text-tx-strong outline-none font-mono"
+            className="input-aura w-full font-mono text-xs"
           />
         </div>
 
@@ -142,7 +137,7 @@ export default function MigracaoPage() {
             <button
               onClick={doPreview}
               disabled={loading || !conteudo.trim()}
-              className="px-3 py-1.5 text-xs bg-inset hover:bg-card border border-line disabled:opacity-50 text-tx-strong rounded"
+              className="btn-secondary text-xs"
             >
               Preview
             </button>
@@ -150,14 +145,14 @@ export default function MigracaoPage() {
           <button
             onClick={() => doImport(true)}
             disabled={loading || !conteudo.trim()}
-            className="px-3 py-1.5 text-xs bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded"
+            className="btn-secondary text-xs"
           >
             Dry-run (sem gravar)
           </button>
           <button
             onClick={() => doImport(false)}
             disabled={loading || !conteudo.trim()}
-            className="px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded inline-flex items-center gap-1.5"
+            className="btn-primary text-xs"
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
             Importar de verdade
@@ -167,26 +162,26 @@ export default function MigracaoPage() {
 
       {/* Preview */}
       {preview && (
-        <div className="rounded-xl border border-line bg-card p-4">
+        <div className="card-aura">
           <p className="text-xs text-tx-muted mb-2">
             {preview.total} linha(s) válida(s). Amostra das primeiras 10:
           </p>
-          <table className="w-full text-xs">
+          <table className="table-aura">
             <thead>
-              <tr className="text-left text-tx-muted border-b border-line">
-                <th className="pb-1">CNPJ</th>
-                <th className="pb-1">Razão Social</th>
-                <th className="pb-1">Regime</th>
-                <th className="pb-1">E-mail</th>
+              <tr>
+                <th>CNPJ</th>
+                <th>Razão Social</th>
+                <th>Regime</th>
+                <th>E-mail</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody>
               {preview.sample.map((r: any, i: number) => (
                 <tr key={i}>
-                  <td className="py-1 font-mono text-tx">{r.cnpj}</td>
-                  <td className="py-1 text-tx-strong truncate max-w-[200px]">{r.razaoSocial}</td>
-                  <td className="py-1 text-tx-muted">{r.regime ?? '—'}</td>
-                  <td className="py-1 text-tx-muted truncate max-w-[180px]">{r.email ?? '—'}</td>
+                  <td className="font-mono">{r.cnpj}</td>
+                  <td className="text-tx-strong truncate max-w-[200px]">{r.razaoSocial}</td>
+                  <td className="text-tx-muted">{r.regime ?? '—'}</td>
+                  <td className="text-tx-muted truncate max-w-[180px]">{r.email ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -196,7 +191,7 @@ export default function MigracaoPage() {
 
       {/* Resultado */}
       {result && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
+        <div className="card-aura space-y-2" style={{ borderColor: tint(COLORS.ok, 30), background: tint(COLORS.ok, 5) }}>
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-ok" />
             <h3 className="text-sm font-medium text-tx-strong">Importação concluída</h3>

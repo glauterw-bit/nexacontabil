@@ -61,21 +61,21 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     toast.variant === 'warning' ? AlertTriangle : Info;
 
   const colorClass =
-    toast.variant === 'success' ? 'text-ok border-emerald-500/40' :
-    toast.variant === 'error' ? 'text-err border-red-500/40' :
-    toast.variant === 'warning' ? 'text-warn border-amber-500/40' :
-    'text-acao border-indigo-500/40';
+    toast.variant === 'success' ? 'text-ok border-[color-mix(in_srgb,var(--dot-ok)_40%,transparent)]' :
+    toast.variant === 'error' ? 'text-err border-[color-mix(in_srgb,var(--dot-erro)_40%,transparent)]' :
+    toast.variant === 'warning' ? 'text-warn border-[color-mix(in_srgb,var(--dot-atencao)_40%,transparent)]' :
+    'text-acao border-[color-mix(in_srgb,var(--acao)_40%,transparent)]';
 
   return (
     <div
-      className={`pointer-events-auto flex gap-3 items-start min-w-[280px] max-w-md bg-card border ${colorClass} rounded-lg p-3 shadow-pop transition-all duration-150 ${
+      className={`pointer-events-auto flex gap-3 items-start min-w-[280px] max-w-md bg-card border ${colorClass} rounded-xl p-3 shadow-pop transition-all duration-150 ${
         entering ? 'opacity-0 translate-x-4' : 'opacity-100 translate-x-0'
       }`}
     >
       <Icon className={`h-4 w-4 mt-0.5 flex-shrink-0 ${colorClass.split(' ')[0]}`} />
       <div className="flex-1 min-w-0">
         {toast.title && <p className="text-sm font-medium text-tx-strong">{toast.title}</p>}
-        <p className="text-xs text-tx break-words">{toast.message}</p>
+        <p className="text-[13px] text-tx break-words">{toast.message}</p>
       </div>
       <button onClick={onClose} className="text-tx-muted hover:text-tx-strong">
         <X className="h-3.5 w-3.5" />

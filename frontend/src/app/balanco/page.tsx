@@ -6,6 +6,7 @@ import {
 import { useCompany } from '@/contexts/CompanyContext';
 import { useToast } from '@/components/ui/Toast';
 import Link from 'next/link';
+import { PageHeader, EmptyState, Spinner, COLORS } from '@/components/ui/kit';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 
@@ -70,42 +71,39 @@ export default function BalancoPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
-        <Building2 className="h-12 w-12 text-tx-faint" />
-        <p className="text-tx-muted text-sm">Selecione uma empresa.</p>
-        <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione uma empresa." />
+        <div className="flex justify-center">
+          <Link href="/carteira" className="btn-primary">Gerenciar Empresas</Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-6xl space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <Scale className="h-5 w-5 text-acao" />
-            <h1 className="text-xl font-semibold text-tx-strong">Balanço Patrimonial</h1>
+    <div className="page space-y-5">
+      <PageHeader
+        icon={<Scale size={22} color={COLORS.acao} />}
+        title="Balanço Patrimonial"
+        subtitle={`${selectedCompany.name} · conforme NBC TG 26 / Lei 6.404`}
+        action={
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={asOf}
+              onChange={e => setAsOf(e.target.value)}
+              className="input-aura"
+            />
+            <button onClick={load} disabled={loading} className="btn-secondary">
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              Atualizar
+            </button>
           </div>
-          <p className="text-sm text-tx-muted">{selectedCompany.name} · conforme NBC TG 26 / Lei 6.404</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={asOf}
-            onChange={e => setAsOf(e.target.value)}
-            className="bg-inset border border-line rounded px-3 py-1.5 text-tx-strong text-xs"
-          />
-          <button onClick={load} disabled={loading} className="px-3 py-1.5 text-xs bg-card hover:bg-inset border border-line text-tx-strong rounded inline-flex items-center gap-1.5">
-            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            Atualizar
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {loading && !bs ? (
-        <div className="text-center py-20 text-sm text-tx-muted flex items-center justify-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" /> Computando balanço…
-        </div>
+        <Spinner />
       ) : bs && (
         <>
           <div className={`rounded-xl border p-4 flex gap-3 items-start ${
@@ -123,7 +121,7 @@ export default function BalancoPage() {
             </div>
             <div className="text-right">
               <p className="text-xs text-tx-muted">Total Ativo</p>
-              <p className="text-base font-semibold text-tx-strong">{brl(bs.totalAtivo)}</p>
+              <p className="num text-base font-semibold text-tx-strong">{brl(bs.totalAtivo)}</p>
             </div>
           </div>
 
@@ -132,13 +130,11 @@ export default function BalancoPage() {
               title="ATIVO"
               groups={[bs.grupos.ativoCirculante, bs.grupos.ativoNaoCirculante]}
               total={bs.totalAtivo}
-              accent="text-ok"
             />
             <BalancoColumn
               title="PASSIVO + PATRIMÔNIO"
               groups={[bs.grupos.passivoCirculante, bs.grupos.passivoNaoCirculante, bs.grupos.patrimonioLiquido]}
               total={bs.totalPassivoEPatrimonio}
-              accent="text-rose-400"
             />
           </div>
 
@@ -152,22 +148,22 @@ export default function BalancoPage() {
 }
 
 function BalancoColumn({
-  title, groups, total, accent,
-}: { title: string; groups: Grupo[]; total: number; accent: string }) {
+  title, groups, total,
+}: { title: string; groups: Grupo[]; total: number }) {
   return (
-    <div className="rounded-xl border border-line bg-card">
+    <div className="card-aura p-0 overflow-hidden">
       <div className="px-5 py-3 border-b border-line flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-tx-strong tracking-wide">{title}</h2>
-        <span className={`text-sm font-semibold ${accent}`}>{brl(total)}</span>
+        <h2 className="text-[15px] font-semibold text-tx-strong tracking-wide m-0">{title}</h2>
+        <span className="num text-sm font-semibold text-tx-strong">{brl(total)}</span>
       </div>
-      <div className="divide-y divide-line">
+      <div className="divide-y divide-line-soft">
         {groups.map(g => (
           <div key={g.codigo} className="px-5 py-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs uppercase tracking-wider text-tx-muted font-medium">
+              <p className="text-[11px] uppercase tracking-wider text-tx-faint font-semibold">
                 {g.codigo} · {g.nome}
               </p>
-              <p className="text-sm font-mono text-tx-strong">{brl(g.total)}</p>
+              <p className="num text-sm text-tx-strong">{brl(g.total)}</p>
             </div>
             {g.contas.length === 0 ? (
               <p className="text-xs text-tx-faint italic">Sem movimento</p>
@@ -176,7 +172,7 @@ function BalancoColumn({
                 {g.contas.slice(0, 12).map(c => (
                   <li key={c.codigo} className="flex items-center justify-between text-xs">
                     <span className="text-tx-muted truncate">{c.codigo} · {c.nome}</span>
-                    <span className="text-tx font-mono flex-shrink-0">{brl(c.saldo)}</span>
+                    <span className="num text-tx flex-shrink-0">{brl(c.saldo)}</span>
                   </li>
                 ))}
                 {g.contas.length > 12 && (

@@ -6,6 +6,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { FileCode, Download, Plus, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
+import { PageHeader, SectionTitle, COLORS, tint, EmptyState } from '@/components/ui/kit';
 
 const LISTAR_SPED = gql`
   query ListarArquivosSped($companyId: ID!) {
@@ -21,14 +22,6 @@ const GERAR_ECF = gql`mutation GerarEcf($companyId: ID!, $anoBase: Int!) { gerar
 const GERAR_ECD = gql`mutation GerarEcd($companyId: ID!, $anoBase: Int!) { gerarEcd(companyId: $companyId, anoBase: $anoBase) { id tipo status linhas } }`;
 const GERAR_REINF = gql`mutation GerarEfdReinf($companyId: ID!, $referenceMonth: String!) { gerarEfdReinf(companyId: $companyId, referenceMonth: $referenceMonth) { id tipo status linhas } }`;
 const BAIXAR = gql`query BaixarSped($id: ID!) { baixarArquivoSped(id: $id) { fileContent tipo referenceMonth } }`;
-
-const TIPO_COLORS: Record<string, string> = {
-  EFD_ICMS_IPI: 'bg-blue-500/10 text-info border-blue-500/20',
-  EFD_PIS_COFINS: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  ECF: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  ECD: 'bg-green-500/10 text-ok border-green-500/20',
-  EFD_REINF: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
-};
 
 export default function SpedPage() {
   const { selectedCompany } = useCompany();
@@ -69,28 +62,26 @@ export default function SpedPage() {
 
   if (!selectedCompany) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <Building2 className="h-12 w-12 text-tx-faint mx-auto mb-4" />
-          <p className="text-tx-muted">Selecione uma empresa no menu lateral</p>
-          <Link href="/carteira" className="mt-4 inline-block text-acao hover:underline">Cadastrar empresa</Link>
+      <div className="page">
+        <EmptyState icon={<Building2 size={40} />} title="Selecione uma empresa no menu lateral" />
+        <div className="flex justify-center">
+          <Link href="/carteira" className="btn-primary">Cadastrar empresa</Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-auto">
-      <div className="flex items-center gap-3">
-        <FileCode className="h-7 w-7 text-acao" />
-        <div>
-          <h1 className="text-2xl font-bold text-tx-strong">SPED / EFD</h1>
-          <p className="text-tx-muted text-sm">Geração de arquivos obrigações acessórias</p>
-        </div>
-      </div>
+    <div className="page space-y-6">
+      <PageHeader
+        icon={<FileCode size={22} color={COLORS.acao} />}
+        title="SPED / EFD"
+        subtitle="Geração de arquivos obrigações acessórias"
+      />
 
       {msg && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-ok text-sm flex items-center gap-2">
+        <div className="rounded-lg p-3 text-ok text-sm flex items-center gap-2"
+          style={{ background: tint(COLORS.dotOk, 10), border: `1px solid ${tint(COLORS.dotOk, 30)}` }}>
           <CheckCircle className="h-4 w-4" /> {msg}
           <button onClick={() => setMsg('')} className="ml-auto">✕</button>
         </div>
@@ -98,24 +89,24 @@ export default function SpedPage() {
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Mensais */}
-        <div className="bg-card border border-line rounded-xl p-5 space-y-4">
-          <h2 className="text-tx-strong font-semibold">Obrigações Mensais</h2>
+        <div className="card-aura space-y-4">
+          <h3 className="text-[15px] font-semibold text-tx-strong m-0">Obrigações Mensais</h3>
           <div className="flex items-center gap-3">
             <label className="text-tx-muted text-sm">Competência:</label>
             <input
               type="month"
               value={refMonth}
               onChange={e => setRefMonth(e.target.value)}
-              className="bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm focus:outline-none focus:border-indigo-500"
+              className="input-aura"
             />
           </div>
           <div className="space-y-2">
             {[
-              { label: 'EFD ICMS/IPI (SPED Fiscal)', fn: () => gerarFiscal({ variables: { companyId, referenceMonth: refMonth } }), color: 'bg-blue-600 hover:bg-blue-700' },
-              { label: 'EFD PIS/COFINS (Contribuições)', fn: () => gerarEfd({ variables: { companyId, referenceMonth: refMonth } }), color: 'bg-purple-600 hover:bg-purple-700' },
-              { label: 'EFD-Reinf (Retenções)', fn: () => gerarReinf({ variables: { companyId, referenceMonth: refMonth } }), color: 'bg-pink-600 hover:bg-pink-700' },
-            ].map(({ label, fn, color }) => (
-              <button key={label} onClick={fn} className={`w-full flex items-center gap-2 ${color} text-white px-4 py-2.5 rounded-lg text-sm transition-colors`}>
+              { label: 'EFD ICMS/IPI (SPED Fiscal)', fn: () => gerarFiscal({ variables: { companyId, referenceMonth: refMonth } }) },
+              { label: 'EFD PIS/COFINS (Contribuições)', fn: () => gerarEfd({ variables: { companyId, referenceMonth: refMonth } }) },
+              { label: 'EFD-Reinf (Retenções)', fn: () => gerarReinf({ variables: { companyId, referenceMonth: refMonth } }) },
+            ].map(({ label, fn }) => (
+              <button key={label} onClick={fn} className="btn-secondary w-full">
                 <Plus className="h-4 w-4" /> {label}
               </button>
             ))}
@@ -123,8 +114,8 @@ export default function SpedPage() {
         </div>
 
         {/* Anuais */}
-        <div className="bg-card border border-line rounded-xl p-5 space-y-4">
-          <h2 className="text-tx-strong font-semibold">Obrigações Anuais</h2>
+        <div className="card-aura space-y-4">
+          <h3 className="text-[15px] font-semibold text-tx-strong m-0">Obrigações Anuais</h3>
           <div className="flex items-center gap-3">
             <label className="text-tx-muted text-sm">Ano-base:</label>
             <input
@@ -133,15 +124,15 @@ export default function SpedPage() {
               onChange={e => setAnoBase(Number(e.target.value))}
               min={2018}
               max={new Date().getFullYear()}
-              className="w-28 bg-inset border border-line rounded-lg px-3 py-2 text-tx-strong text-sm focus:outline-none focus:border-indigo-500"
+              className="input-aura w-28"
             />
           </div>
           <div className="space-y-2">
             {[
-              { label: 'ECF (Escrituração Contábil Fiscal)', fn: () => gerarEcf({ variables: { companyId, anoBase } }), color: 'bg-orange-600 hover:bg-orange-700' },
-              { label: 'ECD (Escrituração Contábil Digital)', fn: () => gerarEcd({ variables: { companyId, anoBase } }), color: 'bg-green-600 hover:bg-green-700' },
-            ].map(({ label, fn, color }) => (
-              <button key={label} onClick={fn} className={`w-full flex items-center gap-2 ${color} text-white px-4 py-2.5 rounded-lg text-sm transition-colors`}>
+              { label: 'ECF (Escrituração Contábil Fiscal)', fn: () => gerarEcf({ variables: { companyId, anoBase } }) },
+              { label: 'ECD (Escrituração Contábil Digital)', fn: () => gerarEcd({ variables: { companyId, anoBase } }) },
+            ].map(({ label, fn }) => (
+              <button key={label} onClick={fn} className="btn-secondary w-full">
                 <Plus className="h-4 w-4" /> {label}
               </button>
             ))}
@@ -150,40 +141,38 @@ export default function SpedPage() {
       </div>
 
       {/* Arquivo list */}
-      <div className="bg-card border border-line rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-line">
-          <h2 className="text-tx-strong font-semibold">Arquivos Gerados ({arquivos.length})</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <div>
+        <SectionTitle>Arquivos Gerados ({arquivos.length})</SectionTitle>
+        <div className="card-aura overflow-x-auto" style={{ padding: 0 }}>
+          <table className="table-aura">
             <thead>
-              <tr className="border-b border-line text-tx-muted">
-                <th className="px-4 py-3 text-left">Tipo</th>
-                <th className="px-4 py-3 text-left">Competência</th>
-                <th className="px-4 py-3 text-left">Linhas</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Hash MD5</th>
-                <th className="px-4 py-3 text-left">Data</th>
-                <th className="px-4 py-3 text-left">Ação</th>
+              <tr>
+                <th>Tipo</th>
+                <th>Competência</th>
+                <th className="num">Linhas</th>
+                <th>Status</th>
+                <th>Hash MD5</th>
+                <th>Data</th>
+                <th>Ação</th>
               </tr>
             </thead>
             <tbody>
               {arquivos.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-tx-muted">Nenhum arquivo gerado ainda.</td></tr>
+                <tr><td colSpan={7}><EmptyState icon={<FileCode size={32} />} title="Nenhum arquivo gerado ainda." /></td></tr>
               ) : arquivos.map((arq: any) => (
-                <tr key={arq.id} className="border-b border-line hover:bg-inset">
-                  <td className="px-4 py-3">
-                    <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium border ${TIPO_COLORS[arq.tipo] || 'text-tx-muted bg-gray-400/10 border-gray-400/20'}`}>
+                <tr key={arq.id}>
+                  <td>
+                    <span className="inline-block px-2.5 py-1 rounded-full text-xs font-medium bg-inset text-tx-muted">
                       {arq.tipo.replace(/_/g, ' ')}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-tx-muted">{arq.referenceMonth}</td>
-                  <td className="px-4 py-3 text-tx-strong font-mono">{arq.linhas?.toLocaleString()}</td>
-                  <td className="px-4 py-3"><span className="text-ok text-xs">{arq.status}</span></td>
-                  <td className="px-4 py-3 text-tx-faint font-mono text-xs">{arq.fileHash?.substring(0, 16)}…</td>
-                  <td className="px-4 py-3 text-tx-muted text-xs">{new Date(arq.createdAt).toLocaleDateString('pt-BR')}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => downloadArquivo(arq)} className="flex items-center gap-1 text-acao hover:opacity-80 text-xs transition-colors">
+                  <td className="text-tx-muted">{arq.referenceMonth}</td>
+                  <td className="num text-tx-strong">{arq.linhas?.toLocaleString()}</td>
+                  <td><span className="text-ok text-xs">{arq.status}</span></td>
+                  <td className="text-tx-faint font-mono text-xs">{arq.fileHash?.substring(0, 16)}…</td>
+                  <td className="text-tx-muted text-xs">{new Date(arq.createdAt).toLocaleDateString('pt-BR')}</td>
+                  <td>
+                    <button onClick={() => downloadArquivo(arq)} className="btn-ghost text-acao text-xs p-1.5">
                       <Download className="h-3.5 w-3.5" /> Download
                     </button>
                   </td>

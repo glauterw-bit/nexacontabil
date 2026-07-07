@@ -42,7 +42,7 @@ export function WelcomeOnboarding() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(13,17,25,0.45)] backdrop-blur-sm p-4" onClick={dismiss}>
       <div
-        className="w-full max-w-lg bg-card border border-line rounded-2xl shadow-pop overflow-hidden"
+        className="w-full max-w-lg bg-card border border-line rounded-xl shadow-pop overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative px-6 pt-6 pb-4">
@@ -50,7 +50,7 @@ export function WelcomeOnboarding() {
             <X className="h-4 w-4" />
           </button>
           <div className="flex items-center gap-2.5 mb-1">
-            <div className="h-9 w-9 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center">
+            <div className="h-9 w-9 rounded-xl bg-[color-mix(in_srgb,var(--acao)_12%,transparent)] border border-[color-mix(in_srgb,var(--acao)_25%,transparent)] flex items-center justify-center">
               <Sparkles className="h-4 w-4 text-acao" />
             </div>
             <div>
@@ -110,7 +110,7 @@ export function WelcomeOnboarding() {
               dismiss();
               router.push('/companies');
             }}
-            className="px-4 py-2 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors flex items-center gap-1.5"
+            className="btn-primary text-xs gap-1.5"
           >
             Começar agora <ArrowRight className="h-3 w-3" />
           </button>
@@ -144,7 +144,7 @@ function Step({
       className={`w-full text-left flex items-start gap-3 p-3 rounded-lg border transition-all ${
         disabled
           ? 'border-line opacity-60 cursor-not-allowed'
-          : 'border-line hover:border-indigo-500/50 hover:bg-inset'
+          : 'border-line hover:border-[color-mix(in_srgb,var(--acao)_50%,transparent)] hover:bg-inset'
       }`}
     >
       <div className="h-7 w-7 rounded-full bg-inset border border-line flex items-center justify-center text-xs text-acao font-mono flex-shrink-0">
