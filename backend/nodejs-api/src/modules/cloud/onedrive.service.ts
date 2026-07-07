@@ -148,15 +148,23 @@ export class OneDriveService {
   async listAllChildren(connectionId: string, driveId?: string, folderId?: string) {
     const token = await this.getValidToken(connectionId);
     const base = driveId ? `${GRAPH_BASE}/drives/${driveId}` : `${GRAPH_BASE}/me/drive`;
-    let url: string | null = folderId ? `${base}/items/${folderId}/children?$top=200` : `${base}/root/children?$top=200`;
+    const q = '$top=200&$orderby=lastModifiedDateTime%20desc';
+    let url: string | null = folderId ? `${base}/items/${folderId}/children?${q}` : `${base}/root/children?${q}`;
     const out: any[] = [];
     let guard = 0;
+    let triedNoOrder = false;
     while (url && guard++ < 60) {
-      const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      let res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      // alguns drives rejeitam $orderby em children — cai para sem ordenação uma vez
+      if (!res.ok && !triedNoOrder) {
+        triedNoOrder = true;
+        url = folderId ? `${base}/items/${folderId}/children?$top=200` : `${base}/root/children?$top=200`;
+        res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      }
       if (!res.ok) break;
       const json: any = await res.json();
       for (const item of (json.value ?? [])) {
-        out.push({ id: item.id, name: item.name, isFolder: !!item.folder, childCount: item.folder?.childCount ?? 0, mimeType: item.file?.mimeType, size: item.size, driveId });
+        out.push({ id: item.id, name: item.name, isFolder: !!item.folder, childCount: item.folder?.childCount ?? 0, mimeType: item.file?.mimeType, size: item.size, modified: item.lastModifiedDateTime ?? null, driveId });
       }
       url = json['@odata.nextLink'] ?? null;
     }
@@ -167,18 +175,31 @@ export class OneDriveService {
   async coletarArquivos(connectionId: string, driveId: string, folderId: string, opts: { ext?: string[]; maxFiles?: number } = {}) {
     const ext = opts.ext ?? ['.xml'];
     const maxFiles = opts.maxFiles ?? 150;
-    const out: Array<{ id: string; name: string; driveId: string }> = [];
-    const queue: string[] = [folderId];
+    const out: Array<{ id: string; name: string; driveId: string; modified: string | null }> = [];
+    // Fila com PRIORIDADE por recência: pastas cujo nome cita um ano/competência
+    // mais recente são visitadas primeiro. Assim, ao bater o teto de maxFiles,
+    // já capturamos os documentos ATUAIS — não os de 2011. (bug corrigido jul/2026)
+    type F = { id: string; name: string };
+    let queue: F[] = [{ id: folderId, name: '' }];
+    const rank = (name: string) => {
+      const s = String(name);
+      const ym = s.match(/(20\d{2})[-_./ ]?(0?[1-9]|1[0-2])\b/); // ano+mes
+      if (ym) return parseInt(ym[1]) * 100 + parseInt(ym[2]);
+      const y = s.match(/\b(20\d{2})\b/);
+      if (y) return parseInt(y[1]) * 100 + 50; // ano solto ~ meio do ano
+      return 0;
+    };
     let guard = 0;
-    while (queue.length && out.length < maxFiles && guard++ < 800) {
-      const fid = queue.shift()!;
+    while (queue.length && out.length < maxFiles && guard++ < 1500) {
+      queue.sort((a, b) => rank(b.name) - rank(a.name)); // mais recente primeiro
+      const cur = queue.shift()!;
       let items: any[] = [];
-      try { items = await this.listAllChildren(connectionId, driveId, fid); } catch { continue; }
+      try { items = await this.listAllChildren(connectionId, driveId, cur.id); } catch { continue; }
       for (const it of items) {
-        if (it.isFolder) { queue.push(it.id); continue; }
+        if (it.isFolder) { queue.push({ id: it.id, name: it.name }); continue; }
         const n = (it.name ?? '').toLowerCase();
         if (ext.some((e) => n.endsWith(e))) {
-          out.push({ id: it.id, name: it.name, driveId });
+          out.push({ id: it.id, name: it.name, driveId, modified: it.modified ?? null });
           if (out.length >= maxFiles) break;
         }
       }

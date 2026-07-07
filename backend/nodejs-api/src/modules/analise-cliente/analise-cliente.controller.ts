@@ -23,6 +23,12 @@ export class AnaliseClienteController {
     return this.svc.analisarLote(body?.limit ?? 8, body?.maxFiles ?? 80, body?.incluirInativos ?? false);
   }
 
+  /** Re-varredura profunda de TODA a carteira (busca arquivos recentes/2026). Chamar em loop até restantes=0. */
+  @Post('resync')
+  resync(@Body() body: { desde: string; limit?: number; maxFiles?: number }) {
+    return this.svc.resyncLote(body.desde, body?.limit ?? 8, body?.maxFiles ?? 300);
+  }
+
   /** Limpa análises e zera flags (pra re-análise com parser novo). */
   @Post('reset')
   reset() {

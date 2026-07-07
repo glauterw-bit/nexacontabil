@@ -155,6 +155,39 @@ export class AnaliseClienteService {
     return { sincronizados: lote.length, novosDocs, detalhes };
   }
 
+  /**
+   * RE-VARREDURA PROFUNDA de toda a carteira ativa em uma passada.
+   * Processa quem ainda não foi tocado NESTA rodada (sharepointAnalisadoEm < desde),
+   * em lotes pequenos e chamável em loop até `restantes` zerar. Usa teto maior
+   * porque agora a coleta prioriza os arquivos recentes (busca 2026 de verdade).
+   */
+  async resyncLote(desde: string, limit = 8, maxFilesPorCliente = 300) {
+    const cutoff = new Date(desde);
+    const where: any = {
+      active: true, sharepointItemId: { not: null },
+      OR: [{ sharepointAnalisadoEm: null }, { sharepointAnalisadoEm: { lt: cutoff } }],
+    };
+    const pendentes = await this.prisma.company.count({ where });
+    const lote = await this.prisma.company.findMany({
+      where, orderBy: { sharepointAnalisadoEm: 'asc' }, take: limit,
+      select: { id: true, name: true },
+    });
+    let novosDocs = 0;
+    const detalhes: any[] = [];
+    for (const c of lote) {
+      try {
+        const r = await this.analisarCliente(c.id, maxFilesPorCliente);
+        novosDocs += r.analisados ?? 0;
+        if (r.analisados) detalhes.push({ cliente: c.name, novos: r.analisados });
+      } catch (e: any) {
+        // marca como tocado nesta rodada mesmo em erro, pra não travar o loop
+        await this.prisma.company.update({ where: { id: c.id }, data: { sharepointAnalisadoEm: new Date() } }).catch(() => undefined);
+        detalhes.push({ cliente: c.name, erro: e?.message ?? 'erro' });
+      }
+    }
+    return { processados: lote.length, restantes: Math.max(0, pendentes - lote.length), novosDocs, detalhes };
+  }
+
   /** Progresso da análise da carteira (pra barra de progresso ao vivo). */
   async progresso() {
     const [total, analisados, ativos, ativosFeitos, documentos] = await Promise.all([
