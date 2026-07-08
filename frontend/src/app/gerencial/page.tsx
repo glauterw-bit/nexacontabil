@@ -3,9 +3,9 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   LayoutDashboard, AlertTriangle, Lightbulb, ChevronRight, Users,
-  CheckCircle2, Mail, Bell, Workflow, Inbox,
+  CheckCircle2, Mail, Bell, Workflow, Inbox, Briefcase, CalendarClock, FileWarning,
 } from 'lucide-react';
-import { PageHeader, Kpi, Card, SectionTitle, COLORS, tint, Spinner, EmptyState, Dot } from '@/components/ui/kit';
+import { PageHeader, Kpi, Card, SectionTitle, COLORS, tint, Spinner, EmptyState, Dot, THead } from '@/components/ui/kit';
 import { useCompetencia, fmtCompetencia } from '@/contexts/CompetenciaContext';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
@@ -23,18 +23,21 @@ export default function GerencialPage() {
   const [torre, setTorre] = useState<any>(null);
   const [d, setD] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [ca, setCa] = useState<any>(null);
   const { competencia } = useCompetencia();
 
   const load = useCallback(async () => {
     setLoading(true);
     const q = competencia ? `?competencia=${competencia}` : '';
     try {
-      const [rt, rg] = await Promise.all([
+      const [rt, rg, rc] = await Promise.all([
         fetch(`${API}/api/v1/torre-controle/overview${q}`, { headers: authHeaders() }),
         fetch(`${API}/api/v1/paineis/gerencial`, { headers: authHeaders() }),
+        fetch(`${API}/api/v1/paineis/carteira-analistas`, { headers: authHeaders() }),
       ]);
       setTorre(rt.ok ? await rt.json() : null);
       setD(rg.ok ? await rg.json() : null);
+      setCa(rc.ok ? await rc.json() : null);
     } catch {} finally { setLoading(false); }
   }, [competencia]);
   useEffect(() => { load(); }, [load]);
@@ -117,52 +120,40 @@ export default function GerencialPage() {
         </>
       )}
 
+      {/* ── CARTEIRA DOS ANALISTAS (visão gerencial rica) ── */}
+      {ca?.analistas?.length > 0 && <CarteiraAnalistas ca={ca} />}
+
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-        {/* ── EQUIPE: carga e desempenho ── */}
-        <div style={{ flex: '1 1 460px', minWidth: 0 }}>
-          <SectionTitle><Users size={15} color={COLORS.acao} /> Equipe — carga e desempenho</SectionTitle>
-          {(torre?.analistas ?? []).length > 0 ? (torre.analistas.map((a: any) => (
-            <Card key={a.analystId} style={{ marginBottom: 8, padding: '12px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13.5, color: COLORS.strong }}>{a.nome}
-                    <span style={{ fontWeight: 400, fontSize: 11.5, color: COLORS.faint }}> · {a.carteira} clientes na carteira</span>
-                  </div>
-                  {a.total > 0 && (
-                    <div style={{ marginTop: 7, height: 6, background: COLORS.surface2, borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ width: `${a.pctConclusao}%`, height: '100%', background: pctCor(a.pctConclusao) }} />
+        {/* ── EQUIPE: produção (torre de controle, se houver workflow) ── */}
+        {(torre?.analistas ?? []).length > 0 && (
+          <div style={{ flex: '1 1 460px', minWidth: 0 }}>
+            <SectionTitle><Users size={15} color={COLORS.acao} /> Produção (workflow do mês)</SectionTitle>
+            {torre.analistas.map((a: any) => (
+              <Card key={a.analystId} style={{ marginBottom: 8, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5, color: COLORS.strong }}>{a.nome}
+                      <span style={{ fontWeight: 400, fontSize: 11.5, color: COLORS.faint }}> · {a.carteira} clientes na carteira</span>
                     </div>
-                  )}
+                    {a.total > 0 && (
+                      <div style={{ marginTop: 7, height: 6, background: COLORS.surface2, borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ width: `${a.pctConclusao}%`, height: '100%', background: pctCor(a.pctConclusao) }} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="num" style={{ textAlign: 'right', fontSize: 12, color: COLORS.muted, flexShrink: 0 }}>
+                    {a.total > 0 ? (
+                      <>
+                        <div><strong style={{ color: pctCor(a.pctConclusao) }}>{a.pctConclusao}%</strong> produção ({a.concluidas}/{a.total})</div>
+                        <div style={{ color: a.vencidas > 0 ? COLORS.erro : COLORS.faint }}>{a.vencidas > 0 ? `${a.vencidas} vencidas` : 'SLA em dia'}</div>
+                      </>
+                    ) : <div style={{ color: COLORS.faint }}>sem tarefas no mês</div>}
+                  </div>
                 </div>
-                <div className="num" style={{ textAlign: 'right', fontSize: 12, color: COLORS.muted, flexShrink: 0 }}>
-                  {a.total > 0 ? (
-                    <>
-                      <div><strong style={{ color: pctCor(a.pctConclusao) }}>{a.pctConclusao}%</strong> produção ({a.concluidas}/{a.total})</div>
-                      <div style={{ color: a.vencidas > 0 ? COLORS.erro : COLORS.faint }}>{a.vencidas > 0 ? `${a.vencidas} vencidas` : 'SLA em dia'}</div>
-                    </>
-                  ) : <div style={{ color: COLORS.faint }}>sem tarefas no mês</div>}
-                </div>
-              </div>
-            </Card>
-          ))) : (d?.equipe ?? []).map((e: any, i: number) => (
-            <Card key={i} style={{ marginBottom: 8, padding: '12px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ flex: 1, fontWeight: 600, fontSize: 13.5, color: COLORS.strong }}>{e.responsavel}</div>
-                <div style={{ fontSize: 12, color: COLORS.muted }}>{e.clientesAtivos} clientes · {e.docs?.toLocaleString('pt-BR')} docs · <span style={{ color: e.taxaErro > 2 ? COLORS.erro : e.taxaErro > 1 ? COLORS.atencao : COLORS.ok, fontWeight: 600 }}>{e.taxaErro}% erro</span></div>
-              </div>
-            </Card>
-          ))}
-          {(torre?.carga?.semResponsavel ?? 0) > 0 && (
-            <Link href="/atribuir-responsavel" style={{ textDecoration: 'none' }}>
-              <div style={{ padding: '10px 14px', background: tint(COLORS.dotAtencao, 9), border: `1px solid ${tint(COLORS.dotAtencao, 30)}`, borderRadius: 10, fontSize: 12.5, color: COLORS.atencao, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <AlertTriangle size={14} /> {torre.carga.semResponsavel} clientes sem responsável — atribuir agora <ChevronRight size={13} style={{ marginLeft: 'auto' }} />
-              </div>
-            </Link>
-          )}
-          <Link href="/produtividade" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 13, color: COLORS.acao, textDecoration: 'none', marginTop: 6 }}>
-            ver produtividade completa <ChevronRight size={14} />
-          </Link>
-        </div>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* ── PENDÊNCIAS + ATENÇÃO ── */}
         <div style={{ flex: '1 1 460px', minWidth: 0 }}>
@@ -246,6 +237,97 @@ export default function GerencialPage() {
         ].map((a) => (
           <Link key={a.href} href={a.href} style={{ padding: '9px 15px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.text, fontSize: 13, textDecoration: 'none', boxShadow: 'var(--shadow-card)' }}>{a.label}</Link>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** Carteira dos analistas — clareza sobre carga, obrigações que faltam e performance. */
+function CarteiraAnalistas({ ca }: { ca: any }) {
+  const t = ca.totais ?? {};
+  const maxCli = Math.max(1, ...ca.analistas.map((a: any) => a.clientes));
+  return (
+    <div style={{ marginTop: 8 }}>
+      <SectionTitle><Briefcase size={15} color={COLORS.acao} /> Carteira dos analistas — {fmtCompetencia(ca.competencia)}</SectionTitle>
+
+      {/* resumo do escritório */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <Kpi label="Obrigações vencidas" value={t.obrigVencidas ?? 0} cor={COLORS.erro} sub="da carteira toda" />
+        <Kpi label="Obrigações pendentes" value={t.obrigPendentes ?? 0} cor={COLORS.atencao} sub="a entregar neste mês" />
+        <Kpi label="Vencem em 7 dias" value={t.proximas7 ?? 0} cor={COLORS.atencao} />
+        <Kpi label="Clientes na carteira" value={t.clientes ?? 0} sub={`${ca.analistas.length} analistas`} />
+        {t.clientesSemResponsavel > 0 && (
+          <Kpi label="Sem responsável" value={t.clientesSemResponsavel} cor={COLORS.info} sub="atribuir" />
+        )}
+      </div>
+
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <THead cols={[
+          { label: 'Analista' },
+          { label: 'Clientes', width: 130 },
+          { label: 'Obrigações do mês', width: 200 },
+          { label: 'Vencidas', width: 80, align: 'right' },
+          { label: 'Vencem 7d', width: 90, align: 'right' },
+          { label: 'Qualidade', width: 120, align: 'right' },
+        ]} />
+        {ca.analistas.map((a: any) => {
+          const entregaCor = a.pctEntrega >= 90 ? COLORS.ok : a.pctEntrega >= 70 ? COLORS.atencao : COLORS.erro;
+          const erroCor = a.taxaErro > 2 ? COLORS.erro : a.taxaErro > 1 ? COLORS.atencao : COLORS.ok;
+          return (
+            <div key={a.responsavel} style={{ display: 'flex', alignItems: 'center', padding: '11px 14px', borderBottom: `1px solid ${COLORS.borderSoft}`, fontSize: 13, gap: 4 }}>
+              {/* analista */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, color: COLORS.strong, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.responsavel}</div>
+                <div style={{ fontSize: 11, color: COLORS.faint }}>{(a.docs ?? 0).toLocaleString('pt-BR')} docs processados</div>
+              </div>
+              {/* clientes + sem doc */}
+              <div style={{ width: 130 }}>
+                <div className="num" style={{ fontWeight: 600, color: COLORS.strong }}>{a.clientes}
+                  {a.clientesSemDoc > 0 && <span style={{ fontWeight: 400, fontSize: 11, color: COLORS.atencao }}> · {a.clientesSemDoc} sem docs</span>}
+                </div>
+                <div style={{ marginTop: 4, height: 5, background: COLORS.surface2, borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${(a.clientes / maxCli) * 100}%`, height: '100%', background: COLORS.acao }} />
+                </div>
+              </div>
+              {/* obrigações do mês (entregues/total + barra) */}
+              <div style={{ width: 200, paddingRight: 10 }}>
+                <div className="num" style={{ fontSize: 12.5 }}>
+                  <strong style={{ color: entregaCor }}>{a.obrigEntregues}</strong>
+                  <span style={{ color: COLORS.faint }}>/{a.obrigTotal} entregues</span>
+                  {a.obrigPendentes > 0 && <span style={{ color: COLORS.atencao }}> · {a.obrigPendentes} faltam</span>}
+                </div>
+                <div style={{ marginTop: 4, height: 6, background: COLORS.surface2, borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${a.pctEntrega}%`, height: '100%', background: entregaCor }} />
+                </div>
+              </div>
+              {/* vencidas */}
+              <div className="num" style={{ width: 80, textAlign: 'right', color: a.obrigVencidas ? COLORS.erro : COLORS.faint, fontWeight: a.obrigVencidas ? 700 : 400 }}>
+                {a.obrigVencidas || '—'}
+              </div>
+              {/* vencem 7 dias */}
+              <div className="num" style={{ width: 90, textAlign: 'right', color: a.proximas7 ? COLORS.atencao : COLORS.faint, fontWeight: a.proximas7 ? 600 : 400 }}>
+                {a.proximas7 || '—'}
+              </div>
+              {/* qualidade (taxa de erro) */}
+              <div className="num" style={{ width: 120, textAlign: 'right' }}>
+                <span style={{ color: erroCor, fontWeight: 600 }}>{a.taxaErro}%</span>
+                <span style={{ color: COLORS.faint, fontSize: 11 }}> erro{a.clientesComErro ? ` · ${a.clientesComErro} cli.` : ''}</span>
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      <div style={{ display: 'flex', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
+        <Link href="/prazos" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, color: COLORS.acao, textDecoration: 'none' }}>
+          <CalendarClock size={13} /> ver todas as obrigações e prazos <ChevronRight size={13} />
+        </Link>
+        <Link href="/atribuir-responsavel" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, color: COLORS.acao, textDecoration: 'none' }}>
+          <Users size={13} /> rebalancear carteiras <ChevronRight size={13} />
+        </Link>
+        <Link href="/produtividade" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, color: COLORS.acao, textDecoration: 'none' }}>
+          <FileWarning size={13} /> produtividade completa <ChevronRight size={13} />
+        </Link>
       </div>
     </div>
   );

@@ -606,6 +606,105 @@ export class PaineisService {
     };
   }
 
+  /**
+   * CARTEIRA DOS ANALISTAS — visão gerencial rica por analista:
+   * clientes, docs, performance (taxa de erro), e as OBRIGAÇÕES da carteira dele
+   * (entregues/pendentes/vencidas), além de clientes com pendência documental.
+   */
+  async carteiraAnalistas() {
+    const now = new Date();
+    const companies = await this.prisma.company.findMany({
+      where: { active: true },
+      select: { id: true, name: true, responsavel: true, taxRegime: true, sharepointDocsCount: true },
+    });
+    const respPorCo = new Map(companies.map((c) => [c.id, c.responsavel || '— Sem responsável —']));
+    const ids = companies.map((c) => c.id);
+
+    // docs e erros por empresa
+    const grouped = await this.prisma.document.groupBy({ by: ['companyId'], _count: { _all: true } });
+    const docsPorCo = new Map(grouped.map((g) => [g.companyId, g._count._all]));
+    const docsErro = await this.prisma.document.findMany({
+      where: { companyId: { in: ids }, fiscalValidation: { not: null } },
+      select: { companyId: true, fiscalValidation: true },
+    });
+    const errosPorCo = new Map<string, number>();
+    const temErroCo = new Set<string>();
+    for (const d of docsErro) {
+      const inc = safe(d.fiscalValidation)?.inconsistencias ?? [];
+      if (inc.length) { errosPorCo.set(d.companyId, (errosPorCo.get(d.companyId) ?? 0) + inc.length); temErroCo.add(d.companyId); }
+    }
+
+    // obrigações da competência corrente + as vencidas em aberto
+    const comp = now.toISOString().slice(0, 7);
+    const obrig = await this.prisma.fiscalCalendarItem.findMany({
+      where: { companyId: { in: ids } },
+      select: { companyId: true, status: true, dataVencimento: true, competencia: true, tipo: true },
+    });
+
+    type Acc = {
+      responsavel: string; clientes: number; docs: number; erros: number; clientesComErro: number;
+      obrigTotal: number; obrigEntregues: number; obrigPendentes: number; obrigVencidas: number;
+      clientesSemDoc: number; proximas7: number;
+    };
+    const map = new Map<string, Acc>();
+    const get = (r: string) => {
+      let a = map.get(r);
+      if (!a) { a = { responsavel: r, clientes: 0, docs: 0, erros: 0, clientesComErro: 0, obrigTotal: 0, obrigEntregues: 0, obrigPendentes: 0, obrigVencidas: 0, clientesSemDoc: 0, proximas7: 0 }; map.set(r, a); }
+      return a;
+    };
+
+    for (const c of companies) {
+      const a = get(respPorCo.get(c.id)!);
+      a.clientes++;
+      const d = docsPorCo.get(c.id) ?? 0;
+      a.docs += d;
+      a.erros += errosPorCo.get(c.id) ?? 0;
+      if (temErroCo.has(c.id)) a.clientesComErro++;
+      if (d === 0) a.clientesSemDoc++;
+    }
+
+    const em7 = new Date(now.getTime() + 7 * 86400000);
+    for (const o of obrig) {
+      const r = respPorCo.get(o.companyId);
+      if (!r) continue;
+      const a = get(r);
+      const entregue = o.status === 'paga' || o.status === 'isenta';
+      const venc = new Date(o.dataVencimento);
+      // considera só a competência corrente + qualquer coisa vencida em aberto (não engorda com histórico pago)
+      const relevante = o.competencia === comp || (!entregue && venc < now);
+      if (!relevante) continue;
+      a.obrigTotal++;
+      if (entregue) a.obrigEntregues++;
+      else {
+        a.obrigPendentes++;
+        if (venc < now) a.obrigVencidas++;
+        else if (venc <= em7) a.proximas7++;
+      }
+    }
+
+    const analistas = [...map.values()]
+      .filter((a) => !a.responsavel.includes('Sem responsável'))
+      .map((a) => ({
+        ...a,
+        taxaErro: a.docs ? Math.round((a.erros / a.docs) * 10000) / 100 : 0,
+        pctEntrega: a.obrigTotal ? Math.round((a.obrigEntregues / a.obrigTotal) * 100) : 100,
+      }))
+      .sort((a, b) => b.obrigVencidas - a.obrigVencidas || b.obrigPendentes - a.obrigPendentes || b.clientes - a.clientes);
+
+    const semResp = map.get('— Sem responsável —');
+    return {
+      competencia: comp,
+      analistas,
+      totais: {
+        clientes: analistas.reduce((s, a) => s + a.clientes, 0),
+        obrigPendentes: analistas.reduce((s, a) => s + a.obrigPendentes, 0),
+        obrigVencidas: analistas.reduce((s, a) => s + a.obrigVencidas, 0),
+        proximas7: analistas.reduce((s, a) => s + a.proximas7, 0),
+        clientesSemResponsavel: semResp?.clientes ?? 0,
+      },
+    };
+  }
+
   // ───────────────────────────────────────────────────────────
   // ATRIBUIÇÃO cliente → responsável (destrava Meu Dia e Produtividade)
   // ───────────────────────────────────────────────────────────

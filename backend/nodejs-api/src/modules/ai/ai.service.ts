@@ -44,7 +44,9 @@ export interface ReconciliacaoResult {
 export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly client: Anthropic;
-  private readonly model = 'claude-sonnet-4-6';
+  // Modelo mais econômico e 100% funcional (US$ 1/US$ 5 por 1M tokens — ~1/3 do Sonnet).
+  // Sobrescrevível por env sem novo deploy: ANTHROPIC_MODEL.
+  private readonly model = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5';
 
   constructor() {
     this.client = new Anthropic({
