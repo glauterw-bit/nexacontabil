@@ -32,6 +32,15 @@ export default function GestaoEquipePage() {
   const [bulkTo, setBulkTo] = useState('');
   const [bulkMotivo, setBulkMotivo] = useState('');
 
+  // contas & senhas
+  const [novoNome, setNovoNome] = useState('');
+  const [novoEmail, setNovoEmail] = useState('');
+  const [novaSenhaCriar, setNovaSenhaCriar] = useState('');
+  const [criando, setCriando] = useState(false);
+  const [resetId, setResetId] = useState('');       // usuário em edição de senha
+  const [resetSenha, setResetSenha] = useState('');
+  const [resetando, setResetando] = useState(false);
+
   useEffect(() => { load(); }, []);
 
   async function load() {
@@ -105,6 +114,41 @@ export default function GestaoEquipePage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function criarAnalista() {
+    if (!novoNome.trim() || !novoEmail.trim() || novaSenhaCriar.length < 6) {
+      toast.push('Nome, e-mail e senha (mín. 6) são obrigatórios', { variant: 'warning' }); return;
+    }
+    setCriando(true);
+    try {
+      const r = await fetch(`${API}/api/v1/auth/admin/criar-analista`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ name: novoNome.trim(), email: novoEmail.trim(), password: novaSenhaCriar }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d?.message ?? 'Falha ao criar');
+      toast.push(`Analista criado · ${d.clientesVinculados} cliente(s) já vinculados pelo nome`, { variant: 'success' });
+      if (d.clientesVinculados === 0) toast.push('Atenção: nenhum cliente com esse nome de responsável. Confira se o nome bate com a carteira.', { variant: 'warning' });
+      setNovoNome(''); setNovoEmail(''); setNovaSenhaCriar(''); load();
+    } catch (e: any) { toast.push(e.message, { variant: 'error' }); }
+    finally { setCriando(false); }
+  }
+
+  async function redefinirSenha(userId: string) {
+    if (resetSenha.length < 6) { toast.push('A nova senha precisa de ao menos 6 caracteres', { variant: 'warning' }); return; }
+    setResetando(true);
+    try {
+      const r = await fetch(`${API}/api/v1/auth/admin/redefinir-senha`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ userId, novaSenha: resetSenha }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d?.message ?? 'Falha ao redefinir');
+      toast.push('Senha redefinida ✅', { variant: 'success' });
+      setResetId(''); setResetSenha('');
+    } catch (e: any) { toast.push(e.message, { variant: 'error' }); }
+    finally { setResetando(false); }
   }
 
   const byAnalyst: Record<string, any[]> = {};
@@ -215,6 +259,52 @@ export default function GestaoEquipePage() {
               })}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Contas & senhas dos analistas */}
+      <div className="card-aura">
+        <h2 className="text-[13px] font-medium text-tx-strong mb-1">Contas & senhas</h2>
+        <p className="text-[11px] text-tx-muted mb-3">
+          O <b className="text-tx">nome</b> da conta precisa bater com o responsável nas empresas — é assim que o analista vê a própria carteira no Meu Dia.
+        </p>
+
+        {/* criar analista */}
+        <div className="grid sm:grid-cols-4 gap-2 mb-4">
+          <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome (igual ao responsável)" className="input-aura sm:col-span-1" />
+          <input value={novoEmail} onChange={(e) => setNovoEmail(e.target.value)} placeholder="E-mail de acesso" className="input-aura sm:col-span-1" />
+          <input value={novaSenhaCriar} onChange={(e) => setNovaSenhaCriar(e.target.value)} placeholder="Senha inicial (mín. 6)" type="text" className="input-aura sm:col-span-1" />
+          <button onClick={criarAnalista} disabled={criando} className="btn-primary justify-center">
+            <UserPlus className="h-3.5 w-3.5" /> {criando ? 'Criando…' : 'Criar analista'}
+          </button>
+        </div>
+
+        {/* lista com redefinir senha */}
+        <div className="space-y-1 max-h-80 overflow-y-auto">
+          {users.length === 0 && <EmptyState icon={<Users size={26} />} title="Nenhuma conta ainda." />}
+          {users.map((u) => (
+            <div key={u.id} className="flex items-center gap-2 p-2 border-b border-line/60">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-tx-strong truncate">{u.name} <span className="text-[10px] text-tx-muted">({u.role})</span></p>
+                <p className="text-[11px] text-tx-muted truncate">{u.email}</p>
+              </div>
+              {resetId === u.id ? (
+                <div className="flex items-center gap-1.5">
+                  <input value={resetSenha} onChange={(e) => setResetSenha(e.target.value)} placeholder="Nova senha" type="text"
+                    className="input-aura" style={{ padding: '5px 8px', fontSize: 12, width: 150 }} autoFocus />
+                  <button onClick={() => redefinirSenha(u.id)} disabled={resetando} className="btn-primary" style={{ padding: '5px 10px', fontSize: 12 }}>
+                    {resetando ? '…' : 'Salvar'}
+                  </button>
+                  <button onClick={() => { setResetId(''); setResetSenha(''); }} className="btn-ghost" style={{ padding: '5px 8px', fontSize: 12 }}>✕</button>
+                </div>
+              ) : (
+                <button onClick={() => { setResetId(u.id); setResetSenha(''); }} className="btn-secondary" style={{ padding: '5px 10px', fontSize: 12 }}
+                  disabled={u.role === 'owner'} title={u.role === 'owner' ? 'A conta do dono não é redefinida por aqui' : 'Redefinir senha'}>
+                  Redefinir senha
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 

@@ -65,6 +65,25 @@ export class AuthController {
     return this.authService.provisionarEquipe(body?.senhaPadrao);
   }
 
+  // ── ADMIN: gestão de contas da equipe (só gestor) ──
+  @Post('admin/criar-analista')
+  @UseGuards(JwtAuthGuard)
+  criarAnalista(@Request() req: any, @Body() body: { name: string; email: string; password: string; role?: string }) {
+    return this.authService.criarAnalista(req.user, body);
+  }
+
+  @Post('admin/redefinir-senha')
+  @UseGuards(JwtAuthGuard)
+  redefinirSenha(@Request() req: any, @Body() body: { userId: string; novaSenha: string }) {
+    return this.authService.redefinirSenha(req.user, body?.userId, body?.novaSenha);
+  }
+
+  @Post('admin/definir-ativo')
+  @UseGuards(JwtAuthGuard)
+  definirAtivo(@Request() req: any, @Body() body: { userId: string; ativo: boolean }) {
+    return this.authService.definirAtivo(req.user, body?.userId, body?.ativo);
+  }
+
   @Put('profile')
   @UseGuards(JwtAuthGuard)
   updateProfile(@Request() req: any, @Body() dto: UpdateProfileDto) {
