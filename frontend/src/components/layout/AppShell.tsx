@@ -30,10 +30,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [redirecting, setRedirecting] = useState(false);
 
   const isAuthPage = AUTH_PATHS.some(p => pathname.startsWith(p));
+  const isClientePage = pathname.startsWith('/meu-escritorio');
 
-  // Home por papel: analista cai no Meu Dia; gestor/dono cai na Operação
-  // (a carteira toda). Nunca no /dashboard, que é a ficha de um cliente só.
-  const homePorPapel = (u: any) => (u?.role === 'analista' ? '/meu-dia' : '/operacao');
+  // Home por papel: analista → Meu Dia · cliente → painel mobile · gestor → Operação
+  // (nunca /dashboard, que é a ficha de um cliente só).
+  const homePorPapel = (u: any) =>
+    u?.role === 'analista' ? '/meu-dia' : u?.role === 'cliente' ? '/meu-escritorio' : '/operacao';
 
   useEffect(() => {
     if (!user && !isAuthPage) {
@@ -42,10 +44,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     } else if (user && isAuthPage) {
       setRedirecting(true);
       router.replace(homePorPapel(user));
+    } else if (user?.role === 'cliente' && !isClientePage) {
+      // cliente nunca acessa as telas do escritório — sempre no próprio painel
+      setRedirecting(true);
+      router.replace('/meu-escritorio');
     } else {
       setRedirecting(false);
     }
-  }, [user, isAuthPage]);
+  }, [user, isAuthPage, isClientePage]);
 
   // Mostra spinner enquanto redireciona
   if (redirecting) return <Spinner />;
@@ -53,7 +59,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Páginas de auth (login/signup) sem sidebar
   if (isAuthPage) return <>{children}</>;
 
-  // Usuário autenticado → layout completo
+  // Cliente: layout mobile limpo, SEM o menu do escritório
+  if (user?.role === 'cliente') {
+    return <ToastProvider><div className="min-h-screen bg-page">{children}</div></ToastProvider>;
+  }
+
+  // Usuário autenticado (equipe) → layout completo
   if (user) {
     return (
       <ToastProvider>

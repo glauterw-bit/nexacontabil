@@ -11,7 +11,8 @@ export default function Home() {
   useEffect(() => {
     if (loading) return;
     if (!user) { router.replace('/login'); return; }
-    router.replace((user as any)?.role === 'analista' ? '/meu-dia' : '/operacao');
+    const role = (user as any)?.role;
+    router.replace(role === 'analista' ? '/meu-dia' : role === 'cliente' ? '/meu-escritorio' : '/operacao');
   }, [user, loading]);
 
   return (

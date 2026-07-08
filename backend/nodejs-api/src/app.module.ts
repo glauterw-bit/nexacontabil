@@ -83,6 +83,7 @@ import { FluxoModule } from './modules/fluxo/fluxo.module';
 import { SyncSchedulerModule } from './modules/sync-scheduler/sync-scheduler.module';
 import { SiegModule } from './modules/sieg/sieg.module';
 import { SefazModule } from './modules/sefaz/sefaz.module';
+import { PortalMobileModule } from './modules/portal-mobile/portal-mobile.module';
 import { AssistenteModule } from './modules/assistente/assistente.module';
 import { GestaoAdminModule } from './modules/gestao-admin/gestao-admin.module';
 import { BenchmarkModule } from './modules/benchmark/benchmark.module';
@@ -213,6 +214,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     SyncSchedulerModule,
     SiegModule,
     SefazModule,
+    PortalMobileModule,
     AssistenteModule,
     GestaoAdminModule,
     BenchmarkModule,
