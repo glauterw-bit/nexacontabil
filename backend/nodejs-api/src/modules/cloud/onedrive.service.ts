@@ -235,6 +235,49 @@ export class OneDriveService {
   }
 
   /**
+   * VERIFICAÇÃO RÁPIDA "existe 2026?" — varre as pastas de um cliente procurando
+   * QUALQUER evidência de 2026 (pasta cujo nome cita 2026, ou arquivo modificado
+   * em 2026). Sai assim que acha. Limite de pastas visitadas para caber no tempo
+   * de uma requisição HTTP. Prioriza pastas de nome recente.
+   */
+  async tem2026(connectionId: string, driveId: string, folderId: string) {
+    const pastas2026: string[] = [];
+    let arquivo2026: { name: string; modified: string } | null = null;
+    let maisRecente: string | null = null;
+    let pastasVisitadas = 0, arquivosVistos = 0;
+    const rank = (name: string) => { const m = String(name).match(/\b(20\d{2})\b/); return m ? parseInt(m[1]) : 0; };
+    let queue: { id: string; name: string }[] = [{ id: folderId, name: '' }];
+    while (queue.length && pastasVisitadas < 600) {
+      queue.sort((a, b) => rank(b.name) - rank(a.name)); // 2026/2025 primeiro
+      const cur = queue.shift()!;
+      pastasVisitadas++;
+      let items: any[] = [];
+      try { items = await this.listAllChildren(connectionId, driveId, cur.id); } catch { continue; }
+      for (const it of items) {
+        if (it.isFolder) {
+          if (/\b2026\b/.test(it.name ?? '')) pastas2026.push(it.name);
+          queue.push({ id: it.id, name: it.name });
+          continue;
+        }
+        if (!/\.(xml)$/i.test(it.name ?? '')) continue;
+        arquivosVistos++;
+        const mod = it.modified ? String(it.modified) : '';
+        if (mod && (!maisRecente || mod > maisRecente)) maisRecente = mod;
+        if (mod.startsWith('2026') && !arquivo2026) arquivo2026 = { name: it.name, modified: mod.slice(0, 10) };
+      }
+      // saída antecipada: já achamos evidência de 2026 e a pasta raiz cita 2026
+      if (arquivo2026 && pastas2026.length) break;
+    }
+    return {
+      tem2026: !!(arquivo2026 || pastas2026.length),
+      pastas2026: pastas2026.slice(0, 5),
+      arquivo2026,
+      maisRecente: maisRecente ? maisRecente.slice(0, 10) : null,
+      pastasVisitadas, arquivosVistos,
+    };
+  }
+
+  /**
    * Análise da carteira: lê os sites "Empresas Ativas/Inativas" do SharePoint,
    * interpreta cada pasta como um cliente (nome + regime + nº de documentos)
    * e devolve a visão agregada pronta pra dashboard.

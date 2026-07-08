@@ -61,6 +61,34 @@ export class CloudController {
     return this.onedrive.getCarteira(id);
   }
 
+  /** "Existe 2026?" — verificação rápida em LOTE, cliente por cliente (skip/limit p/ chamar em loop). */
+  @Get('tem2026')
+  async tem2026(@Query('skip') skip?: string, @Query('limit') limit?: string) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) throw new NotFoundException('Nenhuma conexão OneDrive ativa');
+    const where: any = { active: true, sharepointItemId: { not: null }, sharepointDriveId: { not: null } };
+    const total = await this.prisma.company.count({ where });
+    const empresas = await this.prisma.company.findMany({
+      where, orderBy: { name: 'asc' },
+      skip: parseInt(skip ?? '0', 10) || 0,
+      take: Math.min(15, parseInt(limit ?? '10', 10) || 10),
+      select: { id: true, name: true, sharepointDriveId: true, sharepointItemId: true },
+    });
+    const resultados: any[] = [];
+    let com2026 = 0;
+    for (const e of empresas) {
+      try {
+        const r = await this.onedrive.tem2026(conn.id, e.sharepointDriveId!, e.sharepointItemId!);
+        if (r.tem2026) com2026++;
+        resultados.push({ cliente: e.name, ...r });
+      } catch (err: any) {
+        resultados.push({ cliente: e.name, erro: err?.message ?? 'erro' });
+      }
+    }
+    const fim = (parseInt(skip ?? '0', 10) || 0) + empresas.length;
+    return { total, processados: empresas.length, restantes: Math.max(0, total - fim), com2026NesteLote: com2026, resultados };
+  }
+
   /** Varredura EXAUSTIVA de recência do drive de uma amostra de clientes: existe algum arquivo de 2026? */
   @Get('recencia')
   async recencia(@Query('limit') limit?: string, @Query('companyId') companyId?: string) {
