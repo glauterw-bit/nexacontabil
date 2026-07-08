@@ -60,6 +60,11 @@ export default function BuscarDocsPage() {
         subtitle="Peça em linguagem natural. A IA interpreta e traz os arquivos + a análise fiscal."
       />
 
+      <div style={{ marginBottom: 14, padding: '9px 13px', borderRadius: 9, fontSize: 12.5, background: tint(COLORS.acao, 7), border: `1px solid ${tint(COLORS.acao, 20)}`, color: COLORS.muted, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <FileText size={14} style={{ flexShrink: 0, marginTop: 1, color: COLORS.acao }} />
+        <span>Busca no acervo já <b>capturado</b> — XMLs vindos do drive, e-mail e upload. A captura entra por essas fontes (não há consulta ao vivo no SEFAZ/Receita, que exigiria certificado A1 por cliente).</span>
+      </div>
+
       <div style={{ display: 'flex', gap: 8 }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <Search size={18} style={{ position: 'absolute', left: 14, top: 12, color: 'var(--faint)' }} />

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { Activity, FileText, FileCheck, AlertTriangle, ClipboardList, ChevronRight, Search, ExternalLink, FolderOpen, Inbox, FileX, UserCheck, X, Loader2, CheckSquare, Square } from 'lucide-react';
+import { Activity, FileText, FileCheck, AlertTriangle, ClipboardList, ChevronRight, Search, ExternalLink, FolderOpen, Inbox, FileX, UserCheck, X, Loader2, CheckSquare, Square, HardDriveDownload, CalendarClock, Users } from 'lucide-react';
 import { PageHeader, Card, COLORS, Kpi, StatusChip, Dot, Drawer, Btn, Spinner, EmptyState, THead, tint, StatusTone } from '@/components/ui/kit';
 import { useCompetencia, fmtCompetencia } from '@/contexts/CompetenciaContext';
 
@@ -168,6 +168,69 @@ export default function OperacaoPage() {
         <Atalho icon={<AlertTriangle size={14} />} href="/inconsistencias" txt="Malha fina completa" />
       </div>
 
+      {/* PAINEL AMPLO DO GESTOR: leitura do drive na carteira + obrigações do mês */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 18 }}>
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <HardDriveDownload size={15} color={COLORS.acao} />
+            <span style={{ fontWeight: 600, fontSize: 13.5, color: COLORS.strong }}>Leitura do drive na carteira</span>
+            <Link href="/implantacao" style={{ marginLeft: 'auto', fontSize: 11.5, color: COLORS.acao }}>gerir →</Link>
+          </div>
+          <MiniBarra segs={[
+            { n: d.sincronizacao?.ok ?? 0, cor: COLORS.dotOk, label: 'atualizados' },
+            { n: d.sincronizacao?.desatualizado ?? 0, cor: COLORS.dotAtencao, label: 'desatualizados' },
+            { n: d.sincronizacao?.nunca ?? 0, cor: COLORS.dotErro, label: 'nunca lidos' },
+            { n: d.sincronizacao?.semPasta ?? 0, cor: COLORS.faint, label: 'sem pasta' },
+          ]} />
+        </Card>
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <CalendarClock size={15} color={COLORS.acao} />
+            <span style={{ fontWeight: 600, fontSize: 13.5, color: COLORS.strong }}>Obrigações de {fmtCompetencia(d.obrigacoesMes?.mes)}</span>
+            <Link href="/prazos" style={{ marginLeft: 'auto', fontSize: 11.5, color: COLORS.acao }}>calendário →</Link>
+          </div>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <MiniNum n={d.obrigacoesMes?.vencidas ?? 0} label="vencidas" cor={COLORS.erro} />
+            <MiniNum n={d.obrigacoesMes?.proximas7 ?? 0} label="vencem em 7d" cor={COLORS.atencao} />
+            <MiniNum n={d.obrigacoesMes?.entregues ?? 0} label="entregues" cor={COLORS.ok} />
+            <MiniNum n={d.obrigacoesMes?.total ?? 0} label="total" cor={COLORS.muted} />
+          </div>
+          {(d.obrigacoesMes?.total ?? 0) === 0 && (
+            <div style={{ marginTop: 10, fontSize: 11.5, color: COLORS.faint }}>
+              Sem obrigações geradas para o mês. Gere em <Link href="/implantacao" style={{ color: COLORS.acao }}>Saúde da Implantação</Link>.
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* RESUMO POR ANALISTA — quem tem mais cliente crítico (equilibrar a carga) */}
+      {(d.porAnalista?.length ?? 0) > 0 && (
+        <details style={{ marginBottom: 18 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COLORS.strong, marginBottom: 8, listStyle: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Users size={14} color={COLORS.acao} /> Carga por analista <span style={{ color: COLORS.faint, fontWeight: 400 }}>({d.porAnalista.length}) — clique p/ ver</span>
+          </summary>
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', padding: '7px 14px', borderBottom: `1px solid ${COLORS.border}`, fontSize: 11, fontWeight: 600, color: COLORS.faint, textTransform: 'uppercase', letterSpacing: '.04em', background: COLORS.surface2 }}>
+              <span style={{ flex: 1 }}>Analista</span>
+              <span style={{ width: 70, textAlign: 'right' }}>Clientes</span>
+              <span style={{ width: 70, textAlign: 'right', color: COLORS.erro }}>Crítico</span>
+              <span style={{ width: 70, textAlign: 'right', color: COLORS.atencao }}>Atenção</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Inconsist.</span>
+            </div>
+            {d.porAnalista.map((a: any) => (
+              <Link key={a.responsavel} href={`/painel-analista?responsavel=${encodeURIComponent(a.responsavel)}`}
+                style={{ display: 'flex', padding: '8px 14px', borderBottom: `1px solid ${COLORS.borderSoft}`, fontSize: 13, color: COLORS.text, textDecoration: 'none', alignItems: 'center' }}>
+                <span style={{ flex: 1, fontWeight: 600, color: a.responsavel === 'Sem responsável' ? COLORS.erro : COLORS.strong }}>{a.responsavel}</span>
+                <span className="num" style={{ width: 70, textAlign: 'right' }}>{a.clientes}</span>
+                <span className="num" style={{ width: 70, textAlign: 'right', color: a.vermelhos ? COLORS.erro : COLORS.faint, fontWeight: a.vermelhos ? 700 : 400 }}>{a.vermelhos || '—'}</span>
+                <span className="num" style={{ width: 70, textAlign: 'right', color: a.amarelos ? COLORS.atencao : COLORS.faint }}>{a.amarelos || '—'}</span>
+                <span className="num" style={{ width: 90, textAlign: 'right', color: a.inconsistencias ? COLORS.erro : COLORS.faint }}>{a.inconsistencias || '—'}</span>
+              </Link>
+            ))}
+          </Card>
+        </details>
+      )}
+
       {msg && (
         <div style={{ marginBottom: 12, padding: '9px 13px', borderRadius: 9, fontSize: 13, background: tint(COLORS.dotOk, 10), border: `1px solid ${tint(COLORS.dotOk, 30)}`, color: COLORS.ok }}>{msg}</div>
       )}
@@ -290,6 +353,36 @@ function SyncBadge({ sync }: { sync: any }) {
       style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 999, border: `1px solid ${tint(cor, 35)}`, background: tint(cor, 9), color: cor, fontSize: 12, whiteSpace: 'nowrap' }}>
       <Dot cor={cor} size={7} /> {txt}
     </span>
+  );
+}
+
+/** Barra segmentada de cobertura (ok/desatualizado/nunca/sem pasta) com legenda. */
+function MiniBarra({ segs }: { segs: { n: number; cor: string; label: string }[] }) {
+  const total = segs.reduce((s, x) => s + x.n, 0) || 1;
+  return (
+    <div>
+      <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', background: COLORS.surface2 }}>
+        {segs.map((s, i) => s.n > 0 && (
+          <div key={i} title={`${s.n} ${s.label}`} style={{ width: `${(s.n / total) * 100}%`, background: s.cor }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginTop: 10 }}>
+        {segs.map((s, i) => (
+          <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: COLORS.muted }}>
+            <Dot cor={s.cor} size={7} /> <b className="num" style={{ color: COLORS.strong }}>{s.n}</b> {s.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MiniNum({ n, label, cor }: { n: number; label: string; cor: string }) {
+  return (
+    <div>
+      <div className="num" style={{ fontSize: 22, fontWeight: 800, color: n > 0 ? cor : COLORS.faint, lineHeight: 1 }}>{n}</div>
+      <div style={{ fontSize: 11, color: COLORS.faint, marginTop: 3 }}>{label}</div>
+    </div>
   );
 }
 

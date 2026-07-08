@@ -84,14 +84,28 @@ export class XmlCaptureService {
     };
   }
 
-  async consultarNfeSefaz(chave: string, _companyId: string) {
-    // Em produção: WebService SEFAZ NFeConsultaProtocolo
+  /**
+   * Situação de uma NF-e. IMPORTANTE: o sistema NÃO faz consulta ATIVA ao WebService
+   * do SEFAZ (NFeConsultaProtocolo exige certificado digital A1 do contribuinte/procuração).
+   * Retornamos o que sabemos localmente — a nota capturada no drive/e-mail/upload — e
+   * avisamos com honestidade. NUNCA devolver "Autorizado" fabricado.
+   */
+  async consultarNfeSefaz(chave: string, companyId: string) {
+    const local = await this.prisma.xmlCapture.findFirst({
+      where: { chaveAcesso: chave, companyId },
+      select: { status: true, dataEmissao: true, valorTotal: true, tipoDocumento: true, manifestacao: true },
+    });
     return {
       chave,
-      status: 'Autorizado o uso da NF-e',
-      codigo: '100',
-      dataAutorizacao: new Date(),
-      protocolo: `3${Date.now()}`,
+      consultaAtivaSefaz: false,
+      fonte: local ? 'capturado' : 'nao_encontrado',
+      statusLocal: local?.status ?? null,
+      manifestacao: local?.manifestacao ?? null,
+      dataEmissao: local?.dataEmissao ?? null,
+      valorTotal: local?.valorTotal ?? null,
+      aviso: local
+        ? 'Situação com base no XML já capturado. Consulta ao vivo no SEFAZ requer certificado digital A1 configurado.'
+        : 'Nota não encontrada no acervo capturado (drive/e-mail/upload). Consulta ao vivo no SEFAZ requer certificado digital A1.',
     };
   }
 

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { Sun, CalendarClock, FileWarning, CheckCircle2, Building2, ChevronRight } from 'lucide-react';
+import { Sun, CalendarClock, FileWarning, CheckCircle2, Building2, ChevronRight, FileX } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader, Card, COLORS, Kpi, Spinner, tint } from '@/components/ui/kit';
 
@@ -41,7 +41,7 @@ export default function MeuDiaPage() {
   const r = data?.resumo ?? {};
   const cor = (p: string) => p === 'alta' ? COLORS.erro : p === 'media' ? COLORS.atencao : COLORS.faint;
   const dot = (p: string) => p === 'alta' ? COLORS.dotErro : p === 'media' ? COLORS.dotAtencao : COLORS.faint;
-  const ico = (t: string) => t === 'obrigacao' ? <CalendarClock size={16} /> : t === 'inconsistencia' ? <FileWarning size={16} /> : <Building2 size={16} />;
+  const ico = (t: string) => t === 'obrigacao' ? <CalendarClock size={16} /> : t === 'inconsistencia' ? <FileWarning size={16} /> : t === 'sem_documento' ? <FileX size={16} /> : <Building2 size={16} />;
 
   return (
     <div className="page">
@@ -58,7 +58,7 @@ export default function MeuDiaPage() {
         <Kpi label="Obrigações vencidas" value={r.obrigacoesVencidas ?? 0} cor={COLORS.erro} />
         <Kpi label="Vencem em 7 dias" value={r.obrigacoesProximas ?? 0} cor={COLORS.atencao} />
         <Kpi label="Notas com erro" value={r.notasComErro ?? 0} cor={COLORS.atencao} />
-        <Kpi label="Clientes c/ erro" value={r.clientesComErro ?? 0} cor={COLORS.acao} />
+        <Kpi label="Sem docs no mês" value={r.clientesSemDoc ?? 0} cor={COLORS.erro} sub="clientes a cobrar" />
         <Kpi label="Clientes" value={r.clientes ?? 0} />
       </div>
 
@@ -69,7 +69,10 @@ export default function MeuDiaPage() {
         </div>
       )}
       {data?.aFazer?.map((t: any, i: number) => {
-        const clicavel = t.tipo === 'inconsistencia' && t.companyId;
+        const destino = t.companyId
+          ? (t.tipo === 'inconsistencia' ? `/cliente-erros?companyId=${t.companyId}` : t.tipo === 'sem_documento' ? `/organizacao?companyId=${t.companyId}` : null)
+          : null;
+        const clicavel = !!destino;
         const inner = (
           <div
             onMouseEnter={(e) => (e.currentTarget.style.borderColor = cor(t.prioridade))}
@@ -81,11 +84,11 @@ export default function MeuDiaPage() {
               <div style={{ fontSize: 12, color: COLORS.muted }}>{t.cliente}</div>
             </div>
             {t.data && <span className="num" style={{ fontSize: 12, fontWeight: 600, color: cor(t.prioridade) }}>{dataBR(t.data)}</span>}
-            {clicavel && <span style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 12, color: COLORS.acao, whiteSpace: 'nowrap' }}>como corrigir <ChevronRight size={14} /></span>}
+            {clicavel && <span style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 12, color: COLORS.acao, whiteSpace: 'nowrap' }}>{t.tipo === 'inconsistencia' ? 'como corrigir' : 'abrir'} <ChevronRight size={14} /></span>}
           </div>
         );
         return clicavel
-          ? <Link key={i} href={`/cliente-erros?companyId=${t.companyId}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{inner}</Link>
+          ? <Link key={i} href={destino!} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{inner}</Link>
           : <div key={i}>{inner}</div>;
       })}
     </div>

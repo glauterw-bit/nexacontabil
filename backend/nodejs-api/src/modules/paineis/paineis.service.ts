@@ -235,15 +235,23 @@ export class PaineisService {
       comp = ult?.competencia ?? new Date().toISOString().slice(0, 7);
     }
     const companies = await this.prisma.company.findMany({
-      where: { active: true }, select: { id: true, name: true, taxRegime: true, responsavel: true },
+      where: { active: true }, select: { id: true, name: true, taxRegime: true, responsavel: true, sharepointItemId: true, sharepointAnalisadoEm: true },
     });
     const ids = companies.map((c) => c.id);
-    const [docs, fluxos, ultimaLeitura, ultimoDoc] = await Promise.all([
+    const nowComp = new Date().toISOString().slice(0, 7);
+    const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const fimMes = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59);
+    const [docs, fluxos, ultimaLeitura, ultimoDoc, obrigMes] = await Promise.all([
       this.prisma.document.findMany({ where: { companyId: { in: ids }, extractedData: { not: null } }, select: { companyId: true, totalValue: true, extractedData: true, fiscalValidation: true } }),
       this.prisma.fluxoEstado.findMany({ where: { departamento: 'fiscal', competencia: comp, companyId: { in: ids }, reciboCheckedAt: { not: null } }, select: { companyId: true, reciboEncontrado: true } }),
       // frescor: quando o drive foi lido pela última vez e o doc mais novo capturado
       this.prisma.company.aggregate({ where: { active: true }, _max: { sharepointAnalisadoEm: true } }),
       this.prisma.document.aggregate({ where: { companyId: { in: ids } }, _max: { createdAt: true } }),
+      // obrigações do MÊS CORRENTE (fonte única, mesma tabela do calendário)
+      this.prisma.fiscalCalendarItem.findMany({
+        where: { companyId: { in: ids }, dataVencimento: { gte: inicioMes, lte: fimMes } },
+        select: { status: true, dataVencimento: true },
+      }),
     ]);
     const reciboBy = new Map(fluxos.map((f) => [f.companyId, f.reciboEncontrado]));
     const mesProcessado = fluxos.length > 0; // só pune declaração se o mês já foi verificado
@@ -302,6 +310,42 @@ export class PaineisService {
       return { companyId: c.id, cliente: c.name, regime: c.taxRegime, responsavel: c.responsavel, docs: a.docs, inconsistencias: a.inc, valorInc: Math.round(a.valorInc * 100) / 100, declaracaoEntregue: entregue, status, motivo, pendencias: pend };
     }).sort((x, y) => ({ vermelho: 0, amarelo: 1, verde: 2 } as any)[x.status] - ({ vermelho: 0, amarelo: 1, verde: 2 } as any)[y.status] || y.inconsistencias - x.inconsistencias);
 
+    // COBERTURA DE SINCRONIZAÇÃO da carteira toda (o gestor vê num relance se o drive
+    // está sendo lido): ok = lido nos últimos 2 dias · desatualizado > 2 dias · nunca · sem pasta.
+    const staleCut = new Date(Date.now() - 2 * 86400000);
+    let syncOk = 0, syncStale = 0, syncNunca = 0, syncSemPasta = 0;
+    for (const c of companies) {
+      if (!c.sharepointItemId) { syncSemPasta++; continue; }
+      if (!c.sharepointAnalisadoEm) syncNunca++;
+      else if (new Date(c.sharepointAnalisadoEm) < staleCut) syncStale++;
+      else syncOk++;
+    }
+
+    // OBRIGAÇÕES DO MÊS CORRENTE (agregado da carteira)
+    const ENTREGUE_OB = new Set(['paga', 'isenta', 'entregue']);
+    const nowD = new Date();
+    let obTotal = 0, obVencidas = 0, obProximas = 0, obEntregues = 0;
+    const em7 = new Date(nowD.getTime() + 7 * 86400000);
+    for (const o of obrigMes) {
+      obTotal++;
+      const venc = new Date(o.dataVencimento);
+      if (ENTREGUE_OB.has(o.status)) { obEntregues++; continue; }
+      if (o.status === 'vencida' || venc < nowD) obVencidas++;
+      else if (venc <= em7) obProximas++;
+    }
+
+    // RESUMO POR ANALISTA — quem tem mais cliente crítico (para o gestor equilibrar a carga)
+    const porAnalistaMap = new Map<string, { responsavel: string; clientes: number; verdes: number; amarelos: number; vermelhos: number; inconsistencias: number }>();
+    for (const c of clientes) {
+      const r = c.responsavel || 'Sem responsável';
+      let a = porAnalistaMap.get(r);
+      if (!a) { a = { responsavel: r, clientes: 0, verdes: 0, amarelos: 0, vermelhos: 0, inconsistencias: 0 }; porAnalistaMap.set(r, a); }
+      a.clientes++;
+      if (c.status === 'verde') a.verdes++; else if (c.status === 'amarelo') a.amarelos++; else a.vermelhos++;
+      a.inconsistencias += c.inconsistencias;
+    }
+    const porAnalista = [...porAnalistaMap.values()].sort((x, y) => y.vermelhos - x.vermelhos || y.amarelos - x.amarelos);
+
     return {
       competencia: comp,
       mesProcessado,
@@ -311,6 +355,11 @@ export class PaineisService {
         driveLidoEm: ultimaLeitura._max.sharepointAnalisadoEm ?? null,
         ultimoDocEm: ultimoDoc._max.createdAt ?? null,
       },
+      // cobertura de leitura do drive na carteira inteira
+      sincronizacao: { ok: syncOk, desatualizado: syncStale, nunca: syncNunca, semPasta: syncSemPasta },
+      // obrigações do mês corrente (mês de calendário, não a competência processada)
+      obrigacoesMes: { mes: nowComp, total: obTotal, vencidas: obVencidas, proximas7: obProximas, entregues: obEntregues },
+      porAnalista,
       semaforo: { verdes, amarelos, vermelhos, vermelhoFalta: vermFalta, vermelhoErro: vermErro },
       documentos: { total: totDocs, clientesComDocs: comDocs, clientesSemDocs: semDocs },
       declaracoes: { entregues: declEntregue, pendentes: companies.length - declEntregue },
@@ -1017,12 +1066,22 @@ export class PaineisService {
       if (inc.length) { notasComErro++; errosPorCliente.set(d.companyId, (errosPorCliente.get(d.companyId) ?? 0) + 1); }
     }
 
+    // CLIENTES SEM DOCUMENTOS NO MÊS — o analista precisa cobrar/verificar quem não enviou.
+    const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
+    const docsMes = await this.prisma.document.findMany({
+      where: { issueDate: { gte: inicioMes }, ...(responsavel ? { companyId: { in: [...coIds] } } : {}) },
+      select: { companyId: true },
+    });
+    const comDocMes = new Set(docsMes.map((d) => d.companyId));
+    const semDocMes = companies.filter((c) => !comDocMes.has(c.id));
+
     const vencidas = obrigs.filter((o) => new Date(o.dueDate) < now);
     const proximas = obrigs.filter((o) => new Date(o.dueDate) >= now);
 
     const aFazer = [
-      ...vencidas.map((o) => ({ prioridade: 'alta', tipo: 'obrigacao', titulo: `${o.name} VENCIDA`, cliente: coById.get(o.companyId)?.name, data: o.dueDate })),
-      ...[...errosPorCliente.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([cid, n]) => ({ prioridade: 'alta', tipo: 'inconsistencia', titulo: `${n} nota(s) com erro fiscal`, cliente: coById.get(cid)?.name, companyId: cid, data: null })),
+      ...vencidas.map((o) => ({ prioridade: 'alta', tipo: 'obrigacao', titulo: `${o.name} VENCIDA`, cliente: coById.get(o.companyId)?.name, companyId: o.companyId, data: o.dueDate })),
+      ...[...errosPorCliente.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([cid, n]) => ({ prioridade: 'alta', tipo: 'inconsistencia', titulo: `${n} nota(s) com erro fiscal — ${coById.get(cid)?.name ?? ''}`, cliente: coById.get(cid)?.name, companyId: cid, data: null })),
+      ...semDocMes.slice(0, 20).map((c) => ({ prioridade: 'alta', tipo: 'sem_documento', titulo: 'Sem documentos neste mês — cobrar o cliente', cliente: c.name, companyId: c.id, data: null })),
       ...proximas.map((o) => ({ prioridade: 'media', tipo: 'obrigacao', titulo: o.name, cliente: coById.get(o.companyId)?.name, companyId: o.companyId, data: o.dueDate })),
     ];
 
@@ -1033,9 +1092,10 @@ export class PaineisService {
         obrigacoesProximas: proximas.length,
         notasComErro,
         clientesComErro: errosPorCliente.size,
+        clientesSemDoc: semDocMes.length,
         clientes: companies.length,
       },
-      aFazer: aFazer.slice(0, 60),
+      aFazer: aFazer.slice(0, 80),
     };
   }
 }
