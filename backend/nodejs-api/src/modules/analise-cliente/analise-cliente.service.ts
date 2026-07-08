@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { OneDriveService } from '../cloud/onedrive.service';
 import { NcmInteligenteService } from '../ncm-inteligente/ncm-inteligente.service';
@@ -98,6 +99,53 @@ export class AnaliseClienteService {
       analisados, jaExistiam, ignorados, inconsistencias,
       valorTotal: Math.round(valorTotal * 100) / 100,
     };
+  }
+
+  /**
+   * Ingesta UM XML avulso (SIEG, e-mail, upload) no MESMO pipeline dos XMLs do drive:
+   * parse → validação fiscal contra o Banco de NCM → Document. Dedup pela chave de
+   * acesso (44 dígitos); sem chave (ex.: NFS-e municipal), pelo hash do conteúdo.
+   * Não depende de SharePoint — serve para qualquer fonte de captura.
+   */
+  async ingerirXml(companyId: string, xmlString: string, fonte = 'externo'): Promise<{ status: 'novo' | 'duplicado' | 'invalido'; inconsistencias?: number; valor?: number }> {
+    const nf = parseNfe(xmlString);
+    if (!nf) return { status: 'invalido' };
+    const chave = nf.chave || crypto.createHash('md5').update(xmlString).digest('hex');
+    const filename = `${chave}.xml`;
+    const existe = await this.prisma.document.findFirst({ where: { companyId, originalFilename: filename }, select: { id: true } });
+    if (existe) return { status: 'duplicado' };
+
+    const company = await this.prisma.company.findUnique({ where: { id: companyId }, select: { segmentoFiscal: true, uf: true } });
+    const segmento = company?.segmentoFiscal ?? undefined;
+    const uf = company?.uf ?? undefined;
+    const incs: string[] = [];
+    for (const it of nf.itens) {
+      if (!it.ncm) continue;
+      try {
+        const v = await this.ncm.validarTributacao({
+          ncm: it.ncm, segmento, uf,
+          icmsAliquota: it.icms, ipiAliquota: it.ipi, pisAliquota: it.pis, cofinsAliquota: it.cofins, cfop: it.cfop,
+        });
+        if (!v.regraEncontrada) incs.push(`NCM ${it.ncm} sem regra no Banco de NCM`);
+        else if (!v.ok) for (const d of v.divergencias) incs.push(`NCM ${it.ncm}: ${d.campo} veio ${d.encontrado}% (esperado ${d.esperado}%)`);
+      } catch { /* segue */ }
+    }
+    try {
+      await this.prisma.document.create({
+        data: {
+          companyId, type: nf.tipo, status: 'completed', originalFilename: filename,
+          fileUrl: `${fonte}|${chave}`,
+          number: nf.numero ? String(nf.numero) : undefined,
+          totalValue: nf.valorTotal, issuerName: nf.emitenteNome, issuerCnpj: nf.emitenteCnpj,
+          recipientName: nf.destNome, recipientCnpj: nf.destCnpj,
+          confidenceScore: 1,
+          extractedData: JSON.stringify(nf),
+          fiscalValidation: JSON.stringify({ ok: incs.length === 0, inconsistencias: incs }),
+          issueDate: nf.dataEmissao ? new Date(nf.dataEmissao) : undefined,
+        },
+      });
+      return { status: 'novo', inconsistencias: incs.length, valor: nf.valorTotal ?? 0 };
+    } catch { return { status: 'invalido' }; }
   }
 
   /**

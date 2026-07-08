@@ -52,6 +52,9 @@ export default function CapturaXmlPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [analisando, setAnalisando] = useState(false);
   const [analises, setAnalises] = useState<any[]>([]);
+  const [sieg, setSieg] = useState<{ configurado: boolean; observacao?: string; tipos?: string[] } | null>(null);
+  const [siegRunning, setSiegRunning] = useState(false);
+  const [siegResult, setSiegResult] = useState<any>(null);
 
   async function analisarArquivos(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -101,6 +104,7 @@ export default function CapturaXmlPage() {
       const map: Record<string, boolean> = {};
       (ri.integrations || []).forEach((i: any) => { map[i.key] = i.status === 'configured'; });
       setReady(map);
+      fetch(`${API}/api/v1/sieg/status`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : null).then(setSieg).catch(() => {});
     } catch { /* noop */ }
   }, [connId]);
 
@@ -124,6 +128,21 @@ export default function CapturaXmlPage() {
       toast.push(`${d.roteados}/${d.totalArquivos} roteados · ${d.relatoriosEnviados} relatórios enviados`, { variant: 'success' });
     } catch (e: any) { toast.push(e.message, { variant: 'error' }); }
     finally { setRunning(false); }
+  }
+
+  async function buscarSieg() {
+    setSiegRunning(true); setSiegResult(null);
+    try {
+      const r = await fetch(`${API}/api/v1/sieg/buscar-carteira`, {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify({ limite: 10 }),
+      });
+      if (!r.ok) throw new Error((await r.json())?.message ?? 'Falha na busca SIEG');
+      const d = await r.json();
+      setSiegResult(d);
+      toast.push(`SIEG: ${d.novosTotal} XML novos em ${d.processados} clientes`, { variant: 'success' });
+      load();
+    } catch (e: any) { toast.push(e.message, { variant: 'error' }); }
+    finally { setSiegRunning(false); }
   }
 
   const driveOk = conns.length > 0;
@@ -242,17 +261,41 @@ export default function CapturaXmlPage() {
       </Step>
 
       {/* PASSO 2 — Buscador */}
-      <Step n={2} done={false} icon={Search} title="Apontar o buscador pra essa pasta">
-        <p className="text-sm text-tx-muted mb-2">
-          No seu buscador de XMLs (SIEG, Arquivei…), configure a <b className="text-tx">exportação automática</b> pra salvar
-          os arquivos na mesma pasta do Drive acima. Assim tudo que ele puxar da SEFAZ entra no fluxo.
-        </p>
-        {folderForScript && (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-tx-muted">Pasta destino:</span>
-            <code className="text-tx font-mono">{folderForScript}</code>
-            <button onClick={() => copy(folderForScript, 'f2')} className="text-tx-muted hover:text-tx-strong">{copied === 'f2' ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}</button>
-          </div>
+      <Step n={2} done={!!sieg?.configurado} icon={Search} title="Buscador SIEG — puxa da SEFAZ direto">
+        {sieg?.configurado ? (
+          <>
+            <div className="flex items-center gap-2 mb-2">
+              <StatusChip tone="ok" label="SIEG conectado" size="sm" />
+              <span className="text-xs text-tx-muted">busca {(sieg.tipos ?? []).join(' · ')} pelo CNPJ de cada cliente</span>
+            </div>
+            <p className="text-sm text-tx-muted mb-3">
+              O SIEG captura os XMLs no SEFAZ com o certificado dos clientes. Aqui a gente <b className="text-tx">puxa direto pela API</b>,
+              deduplica pela chave de acesso e já valida a tributação — sem precisar passar pela pasta.
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={buscarSieg} disabled={siegRunning} className="btn-primary">
+                {siegRunning ? <><Loader2 className="h-4 w-4 animate-spin" /> buscando…</> : <><Search className="h-4 w-4" /> Buscar XMLs agora (lote)</>}
+              </button>
+              <span className="text-[11px] text-tx-faint">processa até 10 clientes/vez (limite de 30 req/min do SIEG)</span>
+            </div>
+            {siegResult && (
+              <div className="mt-3 text-xs text-tx-muted bg-inset border border-line rounded-lg p-3">
+                <b className="text-tx">{siegResult.novosTotal}</b> XML novos · {siegResult.processados} de {siegResult.deUmTotalElegivel} clientes elegíveis processados
+                {siegResult.semCnpjReal > 0 && <> · <span className="text-warn">{siegResult.semCnpjReal} sem CNPJ real (não buscáveis)</span></>}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-tx-muted mb-2">
+              Ligue a busca ativa: gere a chave em <b className="text-tx">SIEG → Minha Conta → Integrações API</b> e defina a variável
+              de ambiente <code className="text-tx font-mono">SIEG_API_KEY</code> no backend (Railway). O sistema passa a puxar os XMLs
+              da SEFAZ automaticamente, pelo CNPJ de cada cliente.
+            </p>
+            <p className="text-xs text-tx-faint">
+              Alternativa sem API: aponte a exportação do SIEG/Arquivei para a pasta do Drive do Passo 1 — a Esteira também lê de lá.
+            </p>
+          </>
         )}
       </Step>
 
