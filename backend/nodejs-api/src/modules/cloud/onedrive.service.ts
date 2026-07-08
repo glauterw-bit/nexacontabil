@@ -173,7 +173,8 @@ export class OneDriveService {
 
   /** Coleta recursivamente arquivos (por extensão) dentro de uma pasta. */
   async coletarArquivos(connectionId: string, driveId: string, folderId: string, opts: { ext?: string[]; maxFiles?: number } = {}) {
-    const ext = opts.ext ?? ['.xml'];
+    // além do XML (nota fiscal), captura também PDF/recibos por padrão
+    const ext = opts.ext ?? ['.xml', '.pdf'];
     const maxFiles = opts.maxFiles ?? 150;
     const out: Array<{ id: string; name: string; driveId: string; modified: string | null }> = [];
     // Fila com PRIORIDADE por recência: pastas cujo nome cita um ano/competência
@@ -190,7 +191,7 @@ export class OneDriveService {
       return 0;
     };
     let guard = 0;
-    while (queue.length && out.length < maxFiles && guard++ < 1500) {
+    while (queue.length && out.length < maxFiles && guard++ < 4000) {
       queue.sort((a, b) => rank(b.name) - rank(a.name)); // mais recente primeiro
       const cur = queue.shift()!;
       let items: any[] = [];

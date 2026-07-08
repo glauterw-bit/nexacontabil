@@ -27,9 +27,10 @@ export class AnaliseClienteService {
     });
     if (!conn) throw new BadRequestException('Nenhuma conexão OneDrive ativa.');
 
-    const arquivos = await this.onedrive.coletarArquivos(conn.id, company.sharepointDriveId, company.sharepointItemId, { ext: ['.xml'], maxFiles });
+    // captura XML (nota) + PDF/recibos e outros anexos
+    const arquivos = await this.onedrive.coletarArquivos(conn.id, company.sharepointDriveId, company.sharepointItemId, { ext: ['.xml', '.pdf'], maxFiles });
 
-    let analisados = 0, jaExistiam = 0, inconsistencias = 0, ignorados = 0;
+    let analisados = 0, jaExistiam = 0, inconsistencias = 0, ignorados = 0, outros = 0;
     let valorTotal = 0;
     const segmento = company.segmentoFiscal ?? undefined;
     const uf = company.uf ?? undefined;
@@ -42,10 +43,29 @@ export class AnaliseClienteService {
     const novos = arquivos.filter((f) => !existentes.has(f.name));
     jaExistiam = arquivos.length - novos.length;
 
-    // baixa + parseia em PARALELO (lotes de 6) — sem perder precisão
+    // NÃO-XML (PDF, recibos): captura a REFERÊNCIA sem baixar o conteúdo — fica
+    // listado/baixável e conta no acervo, sem passar pela análise fiscal (que é de XML).
+    const ehXml = (n: string) => n.toLowerCase().endsWith('.xml');
+    const naoXml = novos.filter((f) => !ehXml(f.name));
+    for (const f of naoXml) {
+      try {
+        await this.prisma.document.create({
+          data: {
+            companyId, type: f.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'arquivo',
+            status: 'recebido', originalFilename: f.name,
+            fileUrl: `${f.driveId}|${f.id}`, confidenceScore: 0,
+            issueDate: f.modified ? new Date(f.modified) : undefined,
+          },
+        });
+        outros++;
+      } catch { ignorados++; }
+    }
+
+    // XML: baixa + parseia em PARALELO (lotes de 6) — sem perder precisão
+    const xmlNovos = novos.filter((f) => ehXml(f.name));
     const CONC = 6;
-    for (let i = 0; i < novos.length; i += CONC) {
-      const fatia = novos.slice(i, i + CONC);
+    for (let i = 0; i < xmlNovos.length; i += CONC) {
+      const fatia = xmlNovos.slice(i, i + CONC);
       const parsed = await Promise.all(fatia.map(async (f) => {
         try {
           const { buffer } = await this.onedrive.downloadFile(conn.id, f.id, f.driveId);
@@ -90,13 +110,13 @@ export class AnaliseClienteService {
     // marca a pasta como varrida (mesmo com 0 docs) → não re-tenta
     await this.prisma.company.update({
       where: { id: companyId },
-      data: { sharepointAnalisadoEm: new Date(), sharepointDocsCount: analisados + jaExistiam },
+      data: { sharepointAnalisadoEm: new Date(), sharepointDocsCount: analisados + outros + jaExistiam },
     });
 
     return {
       cliente: company.name,
       arquivosEncontrados: arquivos.length,
-      analisados, jaExistiam, ignorados, inconsistencias,
+      analisados, outros, jaExistiam, ignorados, inconsistencias,
       valorTotal: Math.round(valorTotal * 100) / 100,
     };
   }
@@ -182,7 +202,7 @@ export class AnaliseClienteService {
    * só XMLs NOVOS (dedup por nome de arquivo em analisarCliente). Pensado
    * para o agendador — lote pequeno, rotação por sharepointAnalisadoEm asc.
    */
-  async sincronizarCarteira(limit = 6, maxFilesPorCliente = 120) {
+  async sincronizarCarteira(limit = 6, maxFilesPorCliente = 250) {
     const lote = await this.prisma.company.findMany({
       where: { active: true, sharepointItemId: { not: null }, sharepointAnalisadoEm: { not: null } },
       orderBy: { sharepointAnalisadoEm: 'asc' },
@@ -209,7 +229,7 @@ export class AnaliseClienteService {
    * em lotes pequenos e chamável em loop até `restantes` zerar. Usa teto maior
    * porque agora a coleta prioriza os arquivos recentes (busca 2026 de verdade).
    */
-  async resyncLote(desde: string, limit = 8, maxFilesPorCliente = 300) {
+  async resyncLote(desde: string, limit = 8, maxFilesPorCliente = 2000) {
     const cutoff = new Date(desde);
     const where: any = {
       active: true, sharepointItemId: { not: null },

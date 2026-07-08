@@ -84,10 +84,10 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     };
 
     try {
-      // 1. clientes nunca varridos (primeira captura de XMLs)
-      await passo('capturaInicial', () => this.analise.analisarLote(8, 80));
-      // 2. rotação da carteira — só XMLs novos entram (dedup por nome)
-      await passo('capturaIncremental', () => this.analise.sincronizarCarteira(6, 120));
+      // 1. clientes nunca varridos (primeira captura de XMLs + PDFs)
+      await passo('capturaInicial', () => this.analise.analisarLote(8, 150));
+      // 2. rotação da carteira — só arquivos novos entram (dedup por nome)
+      await passo('capturaIncremental', () => this.analise.sincronizarCarteira(6, 250));
       // 3. recibos ainda não checados nesta competência
       await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 8));
       // 4. re-checa quem estava sem recibo há mais de 1h
