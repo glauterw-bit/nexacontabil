@@ -72,6 +72,18 @@ export class PaineisController {
     return this.service.responsaveis();
   }
 
+  @Get('saude-implantacao')
+  saudeImplantacao() {
+    return this.service.saudeImplantacao();
+  }
+
+  /** Auto-atribui os clientes sem responsável entre os analistas ativos (round-robin). */
+  @Post('auto-atribuir')
+  async autoAtribuir() {
+    const r = await this.service.responsaveis();
+    return this.service.distribuir(r.nomes ?? []);
+  }
+
   @Get('clientes-atribuicao')
   listarClientes(@Query('q') q?: string, @Query('sem') sem?: string) {
     return this.service.listarClientes(q, sem === '1' || sem === 'true');

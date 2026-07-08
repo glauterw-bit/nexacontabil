@@ -10,7 +10,8 @@ export default function Home() {
 
   useEffect(() => {
     if (loading) return;
-    router.replace(user ? '/dashboard' : '/login');
+    if (!user) { router.replace('/login'); return; }
+    router.replace((user as any)?.role === 'analista' ? '/meu-dia' : '/operacao');
   }, [user, loading]);
 
   return (

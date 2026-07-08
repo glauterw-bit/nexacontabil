@@ -31,13 +31,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = AUTH_PATHS.some(p => pathname.startsWith(p));
 
+  // Home por papel: analista cai no Meu Dia; gestor/dono cai na Operação
+  // (a carteira toda). Nunca no /dashboard, que é a ficha de um cliente só.
+  const homePorPapel = (u: any) => (u?.role === 'analista' ? '/meu-dia' : '/operacao');
+
   useEffect(() => {
     if (!user && !isAuthPage) {
       setRedirecting(true);
       router.replace('/login');
     } else if (user && isAuthPage) {
       setRedirecting(true);
-      router.replace('/dashboard');
+      router.replace(homePorPapel(user));
     } else {
       setRedirecting(false);
     }

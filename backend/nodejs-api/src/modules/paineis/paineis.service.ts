@@ -238,9 +238,12 @@ export class PaineisService {
       where: { active: true }, select: { id: true, name: true, taxRegime: true, responsavel: true },
     });
     const ids = companies.map((c) => c.id);
-    const [docs, fluxos] = await Promise.all([
+    const [docs, fluxos, ultimaLeitura, ultimoDoc] = await Promise.all([
       this.prisma.document.findMany({ where: { companyId: { in: ids }, extractedData: { not: null } }, select: { companyId: true, totalValue: true, extractedData: true, fiscalValidation: true } }),
       this.prisma.fluxoEstado.findMany({ where: { departamento: 'fiscal', competencia: comp, companyId: { in: ids }, reciboCheckedAt: { not: null } }, select: { companyId: true, reciboEncontrado: true } }),
+      // frescor: quando o drive foi lido pela última vez e o doc mais novo capturado
+      this.prisma.company.aggregate({ where: { active: true }, _max: { sharepointAnalisadoEm: true } }),
+      this.prisma.document.aggregate({ where: { companyId: { in: ids } }, _max: { createdAt: true } }),
     ]);
     const reciboBy = new Map(fluxos.map((f) => [f.companyId, f.reciboEncontrado]));
     const mesProcessado = fluxos.length > 0; // só pune declaração se o mês já foi verificado
@@ -260,6 +263,10 @@ export class PaineisService {
 
     const REGIMES = new Set(['SIMPLES_NACIONAL', 'LUCRO_PRESUMIDO', 'LUCRO_REAL', 'MEI']);
     let verdes = 0, amarelos = 0, vermelhos = 0;
+    // vermelho tem DOIS motivos bem diferentes p/ o gestor decidir a ação: falta documento
+    // (cliente não mandou / não capturamos → cobrar) vs erro fiscal (mandou, mas a nota tem
+    // inconsistência → corrigir). Contamos separado p/ a tela mostrar dois cartões distintos.
+    let vermFalta = 0, vermErro = 0;
     let totDocs = 0, comDocs = 0, semDocs = 0, semEntradas = 0, comInc = 0, declEntregue = 0;
     let totInc = 0, valorInc = 0, clientesInc = 0;
     const clientes = companies.map((c) => {
@@ -271,6 +278,10 @@ export class PaineisService {
       if (entregue) declEntregue++;
       // semáforo: vermelho = sem docs ou muita inconsistência; amarelo = sem entradas / alguma inconsist / não entregou; verde = ok
       let status: 'verde' | 'amarelo' | 'vermelho';
+      // motivo do vermelho — o que o gestor faz a respeito:
+      //   'falta_documento' → cobrar o cliente/reativar a entrada
+      //   'erro_fiscal'     → o analista corrige a nota
+      let motivo: 'falta_documento' | 'erro_fiscal' | null = null;
       const pend: string[] = [];
       // SEMÁFORO baseado só em sinais CONFIÁVEIS: tem documento + sem erro fiscal.
       // (entradas e recibo entram como info, não derrubam o status — são sinais
@@ -281,18 +292,26 @@ export class PaineisService {
       if (a.inc > 0) pend.push(`${a.inc} inconsistência(s)`);
       if (!REGIMES.has(c.taxRegime ?? '')) pend.push('sem regime');
       if (declPendente) pend.push('declaração não entregue');
-      if (a.docs === 0 || a.inc >= 5) status = 'vermelho';
-      else if (a.inc > 0) status = 'amarelo';
+      if (a.docs === 0) { status = 'vermelho'; motivo = 'falta_documento'; }
+      else if (a.inc >= 5) { status = 'vermelho'; motivo = 'erro_fiscal'; }
+      else if (a.inc > 0) { status = 'amarelo'; motivo = 'erro_fiscal'; }
       else status = 'verde';
-      if (status === 'verde') verdes++; else if (status === 'amarelo') amarelos++; else vermelhos++;
-      return { companyId: c.id, cliente: c.name, regime: c.taxRegime, responsavel: c.responsavel, docs: a.docs, inconsistencias: a.inc, valorInc: Math.round(a.valorInc * 100) / 100, declaracaoEntregue: entregue, status, pendencias: pend };
+      if (status === 'verde') verdes++;
+      else if (status === 'amarelo') amarelos++;
+      else { vermelhos++; if (motivo === 'falta_documento') vermFalta++; else vermErro++; }
+      return { companyId: c.id, cliente: c.name, regime: c.taxRegime, responsavel: c.responsavel, docs: a.docs, inconsistencias: a.inc, valorInc: Math.round(a.valorInc * 100) / 100, declaracaoEntregue: entregue, status, motivo, pendencias: pend };
     }).sort((x, y) => ({ vermelho: 0, amarelo: 1, verde: 2 } as any)[x.status] - ({ vermelho: 0, amarelo: 1, verde: 2 } as any)[y.status] || y.inconsistencias - x.inconsistencias);
 
     return {
       competencia: comp,
       mesProcessado,
       totalClientes: companies.length,
-      semaforo: { verdes, amarelos, vermelhos },
+      // frescor dos dados: última leitura do drive + doc mais novo capturado
+      frescor: {
+        driveLidoEm: ultimaLeitura._max.sharepointAnalisadoEm ?? null,
+        ultimoDocEm: ultimoDoc._max.createdAt ?? null,
+      },
+      semaforo: { verdes, amarelos, vermelhos, vermelhoFalta: vermFalta, vermelhoErro: vermErro },
       documentos: { total: totDocs, clientesComDocs: comDocs, clientesSemDocs: semDocs },
       declaracoes: { entregues: declEntregue, pendentes: companies.length - declEntregue },
       pendencias: { clientes: amarelos + vermelhos, semDocumentos: semDocs, semEntradas },
@@ -817,6 +836,76 @@ export class PaineisService {
   // ───────────────────────────────────────────────────────────
   // ATRIBUIÇÃO cliente → responsável (destrava Meu Dia e Produtividade)
   // ───────────────────────────────────────────────────────────
+  /**
+   * SAÚDE DA IMPLANTAÇÃO — o "roteiro da 1ª hora" do gestor. Cada item é um
+   * problema de fundação com contagem e ação em massa. Some quando resolvido.
+   */
+  async saudeImplantacao() {
+    const now = new Date();
+    const ano = now.getFullYear();
+    const companies = await this.prisma.company.findMany({
+      where: { active: true },
+      select: { id: true, cnpj: true, responsavel: true, sharepointItemId: true, sharepointAnalisadoEm: true },
+    });
+    const total = companies.length;
+    const semCnpj = companies.filter((c) => (c.cnpj ?? '').replace(/\D/g, '').startsWith('7')).length;
+    const semResponsavel = companies.filter((c) => !c.responsavel).length;
+    const semPasta = companies.filter((c) => !c.sharepointItemId).length;
+
+    // calendário do ano corrente já gerado?
+    const idsComCalendario = new Set(
+      (await this.prisma.fiscalCalendarItem.findMany({
+        where: { competencia: { startsWith: String(ano) } },
+        select: { companyId: true }, distinct: ['companyId'],
+      })).map((x) => x.companyId),
+    );
+    const semCalendario = companies.filter((c) => !idsComCalendario.has(c.id)).length;
+
+    // frescor do drive
+    const staleCut = new Date(now.getTime() - 2 * 86400000);
+    let driveOk = 0, driveStale = 0, driveNunca = 0;
+    for (const c of companies) {
+      if (!c.sharepointItemId) continue;
+      if (!c.sharepointAnalisadoEm) driveNunca++;
+      else if (new Date(c.sharepointAnalisadoEm) < staleCut) driveStale++;
+      else driveOk++;
+    }
+
+    // 2026: há documentos com emissão neste ano? (entrada de docs reativada?)
+    const docs2026 = await this.prisma.document.count({
+      where: { issueDate: { gte: new Date(ano, 0, 1) } },
+    });
+
+    // itens do roteiro, em ordem de impacto; `ok:true` = resolvido (some da lista)
+    const itens = [
+      { chave: 'calendario', ok: semCalendario === 0, titulo: 'Regerar o calendário fiscal', qtd: semCalendario,
+        texto: `${semCalendario} clientes sem calendário ${ano}. Regera com as datas novas (FGTS dia 20, DCTFWeb último dia útil).`,
+        acao: 'regerar-calendario', rota: null },
+      { chave: 'responsavel', ok: semResponsavel === 0, titulo: 'Atribuir responsáveis', qtd: semResponsavel,
+        texto: `${semResponsavel} clientes sem analista. Distribui automaticamente entre a equipe (destrava Meu Dia e a torre de controle).`,
+        acao: 'auto-atribuir', rota: '/atribuir-responsavel' },
+      { chave: 'cnpj', ok: semCnpj === 0, titulo: 'Completar CNPJs', qtd: semCnpj,
+        texto: `${semCnpj} clientes com CNPJ provisório (começam com 7). Sem CNPJ real não há consulta de situação fiscal nem NFS-e nacional.`,
+        acao: null, rota: '/carteira' },
+      { chave: 'entrada2026', ok: docs2026 > 0, titulo: 'Reativar a entrada de documentos', qtd: docs2026 === 0 ? total : 0,
+        texto: docs2026 > 0 ? `${docs2026} documentos de ${ano} já capturados.` : `Nenhum documento de ${ano} no drive. Os clientes não estão enviando (ou não estão sendo arquivados). Cobre os clientes ou avalie captura direta na SEFAZ.`,
+        acao: null, rota: '/solicitacoes' },
+      { chave: 'drive', ok: driveStale + driveNunca === 0, titulo: 'Leitura do drive em dia', qtd: driveStale + driveNunca,
+        texto: `${driveOk} clientes atualizados · ${driveStale} desatualizados · ${driveNunca} nunca lidos. A varredura roda a cada 15 min.`,
+        acao: 'sincronizar', rota: null },
+    ];
+    const pendentes = itens.filter((i) => !i.ok);
+    const pct = itens.length ? Math.round(((itens.length - pendentes.length) / itens.length) * 100) : 100;
+
+    return {
+      total, ano,
+      completo: pendentes.length === 0,
+      pctSaude: pct,
+      resumo: { semCnpj, semResponsavel, semCalendario, semPasta, docs2026, drive: { ok: driveOk, desatualizado: driveStale, nunca: driveNunca } },
+      itens,
+    };
+  }
+
   async responsaveis() {
     const [companies, users] = await Promise.all([
       this.prisma.company.findMany({ select: { responsavel: true } }),

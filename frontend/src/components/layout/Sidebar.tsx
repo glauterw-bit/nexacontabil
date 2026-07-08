@@ -11,6 +11,7 @@ import {
   Banknote, ClipboardList, Landmark, Scale, Package, FileCode, FileText,
   UserCheck, Award, Globe, DollarSign, Megaphone, Store, Bot,
   Workflow, Boxes, FileDown, Inbox, Search, ArrowLeftRight, Hash, FolderTree,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useCompany, Company } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,6 +38,7 @@ const VISAO: NavItem[] = [
   { href: '/gerencial', icon: LayoutDashboard, label: 'Painel Gerencial' },
   { href: '/farois',    icon: Lightbulb,       label: 'Faróis' },
   { href: '/meu-dia',   icon: Sun,             label: 'Meu Dia' },
+  { href: '/implantacao', icon: ClipboardCheck, label: 'Saúde da Implantação' },
 ];
 
 const CAMINHO: Step[] = [
@@ -89,7 +91,6 @@ const MODULOS: NavGroup[] = [
   {
     label: 'Gestão avançada',
     items: [
-      { href: '/visao-geral',          icon: Building2, label: 'Visão Geral' },
       { href: '/painel-analista',      icon: UserCheck, label: 'Painel do Analista' },
       { href: '/produtividade',        icon: Users,     label: 'Produtividade' },
       { href: '/atribuir-responsavel', icon: UserCheck, label: 'Atribuir Responsáveis' },

@@ -250,6 +250,36 @@ export class FiscalCalendarService {
     return { generated: data.length };
   }
 
+  /**
+   * REGERA o calendário de um ano para TODAS as empresas ativas — com as datas
+   * corrigidas (FGTS dia 20, DCTFWeb último dia útil, etc). Apaga os itens do ano
+   * que ainda NÃO foram pagos/entregues (preserva histórico de comprovantes) e cria
+   * de novo. Ideal para aplicar as regras novas em massa.
+   */
+  async regenerarTodos(ano: number) {
+    const companies = await this.prisma.company.findMany({
+      where: { active: true }, select: { id: true },
+    });
+    let empresas = 0, gerados = 0, apagados = 0;
+    for (const c of companies) {
+      // apaga só o que está em aberto deste ano (mensais YYYY-MM e anuais YYYY / YYYY-Tn)
+      const del = await this.prisma.fiscalCalendarItem.deleteMany({
+        where: {
+          companyId: c.id,
+          competencia: { startsWith: String(ano) },
+          status: { notIn: ['paga', 'isenta', 'entregue'] },
+        },
+      });
+      apagados += del.count;
+      try {
+        const r = await this.gerarAnual(c.id, ano);
+        gerados += r.generated;
+        empresas++;
+      } catch { /* empresa sem regime válido — pula */ }
+    }
+    return { empresas, gerados, apagadosEmAberto: apagados, ano };
+  }
+
   /** Diariamente: marca obrigações vencidas. Pode ser chamado por cron externo. */
   async markOverdue() {
     const now = new Date();

@@ -42,3 +42,6 @@ htmlcov/
 
 # TypeScript
 *.tsbuildinfo
+
+# dados de diagnóstico (podem conter tokens/CNPJs) — nunca versionar
+scripts/dados/

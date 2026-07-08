@@ -40,6 +40,11 @@ export class FiscalCalendarController {
     return this.service.gerarAnual(body.companyId, body.ano);
   }
 
+  @Post('regenerar-todos')
+  regenerarTodos(@Body() body: { ano?: number }) {
+    return this.service.regenerarTodos(body?.ano ?? new Date().getFullYear());
+  }
+
   @Post('mark-overdue')
   markOverdue() {
     return this.service.markOverdue();
