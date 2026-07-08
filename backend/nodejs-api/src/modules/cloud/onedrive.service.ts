@@ -172,9 +172,11 @@ export class OneDriveService {
   }
 
   /** Coleta recursivamente arquivos (por extensão) dentro de uma pasta. */
-  async coletarArquivos(connectionId: string, driveId: string, folderId: string, opts: { ext?: string[]; maxFiles?: number } = {}) {
-    // além do XML (nota fiscal), captura também PDF/recibos por padrão
+  async coletarArquivos(connectionId: string, driveId: string, folderId: string, opts: { ext?: string[]; maxFiles?: number; todos?: boolean } = {}) {
+    // todos=true → captura QUALQUER arquivo (sem filtro de extensão).
+    // senão, além do XML captura PDF/recibos por padrão.
     const ext = opts.ext ?? ['.xml', '.pdf'];
+    const pegarTudo = opts.todos === true;
     const maxFiles = opts.maxFiles ?? 150;
     const out: Array<{ id: string; name: string; driveId: string; modified: string | null }> = [];
     // Fila com PRIORIDADE por recência: pastas cujo nome cita um ano/competência
@@ -191,7 +193,7 @@ export class OneDriveService {
       return 0;
     };
     let guard = 0;
-    while (queue.length && out.length < maxFiles && guard++ < 4000) {
+    while (queue.length && out.length < maxFiles && guard++ < 20000) {
       queue.sort((a, b) => rank(b.name) - rank(a.name)); // mais recente primeiro
       const cur = queue.shift()!;
       let items: any[] = [];
@@ -199,7 +201,7 @@ export class OneDriveService {
       for (const it of items) {
         if (it.isFolder) { queue.push({ id: it.id, name: it.name }); continue; }
         const n = (it.name ?? '').toLowerCase();
-        if (ext.some((e) => n.endsWith(e))) {
+        if (pegarTudo || ext.some((e) => n.endsWith(e))) {
           out.push({ id: it.id, name: it.name, driveId, modified: it.modified ?? null });
           if (out.length >= maxFiles) break;
         }

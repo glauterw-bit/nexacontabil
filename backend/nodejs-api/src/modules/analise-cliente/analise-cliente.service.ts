@@ -16,7 +16,7 @@ export class AnaliseClienteService {
    * Lê os XMLs da pasta SharePoint do cliente, extrai os dados fiscais,
    * valida a tributação contra o Banco de NCM e salva como Document analisado.
    */
-  async analisarCliente(companyId: string, maxFiles = 120) {
+  async analisarCliente(companyId: string, maxFiles = 120, todos = false) {
     const company = await this.prisma.company.findUnique({ where: { id: companyId } });
     if (!company) throw new NotFoundException('Empresa não encontrada');
     if (!company.sharepointItemId || !company.sharepointDriveId) {
@@ -27,8 +27,8 @@ export class AnaliseClienteService {
     });
     if (!conn) throw new BadRequestException('Nenhuma conexão OneDrive ativa.');
 
-    // captura XML (nota) + PDF/recibos e outros anexos
-    const arquivos = await this.onedrive.coletarArquivos(conn.id, company.sharepointDriveId, company.sharepointItemId, { ext: ['.xml', '.pdf'], maxFiles });
+    // todos=true → puxa QUALQUER arquivo da pasta; senão XML (nota) + PDF/recibos
+    const arquivos = await this.onedrive.coletarArquivos(conn.id, company.sharepointDriveId, company.sharepointItemId, { ext: ['.xml', '.pdf'], maxFiles, todos });
 
     let analisados = 0, jaExistiam = 0, inconsistencias = 0, ignorados = 0, outros = 0;
     let valorTotal = 0;
@@ -47,11 +47,12 @@ export class AnaliseClienteService {
     // listado/baixável e conta no acervo, sem passar pela análise fiscal (que é de XML).
     const ehXml = (n: string) => n.toLowerCase().endsWith('.xml');
     const naoXml = novos.filter((f) => !ehXml(f.name));
+    const extDe = (nome: string) => { const p = nome.split('.'); return p.length > 1 ? p.pop()!.toLowerCase().slice(0, 12) : 'arquivo'; };
     for (const f of naoXml) {
       try {
         await this.prisma.document.create({
           data: {
-            companyId, type: f.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'arquivo',
+            companyId, type: extDe(f.name), // pdf | jpg | xlsx | docx | ...
             status: 'recebido', originalFilename: f.name,
             fileUrl: `${f.driveId}|${f.id}`, confidenceScore: 0,
             issueDate: f.modified ? new Date(f.modified) : undefined,
@@ -229,7 +230,7 @@ export class AnaliseClienteService {
    * em lotes pequenos e chamável em loop até `restantes` zerar. Usa teto maior
    * porque agora a coleta prioriza os arquivos recentes (busca 2026 de verdade).
    */
-  async resyncLote(desde: string, limit = 8, maxFilesPorCliente = 2000) {
+  async resyncLote(desde: string, limit = 6, maxFilesPorCliente = 100000) {
     const cutoff = new Date(desde);
     const where: any = {
       active: true, sharepointItemId: { not: null },
@@ -244,9 +245,10 @@ export class AnaliseClienteService {
     const detalhes: any[] = [];
     for (const c of lote) {
       try {
-        const r = await this.analisarCliente(c.id, maxFilesPorCliente);
-        novosDocs += r.analisados ?? 0;
-        if (r.analisados) detalhes.push({ cliente: c.name, novos: r.analisados });
+        // resync profundo puxa TODO e QUALQUER arquivo (todos=true), sem filtro de tipo
+        const r = await this.analisarCliente(c.id, maxFilesPorCliente, true);
+        novosDocs += (r.analisados ?? 0) + (r.outros ?? 0);
+        if ((r.analisados ?? 0) + (r.outros ?? 0) > 0) detalhes.push({ cliente: c.name, notas: r.analisados, outros: r.outros });
       } catch (e: any) {
         // marca como tocado nesta rodada mesmo em erro, pra não travar o loop
         await this.prisma.company.update({ where: { id: c.id }, data: { sharepointAnalisadoEm: new Date() } }).catch(() => undefined);

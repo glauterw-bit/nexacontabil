@@ -39,6 +39,36 @@ export default function DriveConectadoPage() {
   const [saBusy, setSaBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // resync completo (puxa todo e qualquer arquivo)
+  const [resync, setResync] = useState<{ rodando: boolean; processados: number; restantes: number; novos: number } | null>(null);
+  const pararRef = (typeof window !== 'undefined') ? (window as any) : {};
+
+  async function puxarTudo() {
+    if (resync?.rodando) { pararRef.__pararResync = true; return; }
+    pararRef.__pararResync = false;
+    const desde = new Date().toISOString();
+    let processados = 0, novos = 0, restantes = 1;
+    setResync({ rodando: true, processados: 0, restantes: 0, novos: 0 });
+    try {
+      // chama em loop até restantes = 0 (ou o usuário parar)
+      while (restantes > 0 && !pararRef.__pararResync) {
+        const r = await fetch(`${API}/api/v1/analise-cliente/resync`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({ desde, limit: 6 }),
+        });
+        if (!r.ok) { toast.push('Falha no resync — verifique a conexão do drive.', { variant: 'error' }); break; }
+        const d = await r.json();
+        processados += d.processados ?? 0;
+        novos += d.novosDocs ?? 0;
+        restantes = d.restantes ?? 0;
+        setResync({ rodando: restantes > 0 && !pararRef.__pararResync, processados, restantes, novos });
+      }
+      toast.push(`Resync ${pararRef.__pararResync ? 'pausado' : 'concluído'}: ${novos} arquivo(s) novo(s) em ${processados} clientes.`, { variant: 'success' });
+    } finally {
+      setResync((s) => s ? { ...s, rodando: false } : null);
+    }
+  }
+
   async function load() {
     setLoading(true);
     try {
@@ -120,6 +150,29 @@ export default function DriveConectadoPage() {
             style={{ background: tint(COLORS.acao, 12), border: `1px solid ${tint(COLORS.acao, 30)}` }}>Novo</span>
         }
       />
+
+      {/* Resync completo — puxa TODO e QUALQUER arquivo do drive */}
+      <div className="card-aura space-y-2" style={{ borderColor: tint(COLORS.acao, 30), background: tint(COLORS.acao, 5) }}>
+        <div className="flex items-center gap-2">
+          <FolderOpen size={16} style={{ color: COLORS.acao }} />
+          <h2 className="text-[15px] font-semibold text-tx-strong">Puxar todos os arquivos do drive</h2>
+        </div>
+        <p className="text-xs text-tx-muted">
+          Varredura completa e sem teto: captura <b className="text-tx">qualquer arquivo</b> (XML, PDF, recibos, planilhas, imagens)
+          de todas as pastas dos clientes. Roda em lotes — pode levar um tempo em carteiras grandes; pode pausar quando quiser.
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={puxarTudo} className={resync?.rodando ? 'btn-secondary' : 'btn-primary'}>
+            {resync?.rodando ? <><Loader2 className="h-4 w-4 animate-spin" /> Pausar</> : <><FolderOpen className="h-4 w-4" /> Puxar tudo agora</>}
+          </button>
+          {resync && (
+            <span className="text-xs text-tx-muted">
+              {resync.processados} clientes processados · <b className="text-tx">{resync.novos}</b> arquivo(s) novo(s)
+              {resync.rodando && resync.restantes > 0 && ` · ${resync.restantes} restantes`}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Conta de Serviço — caminho recomendado (sem login/senha) */}
       <div className="card-aura space-y-3" style={{ borderColor: tint(COLORS.ok, 30), background: tint(COLORS.ok, 5) }}>
