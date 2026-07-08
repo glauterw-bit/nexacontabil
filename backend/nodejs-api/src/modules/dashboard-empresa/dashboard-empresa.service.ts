@@ -22,7 +22,9 @@ export class DashboardEmpresaService {
 
     const [tasks, obrigacoes, honorarios, documents] = await Promise.all([
       this.prisma.workflowTask.findMany({ where: { companyId, competencia: comp } }),
-      this.prisma.fiscalObligation.findMany({ where: { companyId }, orderBy: { dueDate: 'asc' }, take: 60 }),
+      // calendário: mesma fonte única do resto do sistema (fiscal_calendar_items), mapeado p/ o formato desta tela
+      this.prisma.fiscalCalendarItem.findMany({ where: { companyId }, orderBy: { dataVencimento: 'asc' }, take: 80 })
+        .then((its) => its.map((o) => ({ name: o.descricao || o.tipo, type: o.tipo, dueDate: o.dataVencimento, status: o.status }))),
       this.prisma.honorario.findMany({ where: { companyId, status: { in: ['pendente', 'atrasado'] } } }),
       this.prisma.document.findMany({ where: { companyId }, orderBy: { createdAt: 'desc' }, take: 5000 }),
     ]);
@@ -41,10 +43,11 @@ export class DashboardEmpresaService {
     });
     const concluidas = tasks.filter((t) => t.status === 'concluida').length;
 
-    // ── Obrigações fiscais (calendário) ──
-    const obrigVencidas = obrigacoes.filter((o) => o.status === 'overdue' || (o.status === 'pending' && o.dueDate < now));
+    // ── Obrigações fiscais (calendário) ── status: pendente|em_apuracao|apurada|paga|vencida|isenta
+    const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    const obrigVencidas = obrigacoes.filter((o) => !ENTREGUE.has(o.status) && (o.status === 'vencida' || o.dueDate < now));
     const obrigProximas = obrigacoes
-      .filter((o) => o.status !== 'completed' && o.dueDate >= now)
+      .filter((o) => !ENTREGUE.has(o.status) && o.dueDate >= now)
       .slice(0, 8)
       .map((o) => ({ nome: o.name, tipo: o.type, venc: o.dueDate, status: o.status }));
 

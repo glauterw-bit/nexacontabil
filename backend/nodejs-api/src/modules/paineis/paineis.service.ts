@@ -513,26 +513,39 @@ export class PaineisService {
     const ini = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const fim = new Date(now.getFullYear(), now.getMonth() + 2, 0);
 
-    const obrigs = await this.prisma.fiscalObligation.findMany({
-      where: { dueDate: { gte: ini, lte: fim }, ...(responsavel ? { responsavel } : {}) },
-      select: { companyId: true, name: true, type: true, dueDate: true, status: true, responsavel: true },
+    // FONTE ÚNICA DO CALENDÁRIO: fiscal_calendar_items (mesma tabela que a "Regerar
+    // calendário" preenche, com as datas corretas — FGTS dia 20, DCTFWeb último dia útil).
+    // O responsável mora na empresa, então filtramos por companyId.
+    let companyIds: string[] | null = null;
+    if (responsavel) {
+      const cos = await this.prisma.company.findMany({ where: { responsavel }, select: { id: true } });
+      companyIds = cos.map((c) => c.id);
+    }
+    const obrigs = await this.prisma.fiscalCalendarItem.findMany({
+      where: {
+        dataVencimento: { gte: ini, lte: fim },
+        ...(companyIds ? { companyId: { in: companyIds } } : {}),
+      },
+      select: { companyId: true, descricao: true, tipo: true, dataVencimento: true, status: true },
     });
 
-    const isAtrasada = (o: any) => o.status !== 'transmitted' && o.status !== 'delivered' && new Date(o.dueDate) < now;
+    const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    const isEntregue = (o: any) => ENTREGUE.has(o.status);
+    const isAtrasada = (o: any) => !isEntregue(o) && (o.status === 'vencida' || new Date(o.dataVencimento) < now);
 
     // agrupa por dia + tipo
     const porData = new Map<string, { data: string; tipos: Map<string, { total: number; atrasadas: number }> }>();
     let atrasadas = 0, proximas = 0, entregues = 0;
     for (const o of obrigs) {
-      const dia = new Date(o.dueDate).toISOString().slice(0, 10);
+      const dia = new Date(o.dataVencimento).toISOString().slice(0, 10);
       if (!porData.has(dia)) porData.set(dia, { data: dia, tipos: new Map() });
       const bucket = porData.get(dia)!;
-      const t = bucket.tipos.get(o.type) ?? { total: 0, atrasadas: 0 };
+      const t = bucket.tipos.get(o.tipo) ?? { total: 0, atrasadas: 0 };
       t.total++;
       if (isAtrasada(o)) { t.atrasadas++; atrasadas++; }
-      bucket.tipos.set(o.type, t);
-      const dd = new Date(o.dueDate);
-      if (o.status === 'transmitted' || o.status === 'delivered') entregues++;
+      bucket.tipos.set(o.tipo, t);
+      const dd = new Date(o.dataVencimento);
+      if (isEntregue(o)) entregues++;
       else if (dd >= now && dd <= new Date(now.getTime() + 7 * 864e5)) proximas++;
     }
 
@@ -543,9 +556,9 @@ export class PaineisService {
     // resumo por tipo
     const porTipo = new Map<string, { total: number; atrasadas: number }>();
     for (const o of obrigs) {
-      const t = porTipo.get(o.type) ?? { total: 0, atrasadas: 0 };
+      const t = porTipo.get(o.tipo) ?? { total: 0, atrasadas: 0 };
       t.total++; if (isAtrasada(o)) t.atrasadas++;
-      porTipo.set(o.type, t);
+      porTipo.set(o.tipo, t);
     }
 
     return {
@@ -980,16 +993,17 @@ export class PaineisService {
     const coIds = new Set(companies.map((c) => c.id));
     const coById = new Map(companies.map((c) => [c.id, c]));
 
-    // obrigações vencidas + próximas
-    const obrigs = await this.prisma.fiscalObligation.findMany({
+    // obrigações vencidas + próximas — mesma fonte do calendário (fiscal_calendar_items)
+    const obrigsRaw = await this.prisma.fiscalCalendarItem.findMany({
       where: {
-        dueDate: { lte: em7 },
-        status: { notIn: ['transmitted', 'delivered'] },
+        dataVencimento: { lte: em7 },
+        status: { notIn: ['paga', 'isenta', 'entregue'] },
         ...(responsavel ? { companyId: { in: [...coIds] } } : {}),
       },
-      select: { companyId: true, name: true, type: true, dueDate: true },
-      orderBy: { dueDate: 'asc' }, take: 100,
+      select: { companyId: true, descricao: true, tipo: true, dataVencimento: true },
+      orderBy: { dataVencimento: 'asc' }, take: 100,
     });
+    const obrigs = obrigsRaw.map((o) => ({ companyId: o.companyId, name: o.descricao || o.tipo, type: o.tipo, dueDate: o.dataVencimento }));
 
     // inconsistências a corrigir
     const docs = await this.prisma.document.findMany({
