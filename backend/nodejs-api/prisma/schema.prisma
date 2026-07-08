@@ -74,6 +74,11 @@ model Company {
   sharepointAnalisadoEm DateTime? // quando a pasta foi varrida (evita re-tentar)
   sharepointDocsCount  Int?     // nº de XMLs analisados na última varredura
 
+  // SEFAZ NFeDistribuiçãoDFe: controle de NSU (Número Sequencial Único) por cliente
+  sefazUltNSU          String?   // último NSU já lido (retoma de onde parou)
+  sefazMaxNSU          String?   // maior NSU informado pelo SEFAZ na última consulta
+  sefazUltConsultaEm   DateTime? // quando consultou o SEFAZ por último (respeita o limite de consumo)
+
   honorarios           Honorario[]
   crmClientes          CrmCliente[]
   tarefas              Tarefa[]

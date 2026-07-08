@@ -102,6 +102,7 @@ const MODULOS: NavGroup[] = [
   {
     label: 'Fiscal avançado',
     items: [
+      { href: '/sefaz',            icon: Landmark,    label: 'Buscar no SEFAZ' },
       { href: '/simples-nacional', icon: Award,       label: 'Simples Nacional' },
       { href: '/sped',             icon: FileCode,    label: 'SPED / EFD' },
       { href: '/fiscal',           icon: Receipt,     label: 'NF-e / NFS-e' },
