@@ -705,6 +705,115 @@ export class PaineisService {
     };
   }
 
+  /**
+   * PAINEL DO ANALISTA — o gerente abre e vê TODA a carteira de um analista:
+   * cada cliente com urgência, pendências, inconsistências (com o que são) e o
+   * FRESCOR DO DRIVE (quando os docs foram lidos pela última vez). Se `responsavel`
+   * vier vazio, devolve a lista de analistas para escolher.
+   */
+  async painelAnalista(responsavel?: string) {
+    const analistas = await this.responsaveis();
+    if (!responsavel) return { escolher: true, analistas: analistas.nomes ?? [] };
+
+    const now = new Date();
+    const comp = now.toISOString().slice(0, 7);
+    const companies = await this.prisma.company.findMany({
+      where: { active: true, responsavel },
+      select: { id: true, name: true, taxRegime: true, sharepointItemId: true, sharepointAnalisadoEm: true, sharepointDocsCount: true },
+    });
+    const ids = companies.map((c) => c.id);
+
+    // docs + inconsistências (com os textos, pra explicar o que é)
+    const docs = await this.prisma.document.findMany({
+      where: { companyId: { in: ids }, extractedData: { not: null } },
+      select: { companyId: true, extractedData: true, fiscalValidation: true },
+    });
+    type Ag = { docs: number; entradas: number; inc: number; incTextos: string[] };
+    const ag = new Map<string, Ag>();
+    for (const d of docs) {
+      const a = ag.get(d.companyId) ?? { docs: 0, entradas: 0, inc: 0, incTextos: [] };
+      a.docs++;
+      const nf = safe(d.extractedData);
+      const dir = String(nf?.itens?.[0]?.cfop ?? '')[0];
+      if (['1', '2', '3'].includes(dir)) a.entradas++;
+      const inc: string[] = safe(d.fiscalValidation)?.inconsistencias ?? [];
+      if (inc.length) { a.inc += inc.length; for (const t of inc) if (a.incTextos.length < 4) a.incTextos.push(t); }
+      ag.set(d.companyId, a);
+    }
+
+    // obrigações por cliente (competência corrente + vencidas em aberto)
+    const obrig = await this.prisma.fiscalCalendarItem.findMany({
+      where: { companyId: { in: ids } },
+      select: { companyId: true, status: true, dataVencimento: true, competencia: true, tipo: true, descricao: true },
+    });
+    type Ob = { pendentes: number; vencidas: number; proximas7: number; itensUrgentes: { tipo: string; venc: string }[] };
+    const obBy = new Map<string, Ob>();
+    const em7 = new Date(now.getTime() + 7 * 86400000);
+    for (const o of obrig) {
+      const entregue = o.status === 'paga' || o.status === 'isenta';
+      const venc = new Date(o.dataVencimento);
+      const relevante = o.competencia === comp || (!entregue && venc < now);
+      if (!relevante || entregue) continue;
+      const b = obBy.get(o.companyId) ?? { pendentes: 0, vencidas: 0, proximas7: 0, itensUrgentes: [] };
+      b.pendentes++;
+      if (venc < now) { b.vencidas++; if (b.itensUrgentes.length < 3) b.itensUrgentes.push({ tipo: o.tipo, venc: venc.toISOString().slice(0, 10) }); }
+      else if (venc <= em7) { b.proximas7++; if (b.itensUrgentes.length < 3) b.itensUrgentes.push({ tipo: o.tipo, venc: venc.toISOString().slice(0, 10) }); }
+      obBy.set(o.companyId, b);
+    }
+
+    // frescor do drive: quando cada cliente foi lido por último
+    const DIAS_STALE = 2;
+    const staleCut = new Date(now.getTime() - DIAS_STALE * 86400000);
+    let driveOk = 0, driveStale = 0, driveNunca = 0, semPasta = 0;
+
+    const clientes = companies.map((c) => {
+      const a = ag.get(c.id) ?? { docs: 0, entradas: 0, inc: 0, incTextos: [] };
+      const b = obBy.get(c.id) ?? { pendentes: 0, vencidas: 0, proximas7: 0, itensUrgentes: [] };
+      // frescor do drive
+      let drive: 'ok' | 'desatualizado' | 'nunca' | 'sem_pasta';
+      if (!c.sharepointItemId) { drive = 'sem_pasta'; semPasta++; }
+      else if (!c.sharepointAnalisadoEm) { drive = 'nunca'; driveNunca++; }
+      else if (new Date(c.sharepointAnalisadoEm) < staleCut) { drive = 'desatualizado'; driveStale++; }
+      else { drive = 'ok'; driveOk++; }
+
+      const pend: string[] = [];
+      if (a.docs === 0) pend.push('sem documentos no mês');
+      else if (a.entradas === 0) pend.push('sem notas de entrada');
+      if (b.pendentes > 0) pend.push(`${b.pendentes} obrigação(ões) a entregar`);
+      if (a.inc > 0) pend.push(`${a.inc} inconsistência(s) fiscais`);
+
+      // urgência: obrigação vencida > vence em 7d > muita inconsistência > sem docs
+      let urgencia: 'critica' | 'alta' | 'media' | 'ok';
+      if (b.vencidas > 0) urgencia = 'critica';
+      else if (b.proximas7 > 0 || a.inc >= 5) urgencia = 'alta';
+      else if (a.inc > 0 || a.docs === 0) urgencia = 'media';
+      else urgencia = 'ok';
+
+      return {
+        companyId: c.id, cliente: c.name, regime: c.taxRegime,
+        docs: a.docs, inconsistencias: a.inc, incExemplos: a.incTextos,
+        obrigPendentes: b.pendentes, obrigVencidas: b.vencidas, obrigProximas7: b.proximas7, obrigItens: b.itensUrgentes,
+        drive, driveLidoEm: c.sharepointAnalisadoEm ?? null,
+        pendencias: pend, urgencia,
+      };
+    }).sort((x, y) => ({ critica: 0, alta: 1, media: 2, ok: 3 } as any)[x.urgencia] - ({ critica: 0, alta: 1, media: 2, ok: 3 } as any)[y.urgencia]
+      || y.obrigVencidas - x.obrigVencidas || y.inconsistencias - x.inconsistencias);
+
+    return {
+      responsavel, competencia: comp, analistas: analistas.nomes ?? [],
+      resumo: {
+        clientes: companies.length,
+        criticos: clientes.filter((c) => c.urgencia === 'critica').length,
+        altos: clientes.filter((c) => c.urgencia === 'alta').length,
+        obrigVencidas: clientes.reduce((s, c) => s + c.obrigVencidas, 0),
+        obrigPendentes: clientes.reduce((s, c) => s + c.obrigPendentes, 0),
+        comInconsistencia: clientes.filter((c) => c.inconsistencias > 0).length,
+      },
+      drive: { ok: driveOk, desatualizado: driveStale, nunca: driveNunca, semPasta, diasStale: DIAS_STALE },
+      clientes,
+    };
+  }
+
   // ───────────────────────────────────────────────────────────
   // ATRIBUIÇÃO cliente → responsável (destrava Meu Dia e Produtividade)
   // ───────────────────────────────────────────────────────────

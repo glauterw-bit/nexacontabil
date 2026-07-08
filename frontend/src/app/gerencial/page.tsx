@@ -274,7 +274,11 @@ function CarteiraAnalistas({ ca }: { ca: any }) {
           const entregaCor = a.pctEntrega >= 90 ? COLORS.ok : a.pctEntrega >= 70 ? COLORS.atencao : COLORS.erro;
           const erroCor = a.taxaErro > 2 ? COLORS.erro : a.taxaErro > 1 ? COLORS.atencao : COLORS.ok;
           return (
-            <div key={a.responsavel} style={{ display: 'flex', alignItems: 'center', padding: '11px 14px', borderBottom: `1px solid ${COLORS.borderSoft}`, fontSize: 13, gap: 4 }}>
+            <Link key={a.responsavel} href={`/painel-analista?responsavel=${encodeURIComponent(a.responsavel)}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div
+              onMouseEnter={(e) => (e.currentTarget.style.background = COLORS.surface2)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              style={{ display: 'flex', alignItems: 'center', padding: '11px 14px', borderBottom: `1px solid ${COLORS.borderSoft}`, fontSize: 13, gap: 4, cursor: 'pointer', transition: 'background .1s' }}>
               {/* analista */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, color: COLORS.strong, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.responsavel}</div>
@@ -314,6 +318,7 @@ function CarteiraAnalistas({ ca }: { ca: any }) {
                 <span style={{ color: COLORS.faint, fontSize: 11 }}> erro{a.clientesComErro ? ` · ${a.clientesComErro} cli.` : ''}</span>
               </div>
             </div>
+            </Link>
           );
         })}
       </Card>

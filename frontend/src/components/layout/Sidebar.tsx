@@ -90,6 +90,7 @@ const MODULOS: NavGroup[] = [
     label: 'Gestão avançada',
     items: [
       { href: '/visao-geral',          icon: Building2, label: 'Visão Geral' },
+      { href: '/painel-analista',      icon: UserCheck, label: 'Painel do Analista' },
       { href: '/produtividade',        icon: Users,     label: 'Produtividade' },
       { href: '/atribuir-responsavel', icon: UserCheck, label: 'Atribuir Responsáveis' },
       { href: '/gestao-equipe',        icon: Users,     label: 'Gestão de Equipe' },

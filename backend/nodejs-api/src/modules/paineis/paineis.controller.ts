@@ -37,6 +37,11 @@ export class PaineisController {
     return this.service.carteiraAnalistas();
   }
 
+  @Get('painel-analista')
+  painelAnalista(@Query('responsavel') responsavel?: string) {
+    return this.service.painelAnalista(responsavel);
+  }
+
   @Get('operacao')
   operacao(@Query('competencia') competencia?: string) {
     return this.service.operacao(competencia);

@@ -21,6 +21,7 @@ const ROUTE_LABELS: Record<string, string> = {
   solicitacoes: 'Solicitar Clientes',
   produtividade: 'Produtividade',
   'atribuir-responsavel': 'Atribuir Responsáveis',
+  'painel-analista': 'Painel do Analista',
   fluxo: 'Fluxo de Trabalho',
   'buscar-docs': 'Buscar Documentos',
   'captura-xml': 'Captura de XMLs',
