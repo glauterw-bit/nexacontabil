@@ -400,6 +400,7 @@ export class SefazDistribuicaoService {
       this.prisma.document.count({ where: { fileUrl: { startsWith: 'sefaz|' } } }),
     ]);
     const esc = await this.certificados.temEscritorio();
+    const certUsavel = esc.tem ? await this.certificadoEscritorioUsavel() : false;
     // amostra de erros da última varredura SEM nomes de clientes (endpoint público)
     const v = this.ultimaVarredura;
     const ultima = v ? {
@@ -409,6 +410,7 @@ export class SefazDistribuicaoService {
     } : null;
     return {
       certificadoEscritorio: esc.tem ? { cnpj: esc.cnpj, validade: esc.validade } : null,
+      certificadoUsavel: certUsavel, // a senha realmente abre o PFX? (mTLS pronto)
       clientesAtivos: totalAtivos,
       clientesComUF: comUF,
       clientesSemUF: semUF,
