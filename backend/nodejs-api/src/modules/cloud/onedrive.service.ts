@@ -401,6 +401,53 @@ export class OneDriveService {
     return { total: cart.clientes.length, criados, atualizados, erros };
   }
 
+  /**
+   * Religa pastas ÓRFÃS: clientes cujo sharepointItemId não existe mais (pasta movida/
+   * recriada — Graph devolve 404 itemNotFound e o Delta nunca fecha). Procura a pasta
+   * atual pelo código/nome na carteira; achou → religa (e respeita Ativas/Inativas);
+   * não achou → limpa o vínculo (vira pendência nomeada na verificação final).
+   */
+  async repararPastasOrfas(connectionId: string, opts?: { max?: number }) {
+    const token = await this.getValidToken(connectionId);
+    // suspeitos: pasta vinculada mas Delta nunca fechou (deltaLink null)
+    const suspeitos = await this.prisma.company.findMany({
+      where: { active: true, sharepointItemId: { not: null }, sharepointDeltaLink: null },
+      select: { id: true, name: true, clienteCodigo: true, sharepointItemId: true, sharepointDriveId: true },
+      take: opts?.max ?? 40,
+    });
+    if (!suspeitos.length) return { suspeitos: 0, religadas: 0, inativadas: 0, semPasta: 0 };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    let carteira: any[] | null = null;
+    let religadas = 0, inativadas = 0, semPasta = 0, pastaExiste = 0, erros = 0;
+    for (const c of suspeitos) {
+      try {
+        const r: any = await fetch(`${GRAPH_BASE}/drives/${c.sharepointDriveId}/items/${c.sharepointItemId}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (r.ok) { pastaExiste++; continue; } // pasta existe — delta falhou por outro motivo (throttle etc.)
+        if (r.status !== 404) { erros++; continue; }
+        carteira ??= (((await this.getCarteira(connectionId)) as any).clientes ?? []);
+        const alvoNome = norm(c.name);
+        const m = (carteira ?? []).find((x: any) =>
+          (c.clienteCodigo && x.codigo && String(x.codigo) === String(c.clienteCodigo)) || norm(x.nome) === alvoNome);
+        if (m) {
+          const jaUsada = await this.prisma.company.findUnique({ where: { sharepointItemId: m.itemId }, select: { id: true } });
+          if (jaUsada && jaUsada.id !== c.id) {
+            await this.prisma.company.update({ where: { id: c.id }, data: { sharepointItemId: null, sharepointDeltaLink: null } });
+            semPasta++; continue;
+          }
+          await this.prisma.company.update({
+            where: { id: c.id },
+            data: { sharepointItemId: m.itemId, sharepointDriveId: m.driveId, sharepointDeltaLink: null, active: m.ativo },
+          });
+          if (m.ativo) religadas++; else inativadas++; // pasta em "Empresas Inativas" → cliente saiu
+        } else {
+          await this.prisma.company.update({ where: { id: c.id }, data: { sharepointItemId: null, sharepointDeltaLink: null } });
+          semPasta++;
+        }
+      } catch { erros++; }
+    }
+    return { suspeitos: suspeitos.length, pastaExiste, religadas, inativadas, semPasta, erros };
+  }
+
   /** Lista itens compartilhados COM a conta (Compartilhados comigo). */
   async listShared(connectionId: string) {
     const token = await this.getValidToken(connectionId);

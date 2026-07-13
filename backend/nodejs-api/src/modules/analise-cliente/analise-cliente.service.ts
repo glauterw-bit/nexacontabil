@@ -300,6 +300,13 @@ export class AnaliseClienteService {
 
   /** Delta em lote (agendador/manual): clientes há mais tempo sem sync, com pasta.
    *  Processa CLIENTES EM PARALELO (turbo) — muito mais rápido na carga inicial. */
+  /** Religa pastas órfãs (itemId que virou 404 no Graph) usando a conexão ativa. */
+  async repararPastasOrfas() {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    return this.onedrive.repararPastasOrfas(conn.id);
+  }
+
   async sincronizarDeltaLote(limit = 6) {
     const lote = await this.prisma.company.findMany({
       where: { active: true, sharepointItemId: { not: null } },

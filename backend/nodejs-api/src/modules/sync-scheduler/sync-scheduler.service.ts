@@ -68,6 +68,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         erros: deltaErros.length,
         errosAmostra: deltaErros.slice(0, 5).map((d) => String(d.erro).slice(0, 140)),
       } : null,
+      ultimoReparoPastas: this.lastRun?.pastasOrfas ?? null,
     };
   }
 
@@ -154,6 +155,8 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         // 2. rotação da carteira via DELTA do Graph — pega tudo na 1ª vez e só o que muda
         //    depois. Delta incremental é barato, então cobrimos MUITOS clientes por ciclo.
         await passo('deltaIncremental', () => this.analise.sincronizarDeltaLote(30));
+        // 2b. religa pastas órfãs (404 itemNotFound) — pasta movida/recriada no SharePoint
+        await passo('pastasOrfas', () => this.analise.repararPastasOrfas());
         // 3. recibos ainda não checados nesta competência
         await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 8));
         // 4. re-checa quem estava sem recibo há mais de 1h

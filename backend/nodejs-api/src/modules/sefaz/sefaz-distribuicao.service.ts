@@ -132,6 +132,25 @@ export class SefazDistribuicaoService {
     return calc(cnpj.slice(0, 12)) === +cnpj[12] && calc(cnpj.slice(0, 13)) === +cnpj[13];
   }
 
+  /** Compara o nome do cliente com a razão social/fantasia do CNPJ na BrasilAPI. */
+  private async nomeConfereNaReceita(cnpj: string, nomeCliente: string): Promise<boolean> {
+    const { data } = await axios.get(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, { timeout: 12000 });
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const IGNORAR = new Set(['LTDA', 'ME', 'MEI', 'EPP', 'EIRELI', 'SA', 'S A', 'DE', 'DA', 'DO', 'DOS', 'DAS', 'E', 'EM', 'COM']);
+    const tokens = (s: string) => new Set(norm(s).split(' ').filter((t) => t.length >= 3 && !IGNORAR.has(t)));
+    const alvo = tokens(nomeCliente);
+    if (!alvo.size) return false;
+    for (const cand of [data?.razao_social, data?.nome_fantasia]) {
+      const ts = tokens(String(cand ?? ''));
+      if (!ts.size) continue;
+      let comuns = 0;
+      for (const t of alvo) if (ts.has(t)) comuns++;
+      const minimo = Math.min(alvo.size, ts.size);
+      if (comuns >= 2 || comuns >= minimo * 0.6) return true;
+    }
+    return false;
+  }
+
   /**
    * INFERE O CNPJ REAL de clientes com CNPJ provisório (começa com 7 / inválido), olhando os
    * PRÓPRIOS documentos do cliente: o CNPJ dele aparece como emitente ou destinatário em quase
@@ -174,6 +193,8 @@ export class SefazDistribuicaoService {
     };
 
     let inferidos = 0, semDocs = 0, semConsenso = 0, conflitos = 0;
+    let apiChecks = 0;
+    const MAX_API_CHECKS = 30; // teto de consultas à BrasilAPI por rodada (rate limit)
     const detalhe: any[] = [];
     const amostraDiag: any[] = [];
     for (const c of alvos) {
@@ -212,6 +233,24 @@ export class SefazDistribuicaoService {
       });
       const melhor = lados.reduce((a, b) => (b.share > a.share || (b.share === a.share && b.topN > a.topN) ? b : a));
       if (amostraDiag.length < 5) amostraDiag.push({ docs: docs.length, uteis, melhorLado: melhor.lado, share: +melhor.share.toFixed(2), topN: melhor.topN });
+      // sinal FRACO (1–2 evidências, mas unânimes): confirma na BrasilAPI comparando a
+      // razão social/fantasia com o nome do cliente antes de aceitar.
+      if (melhor.top && melhor.topN >= 1 && melhor.topN < minDocs && melhor.share >= 0.99 &&
+          !emUso.has(melhor.top) && apiChecks < MAX_API_CHECKS) {
+        apiChecks++;
+        const bate = await this.nomeConfereNaReceita(melhor.top, c.name).catch(() => false);
+        await this.pausa(600);
+        if (bate) {
+          try {
+            await this.prisma.company.update({ where: { id: c.id }, data: { cnpj: melhor.top } });
+            emUso.add(melhor.top); inferidos++;
+            detalhe.push({ cliente: c.name, cnpj: melhor.top, fonte: `${melhor.lado}+receita`, presenca: `${melhor.topN} doc(s), razão social confere` });
+            this.logger.log(`CNPJ inferido (validado na Receita) p/ ${c.name}: ${melhor.top}`);
+            continue;
+          } catch { conflitos++; continue; }
+        }
+        semConsenso++; continue;
+      }
       if (melhor.topN < minDocs) { (docs.length < minDocs ? semDocs++ : semConsenso++); continue; }
       if (!melhor.top || melhor.share < minShare) { semConsenso++; continue; }
       if (emUso.has(melhor.top)) { conflitos++; detalhe.push({ cliente: c.name, cnpj: melhor.top, motivo: 'já usado por outro cliente' }); continue; }
