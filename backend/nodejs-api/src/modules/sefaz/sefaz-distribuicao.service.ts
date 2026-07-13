@@ -117,9 +117,12 @@ export class SefazDistribuicaoService {
     return { ok: true, cnpj: c.cnpjCpf, validade: c.dataValidade, nome: c.nome };
   }
 
-  /** Situação do certificado do escritório. */
+  /** Situação do certificado do escritório (tem + USÁVEL: a senha abre o PFX?). */
   async statusEscritorio() {
-    return this.certificados.temEscritorio();
+    const t = await this.certificados.temEscritorio();
+    if (!t.tem) return { ...t, usavel: false };
+    const usavel = await this.certificadoEscritorioUsavel();
+    return { ...t, usavel };
   }
 
   /** O certificado do escritório está USÁVEL (existe E a senha abre o PFX)? */

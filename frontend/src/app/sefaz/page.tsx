@@ -126,8 +126,16 @@ export default function SefazPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <ShieldCheck size={16} color={esc?.tem ? COLORS.ok : COLORS.atencao} />
           <span style={{ fontWeight: 700, color: COLORS.strong }}>Certificado do escritório (um só para todos)</span>
-          {esc?.tem && <StatusChip tone="ok" label="configurado" size="sm" />}
+          {esc?.tem && (esc?.usavel === false
+            ? <StatusChip tone="critico" label="reenvie o certificado" size="sm" />
+            : <StatusChip tone="ok" label="configurado" size="sm" />)}
         </div>
+        {esc?.tem && esc?.usavel === false && (
+          <div style={{ fontSize: 12.5, color: COLORS.erro, background: tint(COLORS.erro, 10), border: `1px solid ${tint(COLORS.erro, 30)}`, borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
+            <b>A senha deste certificado se perdeu</b> (foi enviado antes da correção que a guarda com segurança).
+            Digite a senha abaixo e envie o .pfx de novo — desta vez ela fica salva criptografada e o buscador passa a funcionar.
+          </div>
+        )}
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>
           Suba <b>um único certificado A1</b> — o e-CNPJ do escritório. Depois, cada cliente concede uma <b>procuração eletrônica</b> a você no <b>e-CAC da Receita</b> (serviço "Distribuição de DF-e") — e o mesmo certificado consulta todos. <b>Não precisa subir o certificado de cada cliente.</b>
         </p>
