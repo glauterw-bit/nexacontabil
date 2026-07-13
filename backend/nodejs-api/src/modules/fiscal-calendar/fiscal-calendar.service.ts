@@ -316,42 +316,43 @@ export class FiscalCalendarService {
   // Só mexe nos status automáticos — preserva o que o contador marcou (paga/isenta/apuração).
 
   private static readonly _KW: Record<string, string[]> = {
-    DAS: ['das', 'pgdas', 'simei', 'simples'],
-    'DASN-SIMEI': ['dasn', 'dasnsimei', 'simei'],
-    DCTFWeb: ['dctfweb', 'dctf', 'mit'],
+    DAS: ['pgdasd', 'pgdas', 'das', 'simei', 'simples'],
+    'DASN-SIMEI': ['dasnsimei', 'dasn', 'simei'],
+    DCTFWeb: ['dctfweb', 'dctfdec', 'dctf', 'mit'],
     DEFIS: ['defis'],
-    ECD: ['ecd', 'sped contabil', 'spedcontabil'],
+    ECD: ['ecd', 'spedcontabil', 'sped contabil'],
     ECF: ['ecf'],
     EFD_REINF: ['reinf', 'efdreinf'],
-    ESOCIAL: ['esocial', 'e social', 'esoc'],
+    ESOCIAL: ['esocial', 'esoc'],
     FGTS: ['fgts', 'grf', 'grrf'],
-    ICMS: ['icms', 'gia', 'gare', 'efd icms', 'sped fiscal', 'spedfiscal'],
+    ICMS: ['icms', 'gia', 'gare', 'sped', 'efd'],
     DARF: ['darf', 'pis', 'cofins', 'irpj', 'csll', 'irrf'],
   };
   private static readonly _MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
+  /** normaliza: sem acento, minúsculo, e QUALQUER separador (/ . - _) vira espaço. */
   private static _norm(s: string): string {
-    return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   }
-  /** keyword como "palavra" (dígitos/pontuação contam como borda) — evita "das" em "vendas". */
+  /** keyword como "palavra" (espaço/dígito conta como borda) — evita "das" em "vendas". */
   private static _temPalavra(nome: string, kw: string): boolean {
     const esc = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp(`(^|[^a-z])${esc}([^a-z]|$)`, 'i').test(nome);
   }
-  /** o nome do arquivo referencia a competência (mês/ano)? */
+  /** nome/pasta referencia a competência? (aceita 05 2026, 2026 05, 052026, maio 2026, ...) */
   private static _refCompetencia(nome: string, competencia: string): boolean {
     const [y, m] = competencia.split('-');
     if (!m) return nome.includes(y); // anual → basta o ano
     const yy = y.slice(2);
     const mm = m.padStart(2, '0');
     const mes = FiscalCalendarService._MESES[parseInt(m, 10) - 1] ?? '';
-    if (mes && nome.includes(mes)) return true;
-    if (mes && nome.includes(mes.slice(0, 3)) && nome.includes(y)) return true;
-    for (const sep of ['/', '-', '.', ' ', '_', '']) {
-      if (nome.includes(`${mm}${sep}${y}`)) return true;             // 05/2026, 052026
-      if (sep && nome.includes(`${mm}${sep}${yy}`)) return true;     // 05/26
-    }
-    if (nome.includes(`${y}-${mm}`) || nome.includes(`${y}${mm}`)) return true; // 2026-05, 202605
+    const pats = [
+      `${mm} ${y}`, `${y} ${mm}`,   // 05 2026 · 2026 05 (pastas /2026/05, 05-2026, 05.2026)
+      `${mm}${y}`, `${y}${mm}`,      // 052026 · 202605
+      `${mm} ${yy}`,                 // 05 26
+    ];
+    if (pats.some((p) => nome.includes(p))) return true;
+    if (mes && nome.includes(mes) && nome.includes(y)) return true; // maio + 2026
     return false;
   }
 
@@ -382,9 +383,10 @@ export class FiscalCalendarService {
       if (!itens.length) { empresasProc++; continue; }
       const docs = await this.prisma.document.findMany({
         where: { companyId: emp.id, originalFilename: { not: null } },
-        select: { originalFilename: true },
+        select: { originalFilename: true, folderPath: true },
       });
-      const nomes = docs.map((d) => FiscalCalendarService._norm(d.originalFilename ?? ''));
+      // usa NOME + PASTA — a competência dos comprovantes costuma estar na pasta (/2026/05)
+      const nomes = docs.map((d) => FiscalCalendarService._norm(`${d.originalFilename ?? ''} ${d.folderPath ?? ''}`));
 
       for (const it of itens) {
         const kws = FiscalCalendarService._KW[it.tipo] ?? [FiscalCalendarService._norm(it.tipo)];

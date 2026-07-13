@@ -32,6 +32,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   private lastAuditYmd: string | null = null;
   private aceleradoAgora = false;
   private demoLimpo = false;
+  private deltaResetFeito = false;
 
   constructor(
     private readonly fluxo: FluxoService,
@@ -260,6 +261,16 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       if (!this.demoLimpo) {
         await passo('limparDemo', () => this.seedDemo.limpar());
         this.demoLimpo = true;
+      }
+      // 0b. RE-CAPTURA (1x): zera os deltaLinks p/ o Delta reler tudo com o caminho da
+      //     PASTA (folderPath) e recuperar os comprovantes mensais de nome igual que
+      //     antes eram deduplicados. É o que permite reconciliar DAS/DCTF/SPED por competência.
+      if (!this.deltaResetFeito) {
+        await passo('resetDeltaParaPastas', async () => {
+          const r = await this.prisma.company.updateMany({ where: { active: true, sharepointDeltaLink: { not: null } }, data: { sharepointDeltaLink: null } });
+          return { deltaLinksZerados: r.count };
+        });
+        this.deltaResetFeito = true;
       }
       // DUAS CADEIAS EM PARALELO — a do Drive (Graph) e a do SEFAZ (Receita) usam APIs
       // diferentes; em série a cadeia pesada do Drive esfomeava a do SEFAZ (UF nunca

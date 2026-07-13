@@ -273,20 +273,22 @@ export class AnaliseClienteService {
     if (!conn) throw new BadRequestException('Nenhuma conexão OneDrive ativa.');
 
     const { arquivos, deltaLink } = await this.onedrive.deltaScan(conn.id, c.sharepointDriveId, c.sharepointItemId, c.sharepointDeltaLink ?? undefined);
-    const existentes = new Set(
-      (await this.prisma.document.findMany({ where: { companyId }, select: { originalFilename: true } })).map((d) => d.originalFilename),
-    );
+    const jaTem = await this.prisma.document.findMany({ where: { companyId }, select: { originalFilename: true, folderPath: true } });
+    // XML dedup por NOME (chave é única); NÃO-XML (comprovantes) dedup por PASTA+NOME —
+    // assim "PGDASD-RECIBO.pdf" de cada mês é guardado separado (antes colapsava em 1).
+    const existNome = new Set(jaTem.map((d) => d.originalFilename));
+    const existPasta = new Set(jaTem.map((d) => `${d.folderPath ?? ''}|${d.originalFilename}`));
     const ehXml = (n: string) => n.toLowerCase().endsWith('.xml');
     const extDe = (nome: string) => { const p = nome.split('.'); return p.length > 1 ? p.pop()!.toLowerCase().slice(0, 12) : 'arquivo'; };
-    const novos = arquivos.filter((f) => !existentes.has(f.name));
 
     let novosXml = 0, novosOutros = 0, ignorados = 0;
-    for (const f of novos.filter((f) => !ehXml(f.name))) {
+    for (const f of arquivos.filter((f: any) => !ehXml(f.name) && !existPasta.has(`${f.path ?? ''}|${f.name}`))) {
       try {
-        await this.prisma.document.create({ data: { companyId, type: extDe(f.name), status: 'recebido', originalFilename: f.name, fileUrl: `${f.driveId}|${f.id}`, confidenceScore: 0, issueDate: f.modified ? new Date(f.modified) : undefined } });
+        await this.prisma.document.create({ data: { companyId, type: extDe(f.name), status: 'recebido', originalFilename: f.name, fileUrl: `${f.driveId}|${f.id}`, folderPath: (f as any).path || null, confidenceScore: 0, issueDate: f.modified ? new Date(f.modified) : undefined } });
         novosOutros++;
       } catch { ignorados++; }
     }
+    const novos = arquivos.filter((f: any) => !existNome.has(f.name));
     const xmls = novos.filter((f) => ehXml(f.name));
     const CONC = 10; // downloads simultâneos por cliente (turbo)
     for (let i = 0; i < xmls.length; i += CONC) {
@@ -299,7 +301,7 @@ export class AnaliseClienteService {
         } catch { ignorados++; }
       }));
     }
-    await this.prisma.company.update({ where: { id: companyId }, data: { sharepointDeltaLink: deltaLink ?? c.sharepointDeltaLink, sharepointAnalisadoEm: new Date(), sharepointDocsCount: existentes.size + novosXml + novosOutros } });
+    await this.prisma.company.update({ where: { id: companyId }, data: { sharepointDeltaLink: deltaLink ?? c.sharepointDeltaLink, sharepointAnalisadoEm: new Date(), sharepointDocsCount: jaTem.length + novosXml + novosOutros } });
     return { cliente: c.name, arquivosNoDelta: arquivos.length, novosXml, novosOutros, ignorados, incremental: !!c.sharepointDeltaLink };
   }
 

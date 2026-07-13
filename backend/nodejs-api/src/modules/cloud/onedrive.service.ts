@@ -180,7 +180,7 @@ export class OneDriveService {
     const token = await this.getValidToken(connectionId);
     const base = `${GRAPH_BASE}/drives/${driveId}`;
     let url: string | null = deltaLink || `${base}/items/${folderId}/delta?$top=500`;
-    const arquivos: Array<{ id: string; name: string; driveId: string; modified: string | null }> = [];
+    const arquivos: Array<{ id: string; name: string; driveId: string; modified: string | null; path?: string }> = [];
     let novoDeltaLink: string | null = deltaLink ?? null;
     let guard = 0, primeira = true;
     while (url && guard++ < 400) {
@@ -197,7 +197,10 @@ export class OneDriveService {
       const json: any = await res.json();
       for (const item of (json.value ?? [])) {
         if (item.deleted || item.folder || !item.file) continue; // só arquivos, ignora pastas/removidos
-        arquivos.push({ id: item.id, name: item.name, driveId, modified: item.lastModifiedDateTime ?? null });
+        // parentReference.path ex.: "/drives/xxx/root:/Empresas/CLIENTE/Fiscal - Documentos/2026/05"
+        const rawPath = item.parentReference?.path ?? '';
+        const path = rawPath.includes('root:') ? rawPath.split('root:')[1] : rawPath;
+        arquivos.push({ id: item.id, name: item.name, driveId, modified: item.lastModifiedDateTime ?? null, path });
       }
       if (json['@odata.nextLink']) url = json['@odata.nextLink'];
       else { novoDeltaLink = json['@odata.deltaLink'] ?? novoDeltaLink; url = null; }

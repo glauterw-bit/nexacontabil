@@ -124,6 +124,7 @@ model Document {
   status            String   @default("pending")
   originalFilename  String?
   fileUrl           String?
+  folderPath        String?  // pasta de origem no OneDrive (ex.: ".../Fiscal - Documentos/2026/05") — dá a competência dos comprovantes sem data no nome
   mimeType          String?
   fileSizeBytes     Int?
   extractedData     String?
