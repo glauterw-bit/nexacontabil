@@ -7,6 +7,9 @@ import { regraMonofasico } from '../organizacao/classificacao.util';
 
 @Injectable()
 export class AnaliseClienteService {
+  /** Limpa os marcadores 'xml_sem_valor' uma vez por processo (após deploy) p/ retentar. */
+  private static _semValorReset = false;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly onedrive: OneDriveService,
@@ -545,6 +548,11 @@ export class AnaliseClienteService {
       where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' },
     });
     if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    // 1x por deploy: limpa marcadores antigos p/ retentar com o parser atual (ex.: fix de CT-e)
+    if (!AnaliseClienteService._semValorReset) {
+      await this.prisma.document.updateMany({ where: { status: 'xml_sem_valor' }, data: { status: 'completed' } }).catch(() => undefined);
+      AnaliseClienteService._semValorReset = true;
+    }
     // exclui os já tentados sem sucesso (status sentinela) p/ não repetir o mesmo lote
     const filtro: any = { totalValue: null, originalFilename: { endsWith: '.xml' }, fileUrl: { contains: '|' }, NOT: { status: 'xml_sem_valor' } };
     const pendentes = await this.prisma.document.count({ where: filtro });
@@ -672,6 +680,7 @@ function parseNfe(xml: string): null | {
 
   const valorTotal =
     num(pick(totalBloco, 'vNF')) ??                       // NF-e
+    num(pick(xml, 'vTPrest')) ?? num(pick(xml, 'vRec')) ?? // CT-e (transporte): total da prestação / a receber
     num(pick(xml, 'ValorLiquidoNfse')) ??                 // NFS-e ABRASF (líquido)
     num(pick(xml, 'ValorServicos')) ??                    // NFS-e (bruto dos serviços)
     num(pick(xml, 'ValorTotalNota')) ?? num(pick(xml, 'ValorTotalRecebido')) ??
@@ -682,7 +691,7 @@ function parseNfe(xml: string): null | {
   const emitenteCnpj = pickCnpj(emitBloco) ?? pickCnpj(prestBloco);
   const destNome = pick(destBloco, 'xNome') ?? pick(tomaBloco, 'RazaoSocial') ?? pick(tomaBloco, 'xNome') ?? pick(tomaBloco, 'NomeRazaoSocial');
   const destCnpj = pickCnpj(destBloco) ?? pickCnpj(tomaBloco);
-  const numero = pick(xml, 'nNF') ?? pick(infNfseBloco, 'Numero') ?? pick(xml, 'NumeroNfse') ?? pick(xml, 'Numero');
+  const numero = pick(xml, 'nNF') ?? pick(xml, 'nCT') ?? pick(infNfseBloco, 'Numero') ?? pick(xml, 'NumeroNfse') ?? pick(xml, 'Numero');
 
   return {
     tipo,
