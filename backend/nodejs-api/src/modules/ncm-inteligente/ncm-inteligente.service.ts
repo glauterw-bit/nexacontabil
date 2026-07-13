@@ -497,7 +497,34 @@ Retorne:
 
   async statusIbpt() {
     const grp = await this.prisma.ibptAliquota.groupBy({ by: ['uf'], _count: { ncm: true }, _max: { versao: true, importadoEm: true } });
-    return { ufs: grp.map((g) => ({ uf: g.uf, ncms: g._count.ncm, versao: g._max.versao, importadoEm: g._max.importadoEm })).sort((a, b) => a.uf.localeCompare(b.uf)) };
+    return {
+      apiAutomatica: !!process.env.IBPT_TOKEN && !!process.env.IBPT_CNPJ,
+      ufs: grp.map((g) => ({ uf: g.uf, ncms: g._count.ncm, versao: g._max.versao, importadoEm: g._max.importadoEm })).sort((a, b) => a.uf.localeCompare(b.uf)),
+    };
+  }
+
+  /**
+   * IBPT AUTOMÁTICO — consulta a API oficial "De Olho no Imposto" (apidoni) por NCM+UF
+   * e cacheia. Ativa quando IBPT_TOKEN + IBPT_CNPJ estão configurados. Assim a carga
+   * IBPT se preenche sozinha conforme os NCMs aparecem — sem CSV manual.
+   */
+  async buscarIbptApi(ncm: string, uf: string): Promise<any | null> {
+    const token = process.env.IBPT_TOKEN, cnpj = (process.env.IBPT_CNPJ || '').replace(/\D/g, '');
+    if (!token || !cnpj) return null;
+    const n = (ncm || '').replace(/\D/g, ''); const u = (uf || '').toUpperCase();
+    if (n.length !== 8) return null;
+    try {
+      const url = `https://apidoni.ibpt.org.br/api/v1/produtos?token=${encodeURIComponent(token)}&cnpj=${cnpj}&codigo=${n}&uf=${u}&ex=0&descricao=&unidadeMedida=&valor=0&gtin=`;
+      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) return null;
+      const j: any = await r.json();
+      const row = await this.prisma.ibptAliquota.upsert({
+        where: { ncm_uf: { ncm: n, uf: u } },
+        update: { descricao: j.Descricao, nacionalFederal: j.Nacional ?? 0, importadoFederal: j.Importado ?? 0, estadual: j.Estadual ?? 0, municipal: j.Municipal ?? 0, versao: j.Versao, vigenciaFim: j.VigenciaFim, importadoEm: new Date() },
+        create: { ncm: n, uf: u, descricao: j.Descricao, nacionalFederal: j.Nacional ?? 0, importadoFederal: j.Importado ?? 0, estadual: j.Estadual ?? 0, municipal: j.Municipal ?? 0, versao: j.Versao, vigenciaFim: j.VigenciaFim },
+      });
+      return row;
+    } catch { return null; }
   }
 
   async matriz(input: { ncm: string; origem: string; destino: string; segmento?: string; importado?: boolean }) {
@@ -510,9 +537,11 @@ Retorne:
     const operacaoInterna = uO === uD;
     const df = { difal: interno.destino != null ? Math.round(((interno.destino as number) - inter) * 100) / 100 : null };
 
-    // IBPT (Lei da Transparência) — carga aproximada por NCM na UF de destino, se importada
+    // IBPT (Lei da Transparência) — carga aproximada por NCM na UF de destino.
+    // Cache local; se não houver e a API automática estiver configurada, busca e cacheia.
     const ncmDig = (input.ncm || '').replace(/\D/g, '');
-    const ibptRow = ncmDig.length === 8 ? await this.prisma.ibptAliquota.findUnique({ where: { ncm_uf: { ncm: ncmDig, uf: uD } } }) : null;
+    let ibptRow: any = ncmDig.length === 8 ? await this.prisma.ibptAliquota.findUnique({ where: { ncm_uf: { ncm: ncmDig, uf: uD } } }) : null;
+    if (!ibptRow && ncmDig.length === 8) ibptRow = await this.buscarIbptApi(ncmDig, uD);
     const ibpt = ibptRow ? {
       federal: input.importado ? ibptRow.importadoFederal : ibptRow.nacionalFederal,
       estadual: ibptRow.estadual, municipal: ibptRow.municipal, versao: ibptRow.versao,

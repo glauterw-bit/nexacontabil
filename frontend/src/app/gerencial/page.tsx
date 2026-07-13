@@ -24,20 +24,23 @@ export default function GerencialPage() {
   const [d, setD] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [ca, setCa] = useState<any>(null);
+  const [em, setEm] = useState<any>(null);
   const { competencia } = useCompetencia();
 
   const load = useCallback(async () => {
     setLoading(true);
     const q = competencia ? `?competencia=${competencia}` : '';
     try {
-      const [rt, rg, rc] = await Promise.all([
+      const [rt, rg, rc, re] = await Promise.all([
         fetch(`${API}/api/v1/torre-controle/overview${q}`, { headers: authHeaders() }),
         fetch(`${API}/api/v1/paineis/gerencial`, { headers: authHeaders() }),
         fetch(`${API}/api/v1/paineis/carteira-analistas`, { headers: authHeaders() }),
+        fetch(`${API}/api/v1/paineis/entregas-mensais`, { headers: authHeaders() }),
       ]);
       setTorre(rt.ok ? await rt.json() : null);
       setD(rg.ok ? await rg.json() : null);
       setCa(rc.ok ? await rc.json() : null);
+      setEm(re.ok ? await re.json() : null);
     } catch {} finally { setLoading(false); }
   }, [competencia]);
   useEffect(() => { load(); }, [load]);
@@ -122,6 +125,9 @@ export default function GerencialPage() {
 
       {/* ── CARTEIRA DOS ANALISTAS (visão gerencial rica) ── */}
       {ca?.analistas?.length > 0 && <CarteiraAnalistas ca={ca} />}
+
+      {/* ── ENTREGAS POR MÊS + acervo do ano ── */}
+      {em && <EntregasMensais em={em} />}
 
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
         {/* ── EQUIPE: produção (torre de controle, se houver workflow) ── */}
@@ -243,9 +249,60 @@ export default function GerencialPage() {
 }
 
 /** Carteira dos analistas — clareza sobre carga, obrigações que faltam e performance. */
+/** Entregas por mês: documentos capturados + obrigações entregues, com destaque de 2026. */
+function EntregasMensais({ em }: { em: any }) {
+  const linha = em.linha ?? [];
+  const maxDoc = Math.max(1, ...linha.map((l: any) => l.documentos));
+  return (
+    <div style={{ marginTop: 22 }}>
+      <SectionTitle><CalendarClock size={15} color={COLORS.acao} /> Entregas e documentos por mês</SectionTitle>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <Kpi label="Documentos no acervo" value={(em.totalDocs ?? 0).toLocaleString('pt-BR')} sub={`${em.semData ?? 0} sem data`} />
+        <Kpi label="Documentos de 2026" value={(em.docs2026 ?? 0).toLocaleString('pt-BR')} cor={em.docs2026 > 0 ? COLORS.ok : COLORS.erro}
+          sub={em.docs2026 > 0 ? 'capturados este ano' : 'nenhum ainda — puxar do drive/SEFAZ'} />
+      </div>
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <THead cols={[{ label: 'Mês', width: 90 }, { label: 'Documentos' }, { label: 'Obrigações entregues', width: 220, align: 'right' }]} />
+        {linha.slice().reverse().map((l: any) => (
+          <div key={l.mes} style={{ display: 'flex', alignItems: 'center', padding: '9px 14px', borderBottom: `1px solid ${COLORS.borderSoft}`, fontSize: 13, gap: 10 }}>
+            <div className="num" style={{ width: 90, color: l.mes >= '2026-01' ? COLORS.ok : COLORS.strong, fontWeight: 600 }}>{l.mes}</div>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, height: 8, background: COLORS.surface2, borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ width: `${(l.documentos / maxDoc) * 100}%`, height: '100%', background: COLORS.acao }} />
+              </div>
+              <span className="num" style={{ width: 60, textAlign: 'right', color: COLORS.muted }}>{l.documentos.toLocaleString('pt-BR')}</span>
+            </div>
+            <div style={{ width: 220, textAlign: 'right', fontSize: 12.5 }}>
+              {l.obrigacoes > 0 ? (
+                <span><b style={{ color: l.pctEntrega >= 90 ? COLORS.ok : l.pctEntrega >= 70 ? COLORS.atencao : COLORS.erro }}>{l.entregues}</b><span style={{ color: COLORS.faint }}>/{l.obrigacoes} ({l.pctEntrega}%)</span></span>
+              ) : <span style={{ color: COLORS.faint }}>—</span>}
+            </div>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+}
+
+/** Barra de progresso com rótulo, % e legenda — cor por faixa. */
+function BarraProg({ label, pct, legenda }: { label: string; pct: number; legenda?: string }) {
+  const p = Math.max(0, Math.min(100, pct ?? 0));
+  const cor = p >= 90 ? COLORS.ok : p >= 70 ? COLORS.atencao : COLORS.erro;
+  return (
+    <div style={{ marginBottom: 9 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 3 }}>
+        <span style={{ color: COLORS.muted }}>{label}</span>
+        <span className="num" style={{ fontWeight: 700, color: cor }}>{p}%{legenda ? <span style={{ color: COLORS.faint, fontWeight: 400 }}> · {legenda}</span> : ''}</span>
+      </div>
+      <div style={{ height: 7, background: COLORS.surface2, borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ width: `${p}%`, height: '100%', background: cor, transition: 'width .3s' }} />
+      </div>
+    </div>
+  );
+}
+
 function CarteiraAnalistas({ ca }: { ca: any }) {
   const t = ca.totais ?? {};
-  const maxCli = Math.max(1, ...ca.analistas.map((a: any) => a.clientes));
   return (
     <div style={{ marginTop: 8 }}>
       <SectionTitle><Briefcase size={15} color={COLORS.acao} /> Carteira dos analistas — {fmtCompetencia(ca.competencia)}</SectionTitle>
@@ -261,67 +318,45 @@ function CarteiraAnalistas({ ca }: { ca: any }) {
         )}
       </div>
 
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
-        <THead cols={[
-          { label: 'Analista' },
-          { label: 'Clientes', width: 130 },
-          { label: 'Obrigações do mês', width: 200 },
-          { label: 'Vencidas', width: 80, align: 'right' },
-          { label: 'Vencem 7d', width: 90, align: 'right' },
-          { label: 'Qualidade', width: 120, align: 'right' },
-        ]} />
+      {/* Cards por analista — barras de Entregas, Pontualidade (tempo) e Precisão */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
         {ca.analistas.map((a: any) => {
-          const entregaCor = a.pctEntrega >= 90 ? COLORS.ok : a.pctEntrega >= 70 ? COLORS.atencao : COLORS.erro;
-          const erroCor = a.taxaErro > 2 ? COLORS.erro : a.taxaErro > 1 ? COLORS.atencao : COLORS.ok;
+          const atencao = a.clientesAtencao ?? 0;
+          const acentoCor = a.obrigVencidas > 0 ? COLORS.erro : atencao > 0 ? COLORS.atencao : COLORS.ok;
           return (
             <Link key={a.responsavel} href={`/painel-analista?responsavel=${encodeURIComponent(a.responsavel)}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-            <div
-              onMouseEnter={(e) => (e.currentTarget.style.background = COLORS.surface2)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-              style={{ display: 'flex', alignItems: 'center', padding: '11px 14px', borderBottom: `1px solid ${COLORS.borderSoft}`, fontSize: 13, gap: 4, cursor: 'pointer', transition: 'background .1s' }}>
-              {/* analista */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, color: COLORS.strong, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.responsavel}</div>
-                <div style={{ fontSize: 11, color: COLORS.faint }}>{(a.docs ?? 0).toLocaleString('pt-BR')} docs processados</div>
-              </div>
-              {/* clientes + sem doc */}
-              <div style={{ width: 130 }}>
-                <div className="num" style={{ fontWeight: 600, color: COLORS.strong }}>{a.clientes}
-                  {a.clientesSemDoc > 0 && <span style={{ fontWeight: 400, fontSize: 11, color: COLORS.atencao }}> · {a.clientesSemDoc} sem docs</span>}
+              <Card accent={acentoCor} style={{ height: '100%' }}>
+                {/* cabeçalho */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: tint(COLORS.acao, 12), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, color: COLORS.acao, fontSize: 14 }}>
+                    {(a.responsavel || '?').split(' ').map((p: string) => p[0]).slice(0, 2).join('')}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: COLORS.strong, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.responsavel}</div>
+                    <div style={{ fontSize: 11.5, color: COLORS.faint }}>{a.clientes} clientes · {(a.docs ?? 0).toLocaleString('pt-BR')} docs</div>
+                  </div>
+                  {atencao > 0 && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: COLORS.erro, background: tint(COLORS.dotErro, 10), border: `1px solid ${tint(COLORS.dotErro, 25)}`, borderRadius: 999, padding: '3px 8px', whiteSpace: 'nowrap' }}>
+                      <AlertTriangle size={11} /> {atencao} atenção
+                    </span>
+                  )}
                 </div>
-                <div style={{ marginTop: 4, height: 5, background: COLORS.surface2, borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: `${(a.clientes / maxCli) * 100}%`, height: '100%', background: COLORS.acao }} />
+                {/* barras */}
+                <BarraProg label="Entregas" pct={a.pctEntrega} legenda={`${a.obrigEntregues}/${a.obrigTotal} obrigações`} />
+                <BarraProg label="Pontualidade (prazo)" pct={a.pontualidade} legenda={a.obrigVencidas > 0 ? `${a.obrigVencidas} vencida(s)` : 'no prazo'} />
+                <BarraProg label="Precisão" pct={a.precisao} legenda={a.clientesComErro > 0 ? `${a.clientesComErro} cli. c/ erro` : 'sem erro fiscal'} />
+                {/* rodapé */}
+                <div style={{ display: 'flex', gap: 14, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${COLORS.borderSoft}`, fontSize: 11.5, color: COLORS.muted }}>
+                  {a.obrigVencidas > 0 && <span style={{ color: COLORS.erro }}>● {a.obrigVencidas} vencidas</span>}
+                  {a.proximas7 > 0 && <span style={{ color: COLORS.atencao }}>● {a.proximas7} vencem 7d</span>}
+                  {a.clientesSemDoc > 0 && <span>● {a.clientesSemDoc} sem docs</span>}
+                  {a.obrigVencidas === 0 && a.proximas7 === 0 && atencao === 0 && <span style={{ color: COLORS.ok }}>● tudo em dia</span>}
                 </div>
-              </div>
-              {/* obrigações do mês (entregues/total + barra) */}
-              <div style={{ width: 200, paddingRight: 10 }}>
-                <div className="num" style={{ fontSize: 12.5 }}>
-                  <strong style={{ color: entregaCor }}>{a.obrigEntregues}</strong>
-                  <span style={{ color: COLORS.faint }}>/{a.obrigTotal} entregues</span>
-                  {a.obrigPendentes > 0 && <span style={{ color: COLORS.atencao }}> · {a.obrigPendentes} faltam</span>}
-                </div>
-                <div style={{ marginTop: 4, height: 6, background: COLORS.surface2, borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: `${a.pctEntrega}%`, height: '100%', background: entregaCor }} />
-                </div>
-              </div>
-              {/* vencidas */}
-              <div className="num" style={{ width: 80, textAlign: 'right', color: a.obrigVencidas ? COLORS.erro : COLORS.faint, fontWeight: a.obrigVencidas ? 700 : 400 }}>
-                {a.obrigVencidas || '—'}
-              </div>
-              {/* vencem 7 dias */}
-              <div className="num" style={{ width: 90, textAlign: 'right', color: a.proximas7 ? COLORS.atencao : COLORS.faint, fontWeight: a.proximas7 ? 600 : 400 }}>
-                {a.proximas7 || '—'}
-              </div>
-              {/* qualidade (taxa de erro) */}
-              <div className="num" style={{ width: 120, textAlign: 'right' }}>
-                <span style={{ color: erroCor, fontWeight: 600 }}>{a.taxaErro}%</span>
-                <span style={{ color: COLORS.faint, fontSize: 11 }}> erro{a.clientesComErro ? ` · ${a.clientesComErro} cli.` : ''}</span>
-              </div>
-            </div>
+              </Card>
             </Link>
           );
         })}
-      </Card>
+      </div>
 
       <div style={{ display: 'flex', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
         <Link href="/prazos" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, color: COLORS.acao, textDecoration: 'none' }}>

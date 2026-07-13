@@ -882,12 +882,22 @@ export class PaineisService {
 
     const analistas = [...map.values()]
       .filter((a) => !a.responsavel.includes('Sem responsável'))
-      .map((a) => ({
-        ...a,
-        taxaErro: a.docs ? Math.round((a.erros / a.docs) * 10000) / 100 : 0,
-        pctEntrega: a.obrigTotal ? Math.round((a.obrigEntregues / a.obrigTotal) * 100) : 100,
-      }))
-      .sort((a, b) => b.obrigVencidas - a.obrigVencidas || b.obrigPendentes - a.obrigPendentes || b.clientes - a.clientes);
+      .map((a) => {
+        // clientes que precisam de atenção: com erro fiscal ou sem documento (limitado ao total)
+        const clientesAtencao = Math.min(a.clientes, a.clientesComErro + a.clientesSemDoc);
+        return {
+          ...a,
+          taxaErro: a.docs ? Math.round((a.erros / a.docs) * 10000) / 100 : 0,
+          // ENTREGAS: % de obrigações entregues
+          pctEntrega: a.obrigTotal ? Math.round((a.obrigEntregues / a.obrigTotal) * 100) : 100,
+          // TEMPO/PONTUALIDADE: % das obrigações NÃO vencidas (no prazo)
+          pontualidade: a.obrigTotal ? Math.round(((a.obrigTotal - a.obrigVencidas) / a.obrigTotal) * 100) : 100,
+          // PRECISÃO: % de clientes SEM erro fiscal
+          precisao: a.clientes ? Math.round(((a.clientes - a.clientesComErro) / a.clientes) * 100) : 100,
+          clientesAtencao,
+        };
+      })
+      .sort((a, b) => b.obrigVencidas - a.obrigVencidas || b.clientesAtencao - a.clientesAtencao || b.clientes - a.clientes);
 
     const semResp = map.get('— Sem responsável —');
     return {
@@ -900,6 +910,46 @@ export class PaineisService {
         proximas7: analistas.reduce((s, a) => s + a.proximas7, 0),
         clientesSemResponsavel: semResp?.clientes ?? 0,
       },
+    };
+  }
+
+  /**
+   * ENTREGAS POR MÊS — documentos capturados por mês de emissão + obrigações entregues
+   * por competência. Responde "quantos docs de 2026?" e "entregas por mês" numa tela.
+   */
+  async entregasMensais() {
+    const [docs, obrig] = await Promise.all([
+      this.prisma.document.findMany({ where: { issueDate: { not: null } }, select: { issueDate: true } }),
+      this.prisma.fiscalCalendarItem.findMany({ select: { competencia: true, status: true } }),
+    ]);
+    const docsPorMes = new Map<string, number>();
+    let docs2026 = 0, semData = 0;
+    for (const d of docs) {
+      if (!d.issueDate) { semData++; continue; }
+      const m = new Date(d.issueDate).toISOString().slice(0, 7);
+      docsPorMes.set(m, (docsPorMes.get(m) ?? 0) + 1);
+      if (m >= '2026-01') docs2026++;
+    }
+    const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    const obrigPorMes = new Map<string, { total: number; entregues: number }>();
+    for (const o of obrig) {
+      const comp = (o.competencia || '').slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(comp)) continue;
+      const b = obrigPorMes.get(comp) ?? { total: 0, entregues: 0 };
+      b.total++; if (ENTREGUE.has(o.status)) b.entregues++;
+      obrigPorMes.set(comp, b);
+    }
+    const meses = [...new Set([...docsPorMes.keys(), ...obrigPorMes.keys()])].sort().slice(-18);
+    return {
+      totalDocs: docs.length, docs2026, semData,
+      totalDocsComData: docs.length,
+      linha: meses.map((m) => ({
+        mes: m,
+        documentos: docsPorMes.get(m) ?? 0,
+        obrigacoes: obrigPorMes.get(m)?.total ?? 0,
+        entregues: obrigPorMes.get(m)?.entregues ?? 0,
+        pctEntrega: obrigPorMes.get(m)?.total ? Math.round((obrigPorMes.get(m)!.entregues / obrigPorMes.get(m)!.total) * 100) : 0,
+      })),
     };
   }
 
