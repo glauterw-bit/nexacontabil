@@ -53,4 +53,13 @@ try:
   else: print("Resposta:",d.get("message") or d.get("body") or d)
 except Exception:
   print(raw)'
-echo "Pronto. Se deu OK, o cert do escritorio vale p/ todos os clientes com procuracao e-CAC."
+# 4) verificação: a senha realmente abre o PFX agora?
+echo "-> verificando se o certificado abre com a senha..."
+sleep 2
+curl -s -m 20 "$API/api/v1/sefaz/progresso" | python3 -c 'import sys,json
+try:
+  d=json.load(sys.stdin)
+  if d.get("certificadoUsavel"): print("== CONFIRMADO: certificado ABRE com a senha. A varredura vai puxar os XMLs no proximo ciclo (~15min).")
+  else: print("== ATENCAO: ainda NAO abre. Confira se a senha do .pfx esta correta (Domo2025) e rode de novo.")
+except Exception: print("(nao consegui verificar agora; cheque em /sefaz)")'
+echo "Pronto. Se confirmou, o cert do escritorio vale p/ todos os clientes com procuracao e-CAC."

@@ -11,7 +11,7 @@ import {
   Banknote, ClipboardList, Landmark, Scale, Package, FileCode, FileText,
   UserCheck, Award, Globe, DollarSign, Megaphone, Store, Bot,
   Workflow, Boxes, FileDown, Inbox, Search, ArrowLeftRight, Hash, FolderTree,
-  ClipboardCheck, Coins,
+  ClipboardCheck, Coins, Sparkles,
 } from 'lucide-react';
 import { useCompany, Company } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,12 +34,14 @@ interface NavGroup { label: string; items: NavItem[] }
    clientes, e módulos avançados recolhidos. ── */
 
 const VISAO: NavItem[] = [
-  { href: '/operacao',  icon: Activity,        label: 'Central de Operação' },
-  { href: '/gerencial', icon: LayoutDashboard, label: 'Painel Gerencial' },
-  { href: '/farois',    icon: Lightbulb,       label: 'Faróis' },
+  { href: '/painel',    icon: LayoutDashboard, label: 'Painel do Escritório' },
+  { href: '/consultor', icon: Sparkles,        label: 'Consultor de IA' },
   { href: '/meu-dia',   icon: Sun,             label: 'Meu Dia' },
-  { href: '/implantacao', icon: ClipboardCheck, label: 'Saúde da Implantação' },
+  { href: '/farois',    icon: Lightbulb,       label: 'Faróis' },
+  { href: '/operacao',  icon: Activity,        label: 'Operação (detalhe)' },
+  { href: '/gerencial', icon: Activity,        label: 'Desempenho da equipe' },
   { href: '/verificacao-final', icon: ShieldCheck, label: 'Verificação Final' },
+  { href: '/implantacao', icon: ClipboardCheck, label: 'Saúde da Implantação' },
 ];
 
 const CAMINHO: Step[] = [

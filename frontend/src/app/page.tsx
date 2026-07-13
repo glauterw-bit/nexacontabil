@@ -12,7 +12,7 @@ export default function Home() {
     if (loading) return;
     if (!user) { router.replace('/login'); return; }
     const role = (user as any)?.role;
-    router.replace(role === 'analista' ? '/meu-dia' : role === 'cliente' ? '/meu-escritorio' : '/operacao');
+    router.replace(role === 'analista' ? '/meu-dia' : role === 'cliente' ? '/meu-escritorio' : '/painel');
   }, [user, loading]);
 
   return (
