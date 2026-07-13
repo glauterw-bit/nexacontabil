@@ -3,6 +3,7 @@ import { FluxoService } from '../fluxo/fluxo.service';
 import { AnaliseClienteService } from '../analise-cliente/analise-cliente.service';
 import { FiscalCalendarService } from '../fiscal-calendar/fiscal-calendar.service';
 import { SolicitacoesService } from '../solicitacoes/solicitacoes.service';
+import { NcmInteligenteService } from '../ncm-inteligente/ncm-inteligente.service';
 
 /**
  * Sincronização agendada do drive (opção 1 — varredura periódica).
@@ -30,6 +31,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     private readonly analise: AnaliseClienteService,
     private readonly fiscalCalendar: FiscalCalendarService,
     private readonly solicitacoes: SolicitacoesService,
+    private readonly ncm: NcmInteligenteService,
   ) {}
 
   private get enabled(): boolean {
@@ -100,6 +102,10 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       //    Idempotente (unique cliente+competência) — rodar em vários ciclos não duplica.
       if (startedAt.getDate() <= 2) {
         await passo('solicitacoesMensais', () => this.solicitacoes.gerarSolicitacoesMensais());
+      }
+      // 7. auditoria semanal do Banco de NCM (segunda-feira) — completude + pendências.
+      if (startedAt.getDay() === 1) {
+        await passo('auditoriaNcm', () => this.ncm.auditoria());
       }
     } finally {
       resultado.finishedAt = new Date().toISOString();

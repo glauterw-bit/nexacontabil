@@ -20,6 +20,18 @@ export class NcmInteligenteController {
     return this.svc.lookup(ncm, segmento, uf);
   }
 
+  /** Matriz tributária completa do NCM entre duas UFs (ICMS/ST/DIFAL/IPI/PIS-COFINS). */
+  @Get('matriz')
+  matriz(@Query('ncm') ncm: string, @Query('origem') origem: string, @Query('destino') destino: string, @Query('segmento') segmento?: string, @Query('importado') importado?: string) {
+    return this.svc.matriz({ ncm, origem, destino, segmento, importado: importado === '1' || importado === 'true' });
+  }
+
+  /** Auditoria semanal do Banco de NCM (completude + pendências de revisão). */
+  @Get('auditoria')
+  auditoria() {
+    return this.svc.auditoria();
+  }
+
   @Post('validar')
   validar(@Body() body: any) {
     return this.svc.validarTributacao(body);

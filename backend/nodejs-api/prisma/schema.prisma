@@ -1495,13 +1495,18 @@ model NcmSegmentoRule {
   // IPI
   ipiAliquota   Float    @default(0)
   ipiCst        String?
-  // PIS/COFINS
+  // PIS/COFINS (alíquota + CST de ENTRADA e de SAÍDA)
   pisAliquota   Float    @default(0)
-  pisCst        String?
+  pisCst        String?  // (compat) CST de saída
   cofinsAliquota Float   @default(0)
-  cofinsCst     String?
-  // CFOP + regras estaduais
+  cofinsCst     String?  // (compat) CST de saída
+  cstPisEntrada    String? // ex.: 50 (crédito) | 70 (monofásico) | 98
+  cstPisSaida      String? // ex.: 01 (tributado) | 04/06 (monofásico revenda)
+  cstCofinsEntrada String?
+  cstCofinsSaida   String?
+  // CFOP + regras estaduais + ST
   cfopPadrao    String?
+  cest          String?  // Código Especificador da ST (quando houver ST)
   regraPorEstado String? // JSON: { "SP": { icms, st, mva }, "MG": {...} }
   // Metadados de aprendizado
   origem        String   @default("manual") // manual|aprendido_xml|ia|econet

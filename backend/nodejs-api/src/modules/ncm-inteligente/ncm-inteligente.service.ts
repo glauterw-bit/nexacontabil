@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { regraMonofasico } from '../organizacao/classificacao.util';
+import { ICMS_INTERNO_UF, aliquotaInterestadual, difal } from './matriz-tributaria.util';
 
 export interface Divergencia {
   campo: string;
@@ -425,6 +426,64 @@ Retorne:
       this.prisma.ncmSegmentoRule.count({ where: { ativo: true, icmsSt: true } }),
     ]);
     return { total, aprendidas, comSt, porSegmento: porSegmento.map(s => ({ segmento: s.segmento, count: s._count })) };
+  }
+
+  /**
+   * MATRIZ TRIBUTÁRIA COMPLETA de um NCM entre duas UFs: ICMS interno (origem/destino),
+   * interestadual e DIFAL (determinísticos por lei), ST/MVA/CEST, IPI, e PIS/COFINS com
+   * CST de entrada e saída — já ciente de monofásico.
+   */
+  async matriz(input: { ncm: string; origem: string; destino: string; segmento?: string; importado?: boolean }) {
+    const rule: any = await this.lookup(input.ncm, input.segmento, input.destino);
+    const mono = regraMonofasico(input.ncm);
+    const interno = { origem: ICMS_INTERNO_UF[(input.origem || '').toUpperCase()] ?? null, destino: ICMS_INTERNO_UF[(input.destino || '').toUpperCase()] ?? null };
+    const inter = aliquotaInterestadual(input.origem, input.destino, input.importado);
+    const df = difal(input.origem, input.destino, input.importado);
+    const operacaoInterna = (input.origem || '').toUpperCase() === (input.destino || '').toUpperCase();
+
+    // PIS/COFINS — base legal do monofásico define os CST de saída/entrada
+    const pisCofins = mono
+      ? { regime: 'monofásico', lei: mono.lei, saida: { cst: '04', aliq: 0 }, entrada: { cst: '70', aliq: 0 }, obs: 'Revenda: alíquota 0% (recolhido na indústria).' }
+      : { regime: 'normal', saida: { cst: rule?.pisCst ?? rule?.cstPisSaida ?? '01', aliq: rule?.pisAliquota ?? 1.65 }, entrada: { cst: rule?.cstPisEntrada ?? '50', aliq: rule?.pisAliquota ?? 1.65 }, cofinsSaida: rule?.cofinsAliquota ?? 7.6 };
+
+    return {
+      ncm: input.ncm, descricao: rule?.descricao ?? null, segmento: input.segmento ?? rule?.segmento ?? 'comercio',
+      icms: {
+        internaOrigem: interno.origem, internaDestino: interno.destino,
+        interestadual: operacaoInterna ? null : inter,
+        operacao: operacaoInterna ? 'interna' : 'interestadual',
+        difal: operacaoInterna ? null : df.difal,
+        cst: rule?.icmsCst ?? null,
+      },
+      st: { tem: !!rule?.icmsSt, mva: rule?.mvaSt ?? null, cest: rule?.cest ?? null },
+      ipi: { aliquota: rule?.ipiAliquota ?? null, cst: rule?.ipiCst ?? null },
+      pisCofins,
+      monofasico: mono ? mono.grupo : null,
+      regraEncontrada: !!rule,
+      fonteAliquotasInternas: '2025/2026 — tabela atualizável (auditoria semanal).',
+    };
+  }
+
+  /**
+   * AUDITORIA SEMANAL do Banco de NCM: mede a completude e aponta o que precisa de
+   * revisão do contador — NCMs usados sem regra, com ST mas sem CEST, sem CST, ou de
+   * baixa confiança. Roda pelo agendador 1x/semana + chamável sob demanda.
+   */
+  async auditoria() {
+    const [total, comSt, semCest, semCstIcms, baixaConf, docsNcms] = await Promise.all([
+      this.prisma.ncmSegmentoRule.count({ where: { ativo: true } }),
+      this.prisma.ncmSegmentoRule.count({ where: { ativo: true, icmsSt: true } }),
+      this.prisma.ncmSegmentoRule.count({ where: { ativo: true, icmsSt: true, OR: [{ cest: null }, { cest: '' }] } }),
+      this.prisma.ncmSegmentoRule.count({ where: { ativo: true, OR: [{ icmsCst: null }, { icmsCst: '' }] } }),
+      this.prisma.ncmSegmentoRule.count({ where: { ativo: true, confianca: { lt: 0.6 } } }),
+      this.prisma.ncmSegmentoRule.count({ where: { ativo: true } }),
+    ]);
+    const pendencias: { tipo: string; qtd: number; texto: string }[] = [];
+    if (semCest > 0) pendencias.push({ tipo: 'cest', qtd: semCest, texto: `${semCest} NCM com ST mas sem CEST informado.` });
+    if (semCstIcms > 0) pendencias.push({ tipo: 'cst_icms', qtd: semCstIcms, texto: `${semCstIcms} NCM sem CST de ICMS.` });
+    if (baixaConf > 0) pendencias.push({ tipo: 'confianca', qtd: baixaConf, texto: `${baixaConf} NCM de baixa confiança (revisar a tributação aprendida).` });
+    const completude = total ? Math.round(((total - semCstIcms) / total) * 100) : 100;
+    return { total, comSt, semCest, semCstIcms, baixaConf, completude, pendencias, auditadoEm: new Date().toISOString() };
   }
 }
 

@@ -55,6 +55,7 @@ const CAMINHO: Step[] = [
       { href: '/esteira-fiscal',  icon: Workflow, label: 'Esteira Fiscal' },
       { href: '/buscar-docs',     icon: Search,   label: 'Buscar Documentos' },
       { href: '/ncm-inteligente', icon: Boxes,    label: 'Banco de NCM' },
+      { href: '/matriz-tributaria', icon: Boxes,  label: 'Matriz Tributária' },
     ],
   },
   {
