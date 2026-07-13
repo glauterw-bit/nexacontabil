@@ -33,6 +33,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   private aceleradoAgora = false;
   private demoLimpo = false;
   private deltaResetFeito = false;
+  private carteiraAlinhada = false;
 
   constructor(
     private readonly fluxo: FluxoService,
@@ -261,6 +262,12 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       if (!this.demoLimpo) {
         await passo('limparDemo', () => this.seedDemo.limpar());
         this.demoLimpo = true;
+      }
+      // 0a. ALINHA A CARTEIRA (1x): desativa empresas fora da planilha oficial (pastas
+      //     importadas como clientes, duplicatas) — resolve os "dados que não existem".
+      if (!this.carteiraAlinhada) {
+        await passo('alinharCarteira', () => this.verificacao.desativarForaDaPlanilha());
+        this.carteiraAlinhada = true;
       }
       // 0b. RE-CAPTURA (1x): zera os deltaLinks p/ o Delta reler tudo com o caminho da
       //     PASTA (folderPath) e recuperar os comprovantes mensais de nome igual que

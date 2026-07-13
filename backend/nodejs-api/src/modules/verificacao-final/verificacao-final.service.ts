@@ -227,6 +227,24 @@ export class VerificacaoFinalService {
     return r;
   }
 
+  /**
+   * DESATIVA as empresas ativas que NÃO estão na planilha oficial (pastas importadas como
+   * clientes, duplicatas, antigas). A planilha é a fonte da verdade dos clientes reais.
+   * Reversível (active=false, dados preservados). Idempotente.
+   */
+  async desativarForaDaPlanilha() {
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const nomesOficiais = new Set(CADASTRO_OFICIAL_2026.map((r) => norm(r.nome)));
+    const codigosOficiais = new Set(CADASTRO_OFICIAL_2026.map((r) => String(r.codigo)));
+    const ativas = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true, clienteCodigo: true } });
+    const fora = ativas.filter((c) => !((c.clienteCodigo && codigosOficiais.has(String(c.clienteCodigo))) || nomesOficiais.has(norm(c.name))));
+    if (fora.length) {
+      await this.prisma.company.updateMany({ where: { id: { in: fora.map((c) => c.id) } }, data: { active: false } });
+    }
+    this.logger.log(`carteira alinhada à planilha: ${fora.length} empresas fora da planilha desativadas`);
+    return { desativadas: fora.length, restamAtivas: ativas.length - fora.length, exemplos: fora.slice(0, 40).map((c) => c.name) };
+  }
+
   /** Texto pronto para pedir a procuração e-CAC ao cliente (WhatsApp/e-mail). */
   async textoProcuracao() {
     const esc = await this.prisma.certificadoDigital.findFirst({ where: { escritorio: true, active: true }, select: { cnpjCpf: true, nome: true } });

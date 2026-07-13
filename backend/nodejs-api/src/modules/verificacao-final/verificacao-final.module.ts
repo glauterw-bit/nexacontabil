@@ -43,6 +43,12 @@ class VerificacaoFinalController {
     return this.service.aplicarCadastroOficial();
   }
 
+  /** Desativa empresas fora da planilha oficial (pastas/duplicatas importadas como clientes). */
+  @Post('alinhar-carteira')
+  alinharCarteira() {
+    return this.service.desativarForaDaPlanilha();
+  }
+
   /** Texto pronto (WhatsApp/e-mail) pedindo a procuração e-CAC ao cliente. */
   @Get('texto-procuracao')
   textoProcuracao() {
