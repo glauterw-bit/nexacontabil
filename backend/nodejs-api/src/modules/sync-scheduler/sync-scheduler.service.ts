@@ -53,12 +53,21 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     const porMes2026: Record<string, number> = {};
     for (const d of docs2026Rows) { if (!d.issueDate) continue; const m = new Date(d.issueDate).toISOString().slice(0, 7); porMes2026[m] = (porMes2026[m] ?? 0) + 1; }
     const pct = comPasta ? Math.round((comDelta / comPasta) * 100) : 0;
+    // diagnóstico do último delta SEM nomes de clientes (endpoint público)
+    const det: any[] = this.lastRun?.deltaIncremental?.detalhes ?? [];
+    const deltaErros = det.filter((d) => d.erro);
     return {
       clientesComPasta: comPasta, clientesLidosPeloDelta: comDelta, pctPrimeiraVolta: pct,
       primeiraVoltaCompleta: comPasta > 0 && comDelta >= comPasta,
       docs2026: docs2026Rows.length, porMes2026, docsHoje, totalDocs,
       executandoAgora: this.running,
       ultimoCiclo: this.lastRun?.finishedAt ?? null,
+      ultimoDelta: this.lastRun?.deltaIncremental ? {
+        processados: this.lastRun.deltaIncremental.processados,
+        novos: this.lastRun.deltaIncremental.novos,
+        erros: deltaErros.length,
+        errosAmostra: deltaErros.slice(0, 5).map((d) => String(d.erro).slice(0, 140)),
+      } : null,
     };
   }
 

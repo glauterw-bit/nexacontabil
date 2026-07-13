@@ -155,9 +155,10 @@ export class SefazDistribuicaoService {
     const detalhe: any[] = [];
     const amostraDiag: any[] = [];
     for (const c of alvos) {
-      // só XMLs — PDFs (guias DAS, extratos) trazem CNPJs de terceiros e poluem a contagem
+      // todos os docs — a contagem POR LADO com denominador "úteis" (só CNPJs válidos)
+      // já neutraliza PDFs sem CNPJ; e guias (DAS etc.) trazem o CNPJ do próprio cliente.
       const docs = await this.prisma.document.findMany({
-        where: { companyId: c.id, originalFilename: { endsWith: '.xml' } },
+        where: { companyId: c.id },
         select: { issuerCnpj: true, recipientCnpj: true },
         take: 800,
       });
