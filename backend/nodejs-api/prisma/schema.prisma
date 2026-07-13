@@ -872,6 +872,7 @@ model CertificadoDigital {
   oauthClientId   String?
   oauthToken      String?
   active          Boolean  @default(true)
+  escritorio      Boolean  @default(false) // certificado do ESCRITÓRIO (e-CNPJ) usado p/ todos via procuração
   alertaDias      Int      @default(30)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

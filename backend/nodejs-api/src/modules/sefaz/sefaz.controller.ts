@@ -18,4 +18,16 @@ export class SefazController {
   buscarCliente(@Body() body: { companyId: string; senha?: string; maxIteracoes?: number }) {
     return this.service.buscarCliente(body.companyId, body?.senha, body?.maxIteracoes);
   }
+
+  /** Situação do certificado do ESCRITÓRIO (um só p/ todos, via procuração). */
+  @Get('certificado-escritorio')
+  statusEscritorio() {
+    return this.service.statusEscritorio();
+  }
+
+  /** Sobe o certificado A1 do ESCRITÓRIO. */
+  @Post('certificado-escritorio')
+  salvarEscritorio(@Body() body: { pfxBase64: string; senha: string; nome: string }) {
+    return this.service.salvarCertEscritorio(body.pfxBase64, body.senha, body.nome);
+  }
 }

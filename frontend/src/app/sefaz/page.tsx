@@ -24,11 +24,33 @@ export default function SefazPage() {
   const [enviandoCert, setEnviandoCert] = useState(false);
   const [buscando, setBuscando] = useState(false);
   const [resultado, setResultado] = useState<any>(null);
+  const [esc, setEsc] = useState<any>(null);
+  const [senhaEsc, setSenhaEsc] = useState('');
+  const [enviandoEsc, setEnviandoEsc] = useState(false);
+
+  const carregarEscritorio = useCallback(() => {
+    fetch(`${API}/api/v1/sefaz/certificado-escritorio`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : null).then(setEsc).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch(`${API}/api/v1/paineis/clientes-atribuicao`, { headers: authHeaders() })
       .then((r) => (r.ok ? r.json() : [])).then((d) => setClientes(Array.isArray(d) ? d : [])).catch(() => {});
-  }, []);
+    carregarEscritorio();
+  }, [carregarEscritorio]);
+
+  async function enviarCertEscritorio(file: File) {
+    if (!senhaEsc) { toast.push('Informe a senha do certificado do escritório.', { variant: 'error' }); return; }
+    setEnviandoEsc(true);
+    try {
+      const b64 = await new Promise<string>((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result).split(',')[1] ?? ''); fr.onerror = reject; fr.readAsDataURL(file); });
+      const r = await fetch(`${API}/api/v1/sefaz/certificado-escritorio`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ pfxBase64: b64, senha: senhaEsc, nome: file.name }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.message ?? 'Falha');
+      toast.push(`Certificado do escritório salvo (CNPJ ${j.cnpj}). Agora todos os clientes com procuração podem ser consultados.`, { variant: 'success' });
+      setSenhaEsc(''); carregarEscritorio(); if (sel) carregarStatus(sel.id);
+    } catch (e: any) { toast.push(e.message ?? 'Erro (senha incorreta?)', { variant: 'error' }); }
+    finally { setEnviandoEsc(false); }
+  }
 
   const carregarStatus = useCallback(async (companyId: string) => {
     setCarregandoStatus(true); setStatus(null);
@@ -98,6 +120,31 @@ export default function SefazPage() {
         <ShieldCheck size={15} style={{ flexShrink: 0, marginTop: 1, color: COLORS.acao }} />
         <span>Puxa as NF-e emitidas <b>contra o CNPJ</b> do cliente, incrementalmente por NSU (retoma de onde parou). Exige o <b>certificado A1</b> do cliente (ou do escritório com procuração e-CAC) e <b>CNPJ real</b>. Cobre NF-e; NFS-e municipal fica por fontes específicas.</span>
       </div>
+
+      {/* CERTIFICADO DO ESCRITÓRIO — um só para todos os clientes (via procuração e-CAC) */}
+      <Card accent={esc?.tem ? COLORS.ok : COLORS.atencao} style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <ShieldCheck size={16} color={esc?.tem ? COLORS.ok : COLORS.atencao} />
+          <span style={{ fontWeight: 700, color: COLORS.strong }}>Certificado do escritório (um só para todos)</span>
+          {esc?.tem && <StatusChip tone="ok" label="configurado" size="sm" />}
+        </div>
+        <p style={{ fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>
+          Suba <b>um único certificado A1</b> — o e-CNPJ do escritório. Depois, cada cliente concede uma <b>procuração eletrônica</b> a você no <b>e-CAC da Receita</b> (serviço "Distribuição de DF-e") — e o mesmo certificado consulta todos. <b>Não precisa subir o certificado de cada cliente.</b>
+        </p>
+        {esc?.tem ? (
+          <div style={{ fontSize: 12.5, color: COLORS.muted }}>
+            Ativo: <b style={{ color: COLORS.strong }}>{esc.cnpj}</b>{esc.validade ? ` · válido até ${new Date(esc.validade).toLocaleDateString('pt-BR')}` : ''}. Para trocar, suba outro abaixo.
+          </div>
+        ) : null}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
+          <input type="password" value={senhaEsc} onChange={(e) => setSenhaEsc(e.target.value)} placeholder="Senha do certificado do escritório"
+            className="input-aura" style={{ padding: '8px 10px', fontSize: 13, width: 260 }} />
+          <label className="btn-primary" style={{ cursor: enviandoEsc ? 'wait' : 'pointer', display: 'inline-flex', fontSize: 13 }}>
+            {enviandoEsc ? <><Loader2 size={14} className="animate-spin" /> enviando…</> : <><Upload size={14} /> {esc?.tem ? 'Trocar' : 'Subir'} certificado do escritório</>}
+            <input type="file" accept=".pfx,.p12" hidden disabled={enviandoEsc} onChange={(e) => e.target.files?.[0] && enviarCertEscritorio(e.target.files[0])} />
+          </label>
+        </div>
+      </Card>
 
       {/* seletor de cliente */}
       <Card style={{ marginBottom: 14 }}>

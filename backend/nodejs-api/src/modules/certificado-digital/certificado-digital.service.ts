@@ -377,6 +377,49 @@ export class CertificadoDigitalService {
     return buildHttpsAgent(parsed.certPem, parsed.keyPem);
   }
 
+  // ─── Certificado do ESCRITÓRIO (um só, usado p/ todos via procuração e-CAC) ──
+
+  async temEscritorio(): Promise<{ tem: boolean; cnpj?: string; validade?: Date; nome?: string }> {
+    const c = await this.prisma.certificadoDigital.findFirst({ where: { escritorio: true, active: true }, orderBy: { createdAt: 'desc' } });
+    return c ? { tem: true, cnpj: c.cnpjCpf, validade: c.dataValidade, nome: c.nome } : { tem: false };
+  }
+
+  private async _parsedDe(cert: any, senha?: string): Promise<CertificadoParsed> {
+    if (!cert?.pfxEncrypted || !cert?.pfxIv) throw new BadRequestException('Certificado sem chave privada.');
+    const pfxBuffer = decryptPfx(cert.pfxEncrypted, cert.pfxIv);
+    const s = senha ?? CertificadoDigitalService._senhaCache.get(cert.id) ?? '';
+    return parsePfxReal(pfxBuffer.toString('base64'), s);
+  }
+
+  /** https.Agent com o certificado do ESCRITÓRIO (mTLS) — para consultar todos os clientes. */
+  async getHttpsAgentEscritorio(senha?: string): Promise<https.Agent> {
+    const cert = await this.prisma.certificadoDigital.findFirst({ where: { escritorio: true, active: true }, orderBy: { createdAt: 'desc' } });
+    if (!cert) throw new NotFoundException('Nenhum certificado do escritório configurado.');
+    const parsed = await this._parsedDe(cert, senha);
+    return buildHttpsAgent(parsed.certPem, parsed.keyPem);
+  }
+
+  /** Salva o certificado A1 do ESCRITÓRIO (marca escritorio=true; desmarca os anteriores). */
+  async salvarCertificadoEscritorio(pfxBase64: string, senha: string, nome: string): Promise<CertificadoInfo> {
+    const meta = parsePfxReal(pfxBase64, senha);
+    const { encrypted, iv } = encryptPfx(pfxBase64);
+    // âncora de companyId: usa a primeira empresa ativa (o cert do escritório não é de um cliente)
+    const ancora = await this.prisma.company.findFirst({ where: { active: true }, select: { id: true } });
+    if (!ancora) throw new BadRequestException('Cadastre ao menos uma empresa antes.');
+    await this.prisma.certificadoDigital.updateMany({ where: { escritorio: true, active: true }, data: { active: false } });
+    const cert = await this.prisma.certificadoDigital.create({
+      data: {
+        companyId: ancora.id, nome, tipo: 'a1', escritorio: true,
+        cnpjCpf: meta.cnpjCpf, dataEmissao: meta.dataEmissao, dataValidade: meta.dataValidade,
+        emissor: meta.emissor, serialNumber: meta.serialNumber, thumbprint: meta.thumbprint,
+        pfxEncrypted: encrypted, pfxIv: iv, active: true, alertaDias: 30,
+      },
+    });
+    CertificadoDigitalService._senhaCache.set(cert.id, senha);
+    const dias = Math.floor((meta.dataValidade.getTime() - Date.now()) / 86400000);
+    return { ...cert, diasParaVencer: dias, expirado: dias < 0 };
+  }
+
   // ─── Configurar BirdID ────────────────────────────────────────────────────
 
   async configurarBirdID(

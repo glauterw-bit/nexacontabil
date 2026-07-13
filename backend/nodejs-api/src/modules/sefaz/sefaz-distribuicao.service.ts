@@ -85,13 +85,17 @@ export class SefazDistribuicaoService {
       where: { id: companyId },
       select: { cnpj: true, uf: true, sefazUltNSU: true, sefazMaxNSU: true, sefazUltConsultaEm: true },
     });
-    let temCert = false;
-    try { await this.certificados.getCertificadoAtivo(companyId); temCert = true; } catch { /* sem cert */ }
+    let temCertProprio = false;
+    try { await this.certificados.getCertificadoAtivo(companyId); temCertProprio = true; } catch { /* sem cert próprio */ }
+    const esc = await this.certificados.temEscritorio();
+    const temCert = temCertProprio || esc.tem;
     const cnpj = (company?.cnpj ?? '').replace(/\D/g, '');
     return {
       ...base,
       companyId,
       certificadoAtivo: temCert,
+      certificadoDoEscritorio: esc.tem && !temCertProprio, // usará o do escritório
+      certificadoEscritorio: esc.tem ? { cnpj: esc.cnpj, validade: esc.validade, nome: esc.nome } : null,
       cnpjReal: !!cnpj && !cnpj.startsWith('7'),
       ufDefinida: !!company?.uf,
       ultNSU: company?.sefazUltNSU ?? '0',
@@ -99,6 +103,17 @@ export class SefazDistribuicaoService {
       ultimaConsulta: company?.sefazUltConsultaEm ?? null,
       pronto: temCert && !!cnpj && !cnpj.startsWith('7') && !!company?.uf,
     };
+  }
+
+  /** Salva o certificado A1 do ESCRITÓRIO (um só, usado p/ todos via procuração). */
+  async salvarCertEscritorio(pfxBase64: string, senha: string, nome: string) {
+    const c = await this.certificados.salvarCertificadoEscritorio(pfxBase64, senha, nome);
+    return { ok: true, cnpj: c.cnpjCpf, validade: c.dataValidade, nome: c.nome };
+  }
+
+  /** Situação do certificado do escritório. */
+  async statusEscritorio() {
+    return this.certificados.temEscritorio();
   }
 
   /**
@@ -116,12 +131,17 @@ export class SefazDistribuicaoService {
     const cUF = company.uf ? this.UF[company.uf.toUpperCase()] : undefined;
     if (!cUF) throw new BadRequestException('Defina a UF do cliente (cUFAutor é exigido pelo SEFAZ).');
 
-    // mTLS com o certificado do cliente
+    // mTLS: usa o certificado PRÓPRIO do cliente se houver; senão, o do ESCRITÓRIO
+    // (um só p/ todos, autorizado por procuração e-CAC).
     let httpsAgent: import('https').Agent;
     try {
       httpsAgent = await this.certificados.getHttpsAgent(companyId, senha);
-    } catch (e: any) {
-      throw new BadRequestException(`Certificado indisponível: ${e?.message ?? 'carregue o A1 do cliente'}`);
+    } catch {
+      try {
+        httpsAgent = await this.certificados.getHttpsAgentEscritorio(senha);
+      } catch (e: any) {
+        throw new BadRequestException('Certificado indisponível: carregue o A1 do cliente OU configure o certificado do ESCRITÓRIO (com procuração e-CAC do cliente).');
+      }
     }
 
     let ultNSU = company.sefazUltNSU ?? '0';
