@@ -151,34 +151,67 @@ export class SefazDistribuicaoService {
     });
     const emUso = new Set(todos.map((c) => (c.cnpj ?? '').replace(/\D/g, '')));
 
+    // CNPJ do escritório nunca é de cliente (aparece em recibos/protocolos da contabilidade)
+    const esc = await this.certificados.temEscritorio().catch(() => ({ tem: false }) as any);
+    const cnpjEscritorio = ((esc as any)?.cnpj ?? '').replace(/\D/g, '');
+
+    /** Extrai CNPJs válidos de um texto: formatados (12.345.678/0001-90) e janelas de 14
+     *  dígitos em sequências numéricas (nomes de guia DAS, chaves de acesso etc.). */
+    const minerarDeTexto = (txt: string): Set<string> => {
+      const achados = new Set<string>();
+      if (!txt) return achados;
+      for (const m of txt.match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-?\d{2}/g) ?? []) {
+        const n = m.replace(/\D/g, '');
+        if (this.cnpjValido(n) && n !== cnpjEscritorio) achados.add(n);
+      }
+      for (const run of txt.match(/\d{14,}/g) ?? []) {
+        for (let i = 0; i + 14 <= run.length; i++) {
+          const n = run.slice(i, i + 14);
+          if (this.cnpjValido(n) && n !== cnpjEscritorio) achados.add(n);
+        }
+      }
+      return achados;
+    };
+
     let inferidos = 0, semDocs = 0, semConsenso = 0, conflitos = 0;
     const detalhe: any[] = [];
     const amostraDiag: any[] = [];
     for (const c of alvos) {
-      // todos os docs — a contagem POR LADO com denominador "úteis" (só CNPJs válidos)
-      // já neutraliza PDFs sem CNPJ; e guias (DAS etc.) trazem o CNPJ do próprio cliente.
+      // atalho: o próprio NOME do cliente pode trazer o CNPJ (pastas "EMPRESA - 12.345...")
+      const doNome = [...minerarDeTexto(c.name ?? '')].filter((n) => !emUso.has(n));
+      if (doNome.length === 1) {
+        try {
+          await this.prisma.company.update({ where: { id: c.id }, data: { cnpj: doNome[0] } });
+          emUso.add(doNome[0]); inferidos++;
+          detalhe.push({ cliente: c.name, cnpj: doNome[0], fonte: 'nome do cliente' });
+          continue;
+        } catch { /* segue pro caminho dos docs */ }
+      }
+
+      // três sinais independentes: emitente, destinatário e NOME DO ARQUIVO (guias DAS,
+      // recibos etc. carregam o CNPJ do cliente no nome). O lado mais dominante decide.
       const docs = await this.prisma.document.findMany({
         where: { companyId: c.id },
-        select: { issuerCnpj: true, recipientCnpj: true },
+        select: { issuerCnpj: true, recipientCnpj: true, originalFilename: true },
         take: 800,
       });
-      // conta emitente e destinatário SEPARADOS: o cliente domina UM dos lados
-      // (compras → sempre destinatário; vendas → sempre emitente). Misturar dilui.
-      const contaLado = (docs2: any[], campo: 'issuerCnpj' | 'recipientCnpj') => {
-        const cont = new Map<string, number>();
-        let uteis = 0;
-        for (const d of docs2) {
-          const n = ((d[campo] ?? '') as string).replace(/\D/g, '');
-          if (n.length === 14 && this.cnpjValido(n)) { uteis++; cont.set(n, (cont.get(n) ?? 0) + 1); }
-        }
+      const contadores = { emit: new Map<string, number>(), dest: new Map<string, number>(), arq: new Map<string, number>() };
+      const uteis = { emit: 0, dest: 0, arq: 0 };
+      for (const d of docs) {
+        const e = ((d.issuerCnpj ?? '') as string).replace(/\D/g, '');
+        if (e.length === 14 && this.cnpjValido(e) && e !== cnpjEscritorio) { uteis.emit++; contadores.emit.set(e, (contadores.emit.get(e) ?? 0) + 1); }
+        const r = ((d.recipientCnpj ?? '') as string).replace(/\D/g, '');
+        if (r.length === 14 && this.cnpjValido(r) && r !== cnpjEscritorio) { uteis.dest++; contadores.dest.set(r, (contadores.dest.get(r) ?? 0) + 1); }
+        const doArq = minerarDeTexto(d.originalFilename ?? '');
+        if (doArq.size) { uteis.arq++; for (const n of doArq) contadores.arq.set(n, (contadores.arq.get(n) ?? 0) + 1); }
+      }
+      const lados = (Object.keys(contadores) as Array<keyof typeof contadores>).map((k) => {
         let top: string | null = null, topN = 0;
-        for (const [cnpj, n] of cont) if (n > topN) { top = cnpj; topN = n; }
-        return { top, topN, uteis, share: uteis ? topN / uteis : 0 };
-      };
-      const emit = contaLado(docs, 'issuerCnpj');
-      const dest = contaLado(docs, 'recipientCnpj');
-      const melhor = dest.share >= emit.share ? dest : emit;
-      if (amostraDiag.length < 5) amostraDiag.push({ docs: docs.length, emitUteis: emit.uteis, destUteis: dest.uteis, shareEmit: +emit.share.toFixed(2), shareDest: +dest.share.toFixed(2) });
+        for (const [cnpj, n] of contadores[k]) if (n > topN) { top = cnpj; topN = n; }
+        return { lado: k, top, topN, uteis: uteis[k], share: uteis[k] ? topN / uteis[k] : 0 };
+      });
+      const melhor = lados.reduce((a, b) => (b.share > a.share || (b.share === a.share && b.topN > a.topN) ? b : a));
+      if (amostraDiag.length < 5) amostraDiag.push({ docs: docs.length, uteis, melhorLado: melhor.lado, share: +melhor.share.toFixed(2), topN: melhor.topN });
       if (melhor.topN < minDocs) { (docs.length < minDocs ? semDocs++ : semConsenso++); continue; }
       if (!melhor.top || melhor.share < minShare) { semConsenso++; continue; }
       if (emUso.has(melhor.top)) { conflitos++; detalhe.push({ cliente: c.name, cnpj: melhor.top, motivo: 'já usado por outro cliente' }); continue; }
@@ -186,8 +219,8 @@ export class SefazDistribuicaoService {
         await this.prisma.company.update({ where: { id: c.id }, data: { cnpj: melhor.top } });
         emUso.add(melhor.top);
         inferidos++;
-        detalhe.push({ cliente: c.name, cnpj: melhor.top, docsXml: docs.length, presenca: Math.round(melhor.share * 100) + '%' });
-        this.logger.log(`CNPJ inferido p/ ${c.name}: ${melhor.top} (${melhor.topN}/${melhor.uteis} no lado dominante)`);
+        detalhe.push({ cliente: c.name, cnpj: melhor.top, fonte: melhor.lado, docs: docs.length, presenca: Math.round(melhor.share * 100) + '%' });
+        this.logger.log(`CNPJ inferido p/ ${c.name}: ${melhor.top} (${melhor.lado}: ${melhor.topN}/${melhor.uteis})`);
       } catch { conflitos++; }
     }
     const r = { candidatos: alvos.length, inferidos, semDocs, semConsenso, conflitos, detalhe: detalhe.slice(0, 60) };

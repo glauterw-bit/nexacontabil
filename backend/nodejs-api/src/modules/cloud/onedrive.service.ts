@@ -188,7 +188,10 @@ export class OneDriveService {
       if (!res.ok) {
         // deltaLink expirado (410 Gone) → recomeça leitura completa da pasta uma vez
         if (primeira && deltaLink) { primeira = false; url = `${base}/items/${folderId}/delta?$top=500`; continue; }
-        break;
+        // NÃO engolir o erro: `break` silencioso deixava o cliente órfão para sempre
+        // (sem deltaLink, sem diagnóstico, girando na fila). Agora o erro sobe e aparece.
+        const corpo = await res.text().catch(() => '');
+        throw new Error(`Graph delta HTTP ${res.status}: ${corpo.slice(0, 160)}`);
       }
       primeira = false;
       const json: any = await res.json();

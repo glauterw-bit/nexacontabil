@@ -314,7 +314,12 @@ export class AnaliseClienteService {
         this.sincronizarDelta(c.id).then((r) => ({ c, r })).catch((e) => ({ c, err: e })),
       ));
       for (const x of rs as any[]) {
-        if (x.err) { detalhes.push({ cliente: x.c.name, erro: x.err?.message ?? 'erro' }); continue; }
+        if (x.err) {
+          detalhes.push({ cliente: x.c.name, erro: x.err?.message ?? 'erro' });
+          // manda pro fim da fila mesmo com erro — senão os que falham monopolizam o lote
+          await this.prisma.company.update({ where: { id: x.c.id }, data: { sharepointAnalisadoEm: new Date() } }).catch(() => undefined);
+          continue;
+        }
         const n = (x.r.novosXml ?? 0) + (x.r.novosOutros ?? 0);
         novos += n;
         if (n > 0) detalhes.push({ cliente: x.c.name, xml: x.r.novosXml, outros: x.r.novosOutros });
