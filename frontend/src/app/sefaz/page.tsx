@@ -27,6 +27,23 @@ export default function SefazPage() {
   const [esc, setEsc] = useState<any>(null);
   const [senhaEsc, setSenhaEsc] = useState('');
   const [enviandoEsc, setEnviandoEsc] = useState(false);
+  const [senhaPadrao, setSenhaPadrao] = useState('');
+  const [importando, setImportando] = useState(false);
+  const [resImport, setResImport] = useState<any>(null);
+
+  async function importarCertificados() {
+    setImportando(true); setResImport(null);
+    try {
+      const r = await fetch(`${API}/api/v1/analise-cliente/importar-certificados`, {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify({ senhaPadrao: senhaPadrao || undefined }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.message ?? 'Falha');
+      setResImport(j);
+      toast.push(`${j.importados} certificado(s) importado(s). Agora esses clientes puxam do SEFAZ sem procuração.`, { variant: 'success' });
+    } catch (e: any) { toast.push(e.message ?? 'Erro ao importar', { variant: 'error' }); }
+    finally { setImportando(false); }
+  }
 
   const carregarEscritorio = useCallback(() => {
     fetch(`${API}/api/v1/sefaz/certificado-escritorio`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : null).then(setEsc).catch(() => {});
@@ -152,6 +169,28 @@ export default function SefazPage() {
             <input type="file" accept=".pfx,.p12" hidden disabled={enviandoEsc} onChange={(e) => e.target.files?.[0] && enviarCertEscritorio(e.target.files[0])} />
           </label>
         </div>
+      </Card>
+
+      {/* Importar certificados A1 do Drive — SEFAZ sem procuração */}
+      <Card style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <span style={{ fontWeight: 700, color: COLORS.strong }}>Importar certificados A1 dos clientes (Drive)</span>
+        </div>
+        <p style={{ fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>
+          Se as pastas dos clientes já têm o <b>.pfx/.p12</b> de cada um, o sistema cadastra em lote — casando pelo <b>CNPJ do certificado</b>. Aí a busca no SEFAZ funciona <b>sem procuração e-CAC</b>. Tenta a senha padrão abaixo, o CNPJ, e arquivos "senha.txt" da própria pasta.
+        </p>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input type="password" value={senhaPadrao} onChange={(e) => setSenhaPadrao(e.target.value)} placeholder="Senha padrão dos certificados (se houver)"
+            className="input-aura" style={{ padding: '8px 10px', fontSize: 13, width: 300 }} />
+          <button className="btn-primary" onClick={importarCertificados} disabled={importando} style={{ display: 'inline-flex', gap: 6, fontSize: 13 }}>
+            {importando ? <><Loader2 size={14} className="animate-spin" /> importando…</> : <>Importar certificados do Drive</>}
+          </button>
+        </div>
+        {resImport && (
+          <div style={{ marginTop: 10, fontSize: 12.5, color: COLORS.text, background: COLORS.surface2, borderRadius: 8, padding: '8px 12px' }}>
+            <b style={{ color: COLORS.ok }}>{resImport.importados}</b> importado(s) · {resImport.jaTinham} já tinham · {resImport.senhaNaoEncontrada} sem senha · {resImport.cnpjDivergente} CNPJ divergente · {resImport.expirados} expirado(s) · de {resImport.certificadosEncontrados} encontrado(s).
+          </div>
+        )}
       </Card>
 
       {/* seletor de cliente */}

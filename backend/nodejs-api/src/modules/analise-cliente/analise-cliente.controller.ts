@@ -53,6 +53,12 @@ export class AnaliseClienteController {
     return this.svc.reprocessarSemValor(body ?? {});
   }
 
+  /** Importa em lote os certificados A1 (.pfx/.p12) das pastas dos clientes → SEFAZ sem procuração. */
+  @Post('importar-certificados')
+  importarCertificados(@Body() body: { senhaPadrao?: string; limit?: number; timeBudgetMs?: number }) {
+    return this.svc.importarCertificadosDrive(body ?? {});
+  }
+
   /** Limpa análises e zera flags (pra re-análise com parser novo). */
   @Post('reset')
   reset() {

@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { OneDriveService } from '../cloud/onedrive.service';
 import { NcmInteligenteService } from '../ncm-inteligente/ncm-inteligente.service';
+import { CertificadoDigitalService, parsePfxReal } from '../certificado-digital/certificado-digital.service';
 import { regraMonofasico } from '../organizacao/classificacao.util';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class AnaliseClienteService {
     private readonly prisma: PrismaService,
     private readonly onedrive: OneDriveService,
     private readonly ncm: NcmInteligenteService,
+    private readonly certificados: CertificadoDigitalService,
   ) {}
 
   /**
@@ -631,6 +633,96 @@ export class AnaliseClienteService {
       } catch (e: any) { amostras.push({ arquivo: (d.originalFilename ?? '').slice(-45), erro: (e?.message ?? 'erro').slice(0, 60) }); }
     }
     return { amostras };
+  }
+
+  /**
+   * IMPORTA em lote os certificados A1 (.pfx/.p12) que já estão nas pastas dos clientes,
+   * casa cada um com sua empresa pelo CNPJ do certificado e cadastra — assim a varredura
+   * SEFAZ passa a puxar sem procuração e-CAC. Senha: tenta a padrão informada, o CNPJ e
+   * seus tokens, e o conteúdo de arquivos "senha*.txt" da mesma pasta do cliente.
+   */
+  async importarCertificadosDrive(opts?: { senhaPadrao?: string; limit?: number; timeBudgetMs?: number }) {
+    const inicio = Date.now();
+    const timeBudgetMs = opts?.timeBudgetMs ?? 5 * 60_000;
+    const conn = await this.prisma.cloudConnection.findFirst({
+      where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' },
+    });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+
+    // certificados .pfx/.p12 já capturados, ignorando os já tentados sem sucesso
+    const certs = await this.prisma.document.findMany({
+      where: {
+        OR: [{ originalFilename: { endsWith: '.pfx' } }, { originalFilename: { endsWith: '.p12' } }],
+        fileUrl: { contains: '|' }, NOT: { status: 'cert_falhou' },
+      },
+      select: { id: true, companyId: true, fileUrl: true, originalFilename: true },
+      take: opts?.limit ?? 400,
+    });
+    // dicas de senha: arquivos "senha*.txt" por empresa (baixados sob demanda)
+    const senhaDocs = await this.prisma.document.findMany({
+      where: { originalFilename: { contains: 'senha', mode: 'insensitive' }, fileUrl: { contains: '|' } },
+      select: { companyId: true, fileUrl: true },
+    });
+    const senhaPorEmpresa = new Map<string, string[]>();
+    for (const s of senhaDocs) { const a = senhaPorEmpresa.get(s.companyId) ?? []; a.push(s.fileUrl!); senhaPorEmpresa.set(s.companyId, a); }
+    const baixarTexto = async (fileUrl: string): Promise<string> => {
+      const [driveId, fileId] = fileUrl.split('|'); if (!fileId) return '';
+      try { const { buffer } = await this.onedrive.downloadFile(conn.id, fileId, driveId); return buffer.toString('utf8').slice(0, 2000); } catch { return ''; }
+    };
+
+    let importados = 0, semSenha = 0, semRef = 0, cnpjDivergente = 0, jaTinha = 0, expirados = 0, falhou = 0;
+    const detalhe: any[] = [];
+    for (const c of certs) {
+      if (Date.now() - inicio > timeBudgetMs) break;
+      const [driveId, fileId] = (c.fileUrl ?? '').split('|');
+      if (!fileId || driveId === 'sefaz' || driveId === 'sieg') { semRef++; continue; }
+      const company = await this.prisma.company.findUnique({ where: { id: c.companyId }, select: { id: true, name: true, cnpj: true } });
+      if (!company) { semRef++; continue; }
+      const cnpjEmpresa = (company.cnpj ?? '').replace(/\D/g, '');
+      // já tem certificado PRÓPRIO ativo? não sobrescreve
+      const jaAtivo = await this.prisma.certificadoDigital.findFirst({ where: { companyId: c.companyId, active: true, escritorio: false }, select: { id: true } });
+      if (jaAtivo) { jaTinha++; continue; }
+
+      let b64: string;
+      try { const { buffer } = await this.onedrive.downloadFile(conn.id, fileId, driveId); b64 = buffer.toString('base64'); }
+      catch { falhou++; continue; }
+
+      // candidatos de senha
+      const cands = new Set<string>();
+      if (opts?.senhaPadrao) cands.add(opts.senhaPadrao);
+      if (cnpjEmpresa) { cands.add(cnpjEmpresa); cands.add(cnpjEmpresa.slice(0, 8)); }
+      for (const fu of senhaPorEmpresa.get(c.companyId) ?? []) {
+        const txt = await baixarTexto(fu);
+        for (const tok of (txt.match(/[A-Za-z0-9@#!$%._-]{4,30}/g) ?? []).slice(0, 20)) cands.add(tok);
+      }
+      ['1234', '123456'].forEach((s) => cands.add(s));
+
+      let parsed: any = null, senhaOk = '';
+      for (const s of cands) { try { parsed = parsePfxReal(b64, s); senhaOk = s; break; } catch { /* senha errada */ } }
+      if (!parsed) { semSenha++; await this.prisma.document.update({ where: { id: c.id }, data: { status: 'cert_falhou' } }).catch(() => undefined); continue; }
+
+      const cnpjCert = (parsed.cnpjCpf ?? '').replace(/\D/g, '');
+      if (parsed.dataValidade && new Date(parsed.dataValidade).getTime() < Date.now()) {
+        expirados++; detalhe.push({ empresa: company.name, arquivo: c.originalFilename, motivo: 'certificado expirado' });
+        await this.prisma.document.update({ where: { id: c.id }, data: { status: 'cert_falhou' } }).catch(() => undefined);
+        continue;
+      }
+      // casa pelo CNPJ (se a empresa tem CNPJ real): evita cadastrar cert de terceiro
+      if (cnpjEmpresa && cnpjEmpresa.length === 14 && cnpjCert && cnpjCert !== cnpjEmpresa) {
+        cnpjDivergente++; detalhe.push({ empresa: company.name, cnpjCert, cnpjEmpresa, motivo: 'CNPJ do certificado difere do cliente' });
+        continue;
+      }
+      try {
+        await this.certificados.salvarCertificadoA1(c.companyId, b64, senhaOk, c.originalFilename ?? 'certificado.pfx');
+        importados++;
+        detalhe.push({ empresa: company.name, cnpj: cnpjCert, validade: parsed.dataValidade });
+      } catch (e: any) { falhou++; detalhe.push({ empresa: company.name, motivo: (e?.message ?? 'erro ao salvar').slice(0, 80) }); }
+    }
+    return {
+      certificadosEncontrados: certs.length, importados, jaTinham: jaTinha,
+      senhaNaoEncontrada: semSenha, cnpjDivergente, expirados, semReferencia: semRef, falhou,
+      detalhe: detalhe.slice(0, 60),
+    };
   }
 
   /** Limpa as análises (documentos) e zera as flags pra re-análise limpa. */
