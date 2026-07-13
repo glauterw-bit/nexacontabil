@@ -1,12 +1,14 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { AiService } from '../ai/ai.service';
+import { regraMonofasico } from '../organizacao/classificacao.util';
 
 export interface Divergencia {
   campo: string;
   esperado: string | number;
   encontrado: string | number;
   severidade: 'alta' | 'media' | 'baixa';
+  obs?: string;
 }
 
 export interface ValidacaoTributaria {
@@ -15,6 +17,7 @@ export interface ValidacaoTributaria {
   segmento: string;
   regraEncontrada: boolean;
   divergencias: Divergencia[];
+  monofasico?: string | null;
   sugestao?: any;
 }
 
@@ -142,11 +145,32 @@ export class NcmInteligenteService {
     pisAliquota?: number; cofinsAliquota?: number; cfop?: string;
   }): Promise<ValidacaoTributaria> {
     const segmento = input.segmento ?? 'comercio';
-    const rule: any = await this.lookup(input.ncm, segmento, input.uf);
     const divergencias: Divergencia[] = [];
 
+    // ── MONOFÁSICO (base legal) — precede a regra estatística ──────────────
+    // Na REVENDA (saída, CFOP 5/6/7) de produto monofásico, PIS/COFINS é 0% por lei.
+    // Então: PIS/COFINS = 0 NÃO é erro (some o falso positivo); PIS/COFINS > 0 é o
+    // achado real (cobrança indevida → oportunidade de recuperação/economia).
+    const mono = regraMonofasico(input.ncm);
+    const ehSaida = ['5', '6', '7'].includes(String(input.cfop ?? '')[0]);
+    if (mono && ehSaida) {
+      const pis = input.pisAliquota ?? 0;
+      const cof = input.cofinsAliquota ?? 0;
+      if (pis > 0.01 || cof > 0.01) {
+        divergencias.push({
+          campo: 'PIS/COFINS', esperado: 0, encontrado: Math.round((pis + cof) * 100) / 100, severidade: 'alta',
+          obs: `Monofásico (${mono.grupo}, ${mono.lei}): na revenda o PIS/COFINS é 0%. Cobrança indevida — oportunidade de recuperação.`,
+        });
+      }
+      // ICMS ainda segue a regra do Banco de NCM (monofásico é só PIS/COFINS)
+      const ruleM: any = await this.lookup(input.ncm, segmento, input.uf);
+      if (ruleM) cmp('ICMS', ruleM.regraEstadualAplicada?.icms ?? ruleM.icmsAliquota, input.icmsAliquota, 'alta', divergencias);
+      return { ok: divergencias.length === 0, ncm: input.ncm, segmento, regraEncontrada: true, monofasico: mono.grupo, divergencias };
+    }
+
+    const rule: any = await this.lookup(input.ncm, segmento, input.uf);
     if (!rule) {
-      return { ok: false, ncm: input.ncm, segmento, regraEncontrada: false, divergencias };
+      return { ok: false, ncm: input.ncm, segmento, regraEncontrada: false, monofasico: null, divergencias };
     }
 
     const est = rule.regraEstadualAplicada;
@@ -165,6 +189,7 @@ export class NcmInteligenteService {
       ncm: input.ncm,
       segmento,
       regraEncontrada: true,
+      monofasico: null,
       divergencias,
     };
   }

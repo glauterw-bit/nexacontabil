@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { OneDriveService } from '../cloud/onedrive.service';
 import { NcmInteligenteService } from '../ncm-inteligente/ncm-inteligente.service';
+import { regraMonofasico } from '../organizacao/classificacao.util';
 
 @Injectable()
 export class AnaliseClienteService {
@@ -84,7 +85,7 @@ export class AnaliseClienteService {
               icmsAliquota: it.icms, ipiAliquota: it.ipi, pisAliquota: it.pis, cofinsAliquota: it.cofins, cfop: it.cfop,
             });
             if (!v.regraEncontrada) incs.push(`NCM ${it.ncm} sem regra no Banco de NCM`);
-            else if (!v.ok) for (const d of v.divergencias) incs.push(`NCM ${it.ncm}: ${d.campo} veio ${d.encontrado}% (esperado ${d.esperado}%)`);
+            else if (!v.ok) for (const d of v.divergencias) incs.push((d as any).obs ? `NCM ${it.ncm}: ${(d as any).obs}` : `NCM ${it.ncm}: ${d.campo} veio ${d.encontrado}% (esperado ${d.esperado}%)`);
           } catch { /* segue */ }
         }
         inconsistencias += incs.length;
@@ -339,6 +340,15 @@ export class AnaliseClienteService {
         const cst = String(it.cst ?? '').trim();
         const isCSOSN = cst.length === 3;       // Simples Nacional usa CSOSN (3 díg)
         const isSimples = regime === 'SIMPLES_NACIONAL' || isCSOSN;
+
+        // ── MONOFÁSICO (base legal) — oportunidade, não erro de digitação ──
+        // Na revenda de produto monofásico, PIS/COFINS é 0% por lei. Nota que cobra
+        // PIS/COFINS na revenda = recolhimento indevido (recuperável em até 5 anos).
+        const mono = regraMonofasico(String(it.ncm));
+        if (mono && ['5', '6', '7'].includes(d1) && !isSimples) {
+          const pc = Math.round(((it.pis ?? 0) + (it.cofins ?? 0)) * 100) / 100;
+          if (pc > 0.01) { incs.push(`NCM ${it.ncm}: monofásico (${mono.grupo}, ${mono.lei}) — PIS/COFINS ${pc}% cobrado na revenda deve ser 0%. Recolhimento indevido, recuperável.`); divergencias++; }
+        }
 
         // ── ICMS — só validamos onde a comparação É FIEL ──
         // Pulamos o que legitimamente NÃO destaca ICMS próprio:
