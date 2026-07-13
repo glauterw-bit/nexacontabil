@@ -67,6 +67,24 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       this.prisma.document.findMany({ where: { issuerName: null }, select: { originalFilename: true, type: true }, take: 12, orderBy: { createdAt: 'desc' } }),
     ]);
     const xmlSemValor = await this.prisma.document.count({ where: { totalValue: null, originalFilename: { endsWith: '.xml' } } });
+    // COBERTURA DE CERTIFICADOS: quantas empresas (ativas) têm um .pfx/.p12 na pasta
+    const certFiltro = { OR: [{ originalFilename: { endsWith: '.pfx' } }, { originalFilename: { endsWith: '.p12' } }] };
+    const [certRows, senhaTxt, jaCadastrados] = await Promise.all([
+      this.prisma.document.findMany({ where: certFiltro, select: { companyId: true } }),
+      this.prisma.document.count({ where: { originalFilename: { contains: 'senha', mode: 'insensitive' }, fileUrl: { contains: '|' } } }),
+      this.prisma.certificadoDigital.count({ where: { active: true, escritorio: false } }),
+    ]);
+    const empresasComCert = new Set(certRows.map((c) => c.companyId));
+    const ativasIds = new Set((await this.prisma.company.findMany({ where: { active: true }, select: { id: true } })).map((c) => c.id));
+    const ativasComCert = [...empresasComCert].filter((id) => ativasIds.has(id)).length;
+    const certificados = {
+      arquivosPfx: certRows.length,
+      empresasComCertificado: empresasComCert.size,
+      empresasAtivasComCertificado: ativasComCert,
+      empresasAtivasSemCertificado: ativasIds.size - ativasComCert,
+      arquivosSenhaTxt: senhaTxt,
+      jaCadastradosNoSistema: jaCadastrados,
+    };
     const porTipo = porTipoRows.map((r) => ({ tipo: r.type, n: r._count.id })).sort((a, b) => b.n - a.n);
     const naoXml = totalDocs - docsXml;
     return {
@@ -76,6 +94,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       pctXmlComValor: docsXml ? Math.round((comValor / docsXml) * 100) : 0,
       ultimoReprocessoNfse: this.lastRun?.reprocessarNfse ?? null,
       empresasComDocumentos: empresasComDoc.length, empresasAtivas,
+      certificados,
       docsDoSefaz: docsSefaz,
       porTipo,
       amostraSemEmitente: amostraVazios.map((d) => ({ arquivo: (d.originalFilename ?? '').slice(-40), tipo: d.type })),
