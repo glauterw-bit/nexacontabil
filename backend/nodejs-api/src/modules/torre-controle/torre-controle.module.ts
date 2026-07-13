@@ -7,6 +7,6 @@ import { PrismaService } from '../../database/prisma.service';
 @Module({
   controllers: [TorreControleController],
   providers: [TorreControleService, SeedDemoService, PrismaService],
-  exports: [TorreControleService],
+  exports: [TorreControleService, SeedDemoService],
 })
 export class TorreControleModule {}

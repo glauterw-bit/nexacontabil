@@ -6,6 +6,7 @@ import { SolicitacoesService } from '../solicitacoes/solicitacoes.service';
 import { NcmInteligenteService } from '../ncm-inteligente/ncm-inteligente.service';
 import { SefazDistribuicaoService } from '../sefaz/sefaz-distribuicao.service';
 import { VerificacaoFinalService } from '../verificacao-final/verificacao-final.service';
+import { SeedDemoService } from '../torre-controle/seed-demo.service';
 import { PrismaService } from '../../database/prisma.service';
 
 /**
@@ -30,6 +31,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   private proximaEm: Date | null = null;
   private lastAuditYmd: string | null = null;
   private aceleradoAgora = false;
+  private demoLimpo = false;
 
   constructor(
     private readonly fluxo: FluxoService,
@@ -39,6 +41,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     private readonly ncm: NcmInteligenteService,
     private readonly sefaz: SefazDistribuicaoService,
     private readonly verificacao: VerificacaoFinalService,
+    private readonly seedDemo: SeedDemoService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -228,6 +231,12 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     };
 
     try {
+      // 0. LIMPEZA (1x): remove empresas DEMO (CNPJ 99999000*) e seus dados — pra os
+      //    números refletirem só clientes reais.
+      if (!this.demoLimpo) {
+        await passo('limparDemo', () => this.seedDemo.limpar());
+        this.demoLimpo = true;
+      }
       // DUAS CADEIAS EM PARALELO — a do Drive (Graph) e a do SEFAZ (Receita) usam APIs
       // diferentes; em série a cadeia pesada do Drive esfomeava a do SEFAZ (UF nunca
       // era preenchida e a varredura nunca rodava durante o backfill).
@@ -241,11 +250,13 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         await passo('pastasOrfas', () => this.analise.repararPastasOrfas());
         // 2c. reprocessa NFS-e/XMLs sem valor com o parser ABRASF (re-baixa e extrai)
         await passo('reprocessarNfse', () => this.analise.reprocessarSemValor({ timeBudgetMs: 3 * 60_000 }));
-        // 3. recibos ainda não checados nesta competência
-        await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 8));
-        // 4. re-checa quem estava sem recibo há mais de 1h
-        await passo('recibosRecheck', () => this.fluxo.reverificarRecibosPendentes(competencia, 6, 60));
-        // 5. higiene do calendário fiscal
+        // 3. RECONCILIAÇÃO POR EVIDÊNCIA — lê os comprovantes já capturados nas pastas
+        //    e decide o status REAL de cada obrigação (entregue/vencida/pendente) por
+        //    tipo+competência. É a fonte de verdade das entregas (substitui o recibo genérico).
+        await passo('reconciliarObrigacoes', () => this.fiscalCalendar.reconciliarPorDocumentos({ timeBudgetMs: 2 * 60_000 }));
+        // 4. recibo genérico (fallback) p/ quem não casou por documento específico
+        await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 6));
+        // 5. marca vencidas o que sobrou pendente e já passou do prazo
         await passo('obrigacoesVencidas', () => this.fiscalCalendar.markOverdue());
       })();
       const cadeiaSefaz = (async () => {

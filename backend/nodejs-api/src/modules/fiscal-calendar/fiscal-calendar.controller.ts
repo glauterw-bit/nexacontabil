@@ -49,4 +49,10 @@ export class FiscalCalendarController {
   markOverdue() {
     return this.service.markOverdue();
   }
+
+  /** Reconcilia obrigações pelos comprovantes já capturados nas pastas (entregue/vencida/pendente). */
+  @Post('reconciliar')
+  reconciliar(@Body() body: { ano?: number; limitEmpresas?: number; timeBudgetMs?: number }) {
+    return this.service.reconciliarPorDocumentos(body ?? {});
+  }
 }

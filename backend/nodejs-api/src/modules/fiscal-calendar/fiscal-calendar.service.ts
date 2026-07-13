@@ -308,4 +308,99 @@ export class FiscalCalendarService {
     });
     return { updated: result.count };
   }
+
+  // ── RECONCILIAÇÃO POR EVIDÊNCIA ────────────────────────────────────────────
+  // Lê os DOCUMENTOS já capturados (comprovantes/recibos nas pastas, ex.: "DAS Maio
+  // 2026.pdf") e decide o status REAL de cada obrigação: entregue (achou o comprovante
+  // dela na competência), vencida (venceu e não achou) ou pendente (ainda no prazo).
+  // Só mexe nos status automáticos — preserva o que o contador marcou (paga/isenta/apuração).
+
+  private static readonly _KW: Record<string, string[]> = {
+    DAS: ['das', 'pgdas', 'simei', 'simples'],
+    'DASN-SIMEI': ['dasn', 'dasnsimei', 'simei'],
+    DCTFWeb: ['dctfweb', 'dctf', 'mit'],
+    DEFIS: ['defis'],
+    ECD: ['ecd', 'sped contabil', 'spedcontabil'],
+    ECF: ['ecf'],
+    EFD_REINF: ['reinf', 'efdreinf'],
+    ESOCIAL: ['esocial', 'e social', 'esoc'],
+    FGTS: ['fgts', 'grf', 'grrf'],
+    ICMS: ['icms', 'gia', 'gare', 'efd icms', 'sped fiscal', 'spedfiscal'],
+    DARF: ['darf', 'pis', 'cofins', 'irpj', 'csll', 'irrf'],
+  };
+  private static readonly _MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+  private static _norm(s: string): string {
+    return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  }
+  /** keyword como "palavra" (dígitos/pontuação contam como borda) — evita "das" em "vendas". */
+  private static _temPalavra(nome: string, kw: string): boolean {
+    const esc = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^a-z])${esc}([^a-z]|$)`, 'i').test(nome);
+  }
+  /** o nome do arquivo referencia a competência (mês/ano)? */
+  private static _refCompetencia(nome: string, competencia: string): boolean {
+    const [y, m] = competencia.split('-');
+    if (!m) return nome.includes(y); // anual → basta o ano
+    const yy = y.slice(2);
+    const mm = m.padStart(2, '0');
+    const mes = FiscalCalendarService._MESES[parseInt(m, 10) - 1] ?? '';
+    if (mes && nome.includes(mes)) return true;
+    if (mes && nome.includes(mes.slice(0, 3)) && nome.includes(y)) return true;
+    for (const sep of ['/', '-', '.', ' ', '_', '']) {
+      if (nome.includes(`${mm}${sep}${y}`)) return true;             // 05/2026, 052026
+      if (sep && nome.includes(`${mm}${sep}${yy}`)) return true;     // 05/26
+    }
+    if (nome.includes(`${y}-${mm}`) || nome.includes(`${y}${mm}`)) return true; // 2026-05, 202605
+    return false;
+  }
+
+  /**
+   * Reconcilia as obrigações do ano a partir dos documentos entregues nas pastas.
+   * Bounded por tempo/empresas p/ caber num ciclo. Idempotente.
+   */
+  async reconciliarPorDocumentos(opts?: { ano?: number; limitEmpresas?: number; timeBudgetMs?: number }) {
+    const ano = opts?.ano ?? new Date().getFullYear();
+    const timeBudgetMs = opts?.timeBudgetMs ?? 3 * 60_000;
+    const inicio = Date.now();
+    const now = new Date();
+    const AUTO = ['pendente', 'vencida', 'entregue']; // status geridos automaticamente
+    // empresas menos recentemente reconciliadas primeiro (usa updatedAt do item mais antigo)
+    const empresas = await this.prisma.company.findMany({
+      where: { active: true },
+      select: { id: true }, take: opts?.limitEmpresas ?? 60,
+      orderBy: { updatedAt: 'asc' },
+    });
+
+    let empresasProc = 0, entregues = 0, vencidas = 0, pendentes = 0, semMudanca = 0;
+    for (const emp of empresas) {
+      if (Date.now() - inicio > timeBudgetMs) break;
+      const itens = await this.prisma.fiscalCalendarItem.findMany({
+        where: { companyId: emp.id, competencia: { startsWith: String(ano) }, status: { in: AUTO } },
+        select: { id: true, tipo: true, competencia: true, dataVencimento: true, status: true },
+      });
+      if (!itens.length) { empresasProc++; continue; }
+      const docs = await this.prisma.document.findMany({
+        where: { companyId: emp.id, originalFilename: { not: null } },
+        select: { originalFilename: true },
+      });
+      const nomes = docs.map((d) => FiscalCalendarService._norm(d.originalFilename ?? ''));
+
+      for (const it of itens) {
+        const kws = FiscalCalendarService._KW[it.tipo] ?? [FiscalCalendarService._norm(it.tipo)];
+        const achou = nomes.some((n) =>
+          kws.some((k) => FiscalCalendarService._temPalavra(n, k)) && FiscalCalendarService._refCompetencia(n, it.competencia),
+        );
+        const novo = achou ? 'entregue' : (new Date(it.dataVencimento) < now ? 'vencida' : 'pendente');
+        if (novo !== it.status) {
+          await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: novo } }).catch(() => undefined);
+          if (novo === 'entregue') entregues++; else if (novo === 'vencida') vencidas++; else pendentes++;
+        } else semMudanca++;
+      }
+      // "toca" a empresa p/ ela ir pro fim da fila de reconciliação
+      await this.prisma.company.update({ where: { id: emp.id }, data: { updatedAt: new Date() } }).catch(() => undefined);
+      empresasProc++;
+    }
+    return { ano, empresasProcessadas: empresasProc, marcadasEntregue: entregues, marcadasVencida: vencidas, marcadasPendente: pendentes, semMudanca };
+  }
 }

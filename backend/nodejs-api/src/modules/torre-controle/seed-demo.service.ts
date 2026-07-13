@@ -363,6 +363,10 @@ export class SeedDemoService {
       await this.prisma.transaction.deleteMany({ where: w });
       await this.prisma.chartAccount.deleteMany({ where: w });
       await this.prisma.fiscalNote.deleteMany({ where: w });
+      // obrigações e documentos das demos — é o que poluía as contagens de vencidas/docs
+      await this.prisma.fiscalCalendarItem.deleteMany({ where: w }).catch(() => undefined);
+      await this.prisma.document.deleteMany({ where: w }).catch(() => undefined);
+      await this.prisma.certificadoDigital.deleteMany({ where: w }).catch(() => undefined);
       await this.prisma.company.deleteMany({ where: { id: { in: ids } } });
     }
     await this.prisma.ncmSegmentoRule.deleteMany({ where: { origem: 'demo' } });
