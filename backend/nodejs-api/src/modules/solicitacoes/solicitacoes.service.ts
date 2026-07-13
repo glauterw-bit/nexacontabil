@@ -69,6 +69,51 @@ export class SolicitacoesService {
     };
   }
 
+  /**
+   * SOLICITAÇÃO MENSAL AUTOMÁTICA (dia 01/02) — para cada cliente com pendência,
+   * cria/garante uma SolicitacaoDoc da competência com a mensagem pronta. Idempotente
+   * (unique companyId+competencia): rodar de novo no dia 02 não duplica.
+   */
+  async gerarSolicitacoesMensais(competencia?: string) {
+    const comp = competencia ?? new Date().toISOString().slice(0, 7);
+    const ov = await this.overview();
+    let criadas = 0, jaExistiam = 0;
+    for (const c of ov.clientes) {
+      const itens = c.pendencias.map((p) => `• ${p.texto}`).join('\n');
+      const texto = `Olá! Estamos iniciando o fechamento de ${comp.split('-').reverse().join('/')}. Para manter sua contabilidade em dia, precisamos de:\n\n${itens}\n\nPode nos enviar assim que possível? 🙏`;
+      const existe = await this.prisma.solicitacaoDoc.findUnique({ where: { companyId_competencia: { companyId: c.companyId, competencia: comp } }, select: { id: true } });
+      if (existe) { jaExistiam++; continue; }
+      await this.prisma.solicitacaoDoc.create({
+        data: { companyId: c.companyId, competencia: comp, canal: 'auto', status: 'gerada', mensagem: texto, pendencias: JSON.stringify(c.pendencias) },
+      }).then(() => criadas++).catch(() => undefined);
+    }
+    return { competencia: comp, clientesComPendencia: ov.clientes.length, criadas, jaExistiam };
+  }
+
+  /** Status das solicitações do mês (para o dashboard). */
+  async statusMensal(competencia?: string) {
+    const comp = competencia ?? new Date().toISOString().slice(0, 7);
+    const solic = await this.prisma.solicitacaoDoc.findMany({ where: { competencia: comp }, select: { status: true } });
+    const por = (s: string) => solic.filter((x) => x.status === s).length;
+    return { competencia: comp, total: solic.length, geradas: por('gerada'), enviadas: por('enviada'), respondidas: por('respondida') };
+  }
+
+  /** Lista as solicitações da competência (para a tela). */
+  async listarMensais(competencia?: string) {
+    const comp = competencia ?? new Date().toISOString().slice(0, 7);
+    const [solic, companies] = await Promise.all([
+      this.prisma.solicitacaoDoc.findMany({ where: { competencia: comp }, orderBy: { createdAt: 'desc' } }),
+      this.prisma.company.findMany({ select: { id: true, name: true } }),
+    ]);
+    const nome = new Map(companies.map((c) => [c.id, c.name]));
+    return { competencia: comp, itens: solic.map((s) => ({ ...s, cliente: nome.get(s.companyId) ?? s.companyId, pendencias: safe(s.pendencias) ?? [] })) };
+  }
+
+  /** Marca uma solicitação como enviada (após disparar por WhatsApp/e-mail). */
+  async marcarEnviada(id: string) {
+    return this.prisma.solicitacaoDoc.update({ where: { id }, data: { status: 'enviada', enviadaEm: new Date() } });
+  }
+
   /** Texto pronto pra enviar ao cliente (WhatsApp/e-mail). */
   async mensagem(companyId: string) {
     const ov = await this.overview();

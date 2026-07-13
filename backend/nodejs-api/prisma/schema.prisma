@@ -1631,3 +1631,21 @@ model FluxoEstado {
   @@index([departamento, competencia])
   @@map("fluxo_estados")
 }
+
+// ─── Solicitação mensal de documentos ao cliente (dia 01/02) ───
+model SolicitacaoDoc {
+  id          String   @id @default(uuid())
+  companyId   String
+  competencia String   // YYYY-MM
+  canal       String   @default("auto")     // auto|whatsapp|email|manual
+  status      String   @default("gerada")   // gerada|enviada|respondida
+  mensagem    String?
+  pendencias  String?  // JSON das pendências no momento
+  enviadaEm   DateTime?
+  respondidaEm DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([companyId, competencia])
+  @@index([competencia, status])
+  @@map("solicitacoes_doc")
+}

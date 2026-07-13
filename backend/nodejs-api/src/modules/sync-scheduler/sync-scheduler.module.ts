@@ -4,6 +4,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
 import { FluxoModule } from '../fluxo/fluxo.module';
 import { AnaliseClienteModule } from '../analise-cliente/analise-cliente.module';
 import { FiscalCalendarModule } from '../fiscal-calendar/fiscal-calendar.module';
+import { SolicitacoesModule } from '../solicitacoes/solicitacoes.module';
 
 @Controller('sync-drive')
 @UseGuards(JwtAuthGuard)
@@ -24,7 +25,7 @@ class SyncSchedulerController {
 }
 
 @Module({
-  imports: [FluxoModule, AnaliseClienteModule, FiscalCalendarModule],
+  imports: [FluxoModule, AnaliseClienteModule, FiscalCalendarModule, SolicitacoesModule],
   controllers: [SyncSchedulerController],
   providers: [SyncSchedulerService],
 })

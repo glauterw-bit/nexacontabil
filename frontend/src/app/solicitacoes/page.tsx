@@ -16,11 +16,26 @@ export default function SolicitacoesPage() {
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState('');
   const [copiado, setCopiado] = useState<string | null>(null);
+  const [statusMensal, setStatusMensal] = useState<any>(null);
+  const [gerando, setGerando] = useState(false);
 
+  function carregarStatus() {
+    fetch(`${API}/api/v1/solicitacoes/status-mensal`, { headers: authHeaders() })
+      .then((r) => r.ok ? r.json() : null).then(setStatusMensal).catch(() => {});
+  }
   useEffect(() => {
     fetch(`${API}/api/v1/solicitacoes/overview`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null).then(setD).catch(() => {}).finally(() => setLoading(false));
+    carregarStatus();
   }, []);
+
+  async function gerarMensais() {
+    setGerando(true);
+    try {
+      const r = await fetch(`${API}/api/v1/solicitacoes/gerar-mensais`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: '{}' });
+      if (r.ok) carregarStatus();
+    } catch {} finally { setGerando(false); }
+  }
 
   async function copiarMsg(companyId: string, nome: string) {
     const r = await fetch(`${API}/api/v1/solicitacoes/mensagem/${companyId}`, { headers: authHeaders() });
@@ -47,6 +62,18 @@ export default function SolicitacoesPage() {
     <div className="page-narrow">
       <PageHeader icon={<ClipboardCheck size={22} color={COLORS.acao} />} title="Solicitar aos Clientes"
         subtitle="O que falta em cada cliente — pra o analista pedir e completar a contabilidade." />
+
+      {/* Solicitação mensal automática (dia 01/02) */}
+      <div style={{ marginBottom: 16, padding: '11px 14px', borderRadius: 10, fontSize: 13, background: tint(COLORS.acao, 7), border: `1px solid ${tint(COLORS.acao, 20)}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <ClipboardCheck size={16} color={COLORS.acao} style={{ flexShrink: 0 }} />
+        <span style={{ flex: 1, minWidth: 200, color: COLORS.muted }}>
+          <b style={{ color: COLORS.strong }}>Solicitação mensal automática</b> — no dia 01/02 o sistema gera o pedido de documentos para todos os clientes com pendência.
+          {statusMensal && <> Este mês: <b style={{ color: COLORS.strong }}>{statusMensal.total}</b> geradas · {statusMensal.enviadas} enviadas · {statusMensal.respondidas} respondidas.</>}
+        </span>
+        <button onClick={gerarMensais} disabled={gerando} className="btn-secondary" style={{ fontSize: 12.5 }}>
+          {gerando ? 'Gerando…' : 'Gerar agora'}
+        </button>
+      </div>
 
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
         <Kpi label="Clientes ativos" value={d.totalAtivos} />

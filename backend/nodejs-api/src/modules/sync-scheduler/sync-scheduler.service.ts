@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import { FluxoService } from '../fluxo/fluxo.service';
 import { AnaliseClienteService } from '../analise-cliente/analise-cliente.service';
 import { FiscalCalendarService } from '../fiscal-calendar/fiscal-calendar.service';
+import { SolicitacoesService } from '../solicitacoes/solicitacoes.service';
 
 /**
  * Sincronização agendada do drive (opção 1 — varredura periódica).
@@ -28,6 +29,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     private readonly fluxo: FluxoService,
     private readonly analise: AnaliseClienteService,
     private readonly fiscalCalendar: FiscalCalendarService,
+    private readonly solicitacoes: SolicitacoesService,
   ) {}
 
   private get enabled(): boolean {
@@ -94,6 +96,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       await passo('recibosRecheck', () => this.fluxo.reverificarRecibosPendentes(competencia, 6, 60));
       // 5. higiene do calendário fiscal
       await passo('obrigacoesVencidas', () => this.fiscalCalendar.markOverdue());
+      // 6. no início do mês (dia 01/02): gera as solicitações de documentos aos clientes.
+      //    Idempotente (unique cliente+competência) — rodar em vários ciclos não duplica.
+      if (startedAt.getDate() <= 2) {
+        await passo('solicitacoesMensais', () => this.solicitacoes.gerarSolicitacoesMensais());
+      }
     } finally {
       resultado.finishedAt = new Date().toISOString();
       resultado.duracaoMs = Date.now() - startedAt.getTime();
