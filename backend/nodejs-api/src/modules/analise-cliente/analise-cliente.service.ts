@@ -533,6 +533,51 @@ export class AnaliseClienteService {
     return { processados: docs.length, corrigidos, semReferencia: semRef, semDataApos: falhou, restantes: Math.max(0, pendentes - docs.length) };
   }
 
+  /**
+   * REPROCESSA NFS-e (e XMLs) que ficaram SEM VALOR — re-baixa o XML do OneDrive e aplica
+   * o parser novo (padrão ABRASF: PrestadorServico + ValorServicos). Bounded por tempo/limite.
+   */
+  async reprocessarSemValor(opts?: { limit?: number; timeBudgetMs?: number }) {
+    const limit = opts?.limit ?? 300;
+    const timeBudgetMs = opts?.timeBudgetMs ?? 4 * 60_000;
+    const inicio = Date.now();
+    const conn = await this.prisma.cloudConnection.findFirst({
+      where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' },
+    });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    const filtro = { totalValue: null, originalFilename: { endsWith: '.xml' }, fileUrl: { contains: '|' } } as const;
+    const pendentes = await this.prisma.document.count({ where: filtro });
+    const docs = await this.prisma.document.findMany({
+      where: filtro, select: { id: true, companyId: true, fileUrl: true }, take: limit,
+      orderBy: { createdAt: 'desc' },
+    });
+    let corrigidos = 0, semRef = 0, semValorAinda = 0, falhou = 0;
+    for (const d of docs) {
+      if (Date.now() - inicio > timeBudgetMs) break;
+      const [driveId, fileId] = (d.fileUrl ?? '').split('|');
+      if (!fileId || driveId === 'sieg' || driveId === 'sefaz') { semRef++; continue; }
+      try {
+        const { buffer } = await this.onedrive.downloadFile(conn.id, fileId, driveId);
+        const nf = parseNfe(buffer.toString('utf8'));
+        if (nf && (nf.valorTotal != null || nf.emitenteNome)) {
+          await this.prisma.document.update({
+            where: { id: d.id },
+            data: {
+              type: nf.tipo, totalValue: nf.valorTotal ?? undefined,
+              number: nf.numero ? String(nf.numero) : undefined,
+              issuerName: nf.emitenteNome ?? undefined, issuerCnpj: nf.emitenteCnpj ?? undefined,
+              recipientName: nf.destNome ?? undefined, recipientCnpj: nf.destCnpj ?? undefined,
+              issueDate: nf.dataEmissao ? new Date(nf.dataEmissao) : undefined,
+              extractedData: JSON.stringify(nf),
+            },
+          });
+          if (nf.valorTotal != null) corrigidos++; else semValorAinda++;
+        } else semValorAinda++;
+      } catch { falhou++; }
+    }
+    return { pendentesAntes: pendentes, processados: docs.length, corrigidos, semValorAinda, semReferencia: semRef, falhou, restantes: Math.max(0, pendentes - corrigidos) };
+  }
+
   /** Limpa as análises (documentos) e zera as flags pra re-análise limpa. */
   async resetAnalises() {
     const clientes = await this.prisma.company.findMany({ where: { sharepointItemId: { not: null } }, select: { id: true } });
@@ -571,12 +616,33 @@ function parseNfe(xml: string): null | {
     });
   }
 
+  // ── NFS-e municipal (padrão ABRASF e variantes): não tem <emit>/<ICMSTot>. ──
+  // Prestador = emitente; Tomador = destinatário; valor em <ValorServicos>/<ValorLiquidoNfse>.
+  const prestBloco = (xml.match(/<(?:[\w.-]+:)?(?:PrestadorServico|Prestador|prest)(?:\s[^>]*)?>[\s\S]*?<\/(?:[\w.-]+:)?(?:PrestadorServico|Prestador|prest)>/i) ?? [''])[0];
+  const tomaBloco = (xml.match(/<(?:[\w.-]+:)?(?:TomadorServico|Tomador|toma)(?:\s[^>]*)?>[\s\S]*?<\/(?:[\w.-]+:)?(?:TomadorServico|Tomador|toma)>/i) ?? [''])[0];
+  const infNfseBloco = (xml.match(/<(?:[\w.-]+:)?(?:InfNfse|IdentificacaoNfse|Nfse|CompNfse)(?:\s[^>]*)?>[\s\S]*?(?:<\/(?:[\w.-]+:)?(?:InfNfse|IdentificacaoNfse)>|$)/i) ?? [''])[0];
+  const pickCnpj = (bloco: string) => pick(bloco, 'CNPJ') ?? pick(bloco, 'Cnpj') ?? pick(bloco, 'CpfCnpj')?.replace(/\D/g, '') ?? undefined;
+
+  const valorTotal =
+    num(pick(totalBloco, 'vNF')) ??                       // NF-e
+    num(pick(xml, 'ValorLiquidoNfse')) ??                 // NFS-e ABRASF (líquido)
+    num(pick(xml, 'ValorServicos')) ??                    // NFS-e (bruto dos serviços)
+    num(pick(xml, 'ValorTotalNota')) ?? num(pick(xml, 'ValorTotalRecebido')) ??
+    num(pick(xml, 'ValorNfse')) ?? num(pick(xml, 'vServ')) ?? num(pick(xml, 'ValorTotalServico')) ??
+    num(pick(xml, 'ValorTotal'));
+
+  const emitenteNome = pick(emitBloco, 'xNome') ?? pick(prestBloco, 'RazaoSocial') ?? pick(prestBloco, 'xNome') ?? pick(prestBloco, 'NomeRazaoSocial');
+  const emitenteCnpj = pickCnpj(emitBloco) ?? pickCnpj(prestBloco);
+  const destNome = pick(destBloco, 'xNome') ?? pick(tomaBloco, 'RazaoSocial') ?? pick(tomaBloco, 'xNome') ?? pick(tomaBloco, 'NomeRazaoSocial');
+  const destCnpj = pickCnpj(destBloco) ?? pickCnpj(tomaBloco);
+  const numero = pick(xml, 'nNF') ?? pick(infNfseBloco, 'Numero') ?? pick(xml, 'NumeroNfse') ?? pick(xml, 'Numero');
+
   return {
     tipo,
-    numero: pick(xml, 'nNF'),
+    numero,
     chave: (xml.match(/Id="NFe(\d{44})"/) ?? [])[1],
     dataEmissao: extrairData(xml),
-    valorTotal: num(pick(totalBloco, 'vNF')),
+    valorTotal,
     natOp: pick(xml, 'natOp'),
     totais: {
       produtos: num(pick(totalBloco, 'vProd')),
@@ -587,10 +653,10 @@ function parseNfe(xml: string): null | {
       cofins: num(pick(totalBloco, 'vCOFINS')),
       frete: num(pick(totalBloco, 'vFrete')),
     },
-    emitenteNome: pick(emitBloco, 'xNome'),
-    emitenteCnpj: pick(emitBloco, 'CNPJ'),
-    destNome: pick(destBloco, 'xNome'),
-    destCnpj: pick(destBloco, 'CNPJ'),
+    emitenteNome,
+    emitenteCnpj,
+    destNome,
+    destCnpj,
     // Reforma Tributária (NT 2025.002): grupo UB/gIBSCBS + cClassTrib.
     // A partir de 03/08/2026 nota do regime regular SEM esses campos é rejeitada.
     temIBSCBS: /<gIBSCBS|<IBSCBS|cClassTrib|<CST-?IBS/i.test(xml),

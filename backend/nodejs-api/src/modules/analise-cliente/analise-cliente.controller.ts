@@ -47,6 +47,12 @@ export class AnaliseClienteController {
     return this.svc.diagnostico();
   }
 
+  /** Reprocessa NFS-e/XMLs sem valor com o parser ABRASF (re-baixa e extrai). */
+  @Post('reprocessar-nfse')
+  reprocessarNfse(@Body() body: { limit?: number; timeBudgetMs?: number }) {
+    return this.svc.reprocessarSemValor(body ?? {});
+  }
+
   /** Limpa análises e zera flags (pra re-análise com parser novo). */
   @Post('reset')
   reset() {

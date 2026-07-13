@@ -66,13 +66,15 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       // amostra de arquivos SEM emitente (p/ ver se são PDFs/NFS-e municipais)
       this.prisma.document.findMany({ where: { issuerName: null }, select: { originalFilename: true, type: true }, take: 12, orderBy: { createdAt: 'desc' } }),
     ]);
+    const xmlSemValor = await this.prisma.document.count({ where: { totalValue: null, originalFilename: { endsWith: '.xml' } } });
     const porTipo = porTipoRows.map((r) => ({ tipo: r.type, n: r._count.id })).sort((a, b) => b.n - a.n);
     const naoXml = totalDocs - docsXml;
     return {
       totalDocs,
-      xml: docsXml, naoXml,
+      xml: docsXml, naoXml, xmlSemValor,
       comEmitente, comValor, comData, comExtractedData: comExtract,
       pctXmlComValor: docsXml ? Math.round((comValor / docsXml) * 100) : 0,
+      ultimoReprocessoNfse: this.lastRun?.reprocessarNfse ?? null,
       empresasComDocumentos: empresasComDoc.length, empresasAtivas,
       docsDoSefaz: docsSefaz,
       porTipo,
@@ -212,6 +214,8 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         await passo('deltaIncremental', () => this.analise.sincronizarDeltaLote(30));
         // 2b. religa pastas órfãs (404 itemNotFound) — pasta movida/recriada no SharePoint
         await passo('pastasOrfas', () => this.analise.repararPastasOrfas());
+        // 2c. reprocessa NFS-e/XMLs sem valor com o parser ABRASF (re-baixa e extrai)
+        await passo('reprocessarNfse', () => this.analise.reprocessarSemValor({ timeBudgetMs: 3 * 60_000 }));
         // 3. recibos ainda não checados nesta competência
         await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 8));
         // 4. re-checa quem estava sem recibo há mais de 1h
