@@ -25,6 +25,7 @@ export default function ExportarDominioPage() {
   const toast = useToast();
   const [mesAno, setMesAno] = useState(mesAtual());
   const [todos, setTodos] = useState(false);
+  const [fonte, setFonte] = useState<'fiscal' | 'contabil'>('fiscal');
   const [separator, setSeparator] = useState(';');
   const [dateFormat, setDateFormat] = useState<'DD/MM/YYYY' | 'DDMMYYYY' | 'YYYY-MM-DD'>('DD/MM/YYYY');
   const [decimalSep, setDecimalSep] = useState<',' | '.'>(',');
@@ -41,13 +42,14 @@ export default function ExportarDominioPage() {
         body: JSON.stringify({
           companyId: selectedCompany.id,
           mesAno: todos ? undefined : mesAno,
+          fonte,
           layout: { separator, dateFormat, decimalSep },
         }),
       });
       if (!r.ok) throw new Error((await r.json())?.message ?? 'Falha ao gerar');
       const data = await r.json();
       setResult(data);
-      if (data.totalLinhas === 0) toast.push('Nenhum lançamento aprovado no período', { variant: 'info' });
+      if (data.totalLinhas === 0) toast.push(fonte === 'fiscal' ? 'Nenhuma nota fiscal no período (verifique se os XMLs foram capturados)' : 'Nenhum lançamento aprovado no período', { variant: 'info' });
       else toast.push(`${data.totalLinhas} linhas geradas de ${data.transacoesExportadas} lançamentos`, { variant: 'success' });
     } catch (e: any) {
       toast.push(e.message, { variant: 'error' });
@@ -87,6 +89,24 @@ export default function ExportarDominioPage() {
       />
 
       <div className="card-aura space-y-4">
+        {/* Fonte dos lançamentos */}
+        <div>
+          <label className="block text-xs text-tx-muted mb-1.5 uppercase tracking-wider">Fonte</label>
+          <div className="flex gap-2">
+            <button onClick={() => setFonte('fiscal')} className={fonte === 'fiscal' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: 13 }}>
+              Notas fiscais (XML)
+            </button>
+            <button onClick={() => setFonte('contabil')} className={fonte === 'contabil' ? 'btn-primary' : 'btn-secondary'} style={{ fontSize: 13 }}>
+              Lançamentos contábeis
+            </button>
+          </div>
+          <p className="text-[11px] text-tx-muted mt-1.5">
+            {fonte === 'fiscal'
+              ? 'Monta a escrituração a partir das notas do mês (venda → Clientes/Receita; compra → Estoque/Fornecedores; ICMS a recolher). Ajuste o plano de contas depois no Domínio.'
+              : 'Exporta os lançamentos contábeis já aprovados no sistema (tabela de lançamentos).'}
+          </p>
+        </div>
+
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs text-tx-muted mb-1.5 uppercase tracking-wider">Competência</label>
@@ -96,7 +116,7 @@ export default function ExportarDominioPage() {
           <div className="flex items-end">
             <label className="flex items-center gap-2 text-sm text-tx cursor-pointer">
               <input type="checkbox" checked={todos} onChange={(e) => setTodos(e.target.checked)} className="accent-indigo-500" />
-              Exportar todos os lançamentos aprovados
+              {fonte === 'fiscal' ? 'Todas as competências' : 'Todos os lançamentos aprovados'}
             </label>
           </div>
         </div>

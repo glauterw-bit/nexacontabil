@@ -34,6 +34,21 @@ const LAYOUT_PADRAO: DominioLayout = {
 
 interface EntryParsed { conta: string; natureza: 'D' | 'C'; valor: number }
 
+/** Plano de contas padrão (configurável no body). O contador ajusta pelo dele. */
+export interface PlanoContas {
+  clientes: string; fornecedores: string; receita: string; compras: string;
+  icmsRecolher: string; icmsVendas: string;
+}
+const PLANO_PADRAO: PlanoContas = {
+  clientes: '1.1.02.001',      // Clientes / Duplicatas a receber
+  fornecedores: '2.1.01.001',  // Fornecedores
+  receita: '3.1.01.001',       // Receita bruta de vendas
+  compras: '1.1.03.001',       // Estoques / Compras
+  icmsRecolher: '2.1.04.001',  // ICMS a recolher
+  icmsVendas: '3.1.02.001',    // (-) ICMS sobre vendas
+};
+function safeJson(s: any) { try { return s ? JSON.parse(s) : null; } catch { return null; } }
+
 interface LinhaLancamento {
   data: Date;
   debito: string;
@@ -116,6 +131,69 @@ export class DominioExportService {
       nomeArquivo: `dominio_lancamentos_${(company.cnpj || '').replace(/\D/g, '')}_${input.mesAno ?? 'geral'}.txt`,
       conteudo,            // preview UTF-8
       conteudoBase64Ansi,  // download fiel (latin1/ANSI)
+    };
+  }
+
+  /**
+   * MODO FISCAL — gera os lançamentos contábeis A PARTIR DAS NOTAS (XML) da competência.
+   * O escritório trabalha com XMLs, não com lançamento manual; por isso a tabela de
+   * transações vive vazia e o simulador não gerava nada. Aqui montamos a escrituração:
+   *   Venda (saída):  D Clientes  / C Receita   (+ D ICMS s/ vendas / C ICMS a recolher)
+   *   Compra (entrada): D Estoque / C Fornecedores
+   * O plano de contas é configurável; os defaults são ajustáveis pelo contador.
+   */
+  async gerarLancamentosFiscais(input: {
+    companyId: string; mesAno?: string; layout?: Partial<DominioLayout>; plano?: Partial<PlanoContas>;
+  }) {
+    if (!input.companyId) throw new BadRequestException('companyId obrigatório');
+    const company = await this.prisma.company.findUnique({ where: { id: input.companyId } });
+    if (!company) throw new NotFoundException('Empresa não encontrada');
+    const layout: DominioLayout = { ...LAYOUT_PADRAO, ...(input.layout ?? {}) };
+    const contas: PlanoContas = { ...PLANO_PADRAO, ...(input.plano ?? {}) };
+
+    const where: any = { companyId: input.companyId, extractedData: { not: null }, issueDate: { not: null } };
+    if (input.mesAno) {
+      const [y, m] = input.mesAno.split('-').map(Number);
+      where.issueDate = { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) };
+    }
+    const docs = await this.prisma.document.findMany({ where, orderBy: { issueDate: 'asc' } });
+
+    const linhas: LinhaLancamento[] = [];
+    const avisos: string[] = [];
+    let notasOk = 0, semValor = 0;
+    for (const d of docs) {
+      const nf = safeJson(d.extractedData);
+      const data = d.issueDate as Date;
+      const valor = round(nf?.valorTotal ?? nf?.totais?.produtos ?? d.totalValue ?? 0);
+      if (!data || valor <= 0.005) { semValor++; continue; }
+      const cfop = String(nf?.itens?.[0]?.cfop ?? '');
+      const dir = cfop[0];
+      const saida = ['5', '6', '7'].includes(dir) || (dir === '' && (d.type === 'nfse'));
+      const entrada = ['1', '2', '3'].includes(dir);
+      const nnf = nf?.numero ? `NF ${nf.numero}` : (d.number ? `NF ${d.number}` : 'NF');
+      if (saida) {
+        linhas.push({ data, debito: contas.clientes, credito: contas.receita, valor, historico: `Venda ${nnf} - ${nf?.destNome ?? d.recipientName ?? ''}`.trim() });
+        const icms = round(nf?.totais?.icms ?? 0);
+        if (icms > 0.005) linhas.push({ data, debito: contas.icmsVendas, credito: contas.icmsRecolher, valor: icms, historico: `ICMS s/ ${nnf}` });
+        notasOk++;
+      } else if (entrada) {
+        linhas.push({ data, debito: contas.compras, credito: contas.fornecedores, valor, historico: `Compra ${nnf} - ${nf?.emitenteNome ?? d.issuerName ?? ''}`.trim() });
+        notasOk++;
+      } else {
+        avisos.push(`${nnf}: CFOP ${cfop || '—'} sem direção clara — revisar`);
+      }
+    }
+    if (semValor > 0) avisos.push(`${semValor} nota(s) sem valor/data — ignoradas.`);
+
+    const conteudo = linhas.map(l => this.formatarLinha(l, layout)).join('\r\n');
+    const conteudoBase64Ansi = Buffer.from(conteudo, 'latin1').toString('base64');
+    return {
+      companyId: input.companyId, companyName: company.name, cnpj: company.cnpj,
+      fonte: 'fiscal', periodo: input.mesAno ?? 'todos',
+      totalTransacoes: docs.length, transacoesExportadas: notasOk, totalLinhas: linhas.length,
+      avisos, layout, plano: contas,
+      nomeArquivo: `dominio_fiscal_${(company.cnpj || '').replace(/\D/g, '')}_${input.mesAno ?? 'geral'}.txt`,
+      conteudo, conteudoBase64Ansi,
     };
   }
 
