@@ -84,6 +84,20 @@ export class AuthController {
     return this.authService.definirAtivo(req.user, body?.userId, body?.ativo);
   }
 
+  // Define os poderes (papel) de um usuário da equipe (só dono/admin).
+  @Post('admin/definir-papel')
+  @UseGuards(JwtAuthGuard)
+  definirPapel(@Request() req: any, @Body() body: { userId: string; papel: string }) {
+    return this.authService.definirPapel(req.user, body?.userId, body?.papel);
+  }
+
+  // Lista os papéis atribuíveis (para o seletor da tela de equipe).
+  @Get('admin/papeis')
+  @UseGuards(JwtAuthGuard)
+  papeis() {
+    return this.authService.papeisDisponiveis();
+  }
+
   @Put('profile')
   @UseGuards(JwtAuthGuard)
   updateProfile(@Request() req: any, @Body() dto: UpdateProfileDto) {

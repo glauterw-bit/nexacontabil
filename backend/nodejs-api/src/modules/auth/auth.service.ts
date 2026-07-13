@@ -80,6 +80,17 @@ export class AuthService {
   private _ehGestor(role?: string) {
     return ['owner', 'admin', 'contador'].includes(role ?? '');
   }
+  /** Só dono/admin podem MEXER em poderes (papéis) e conceder admin. */
+  private _ehAdmin(role?: string) {
+    return ['owner', 'admin'].includes(role ?? '');
+  }
+  /** Papéis atribuíveis pela gestão de equipe (owner é reservado ao dono). */
+  static readonly PAPEIS: Record<string, string> = {
+    admin: 'Administrador — gestão completa (equipe, carteira, tudo)',
+    contador: 'Contador — gestão da equipe + operação',
+    analista: 'Analista — opera a própria carteira',
+    assistente: 'Assistente — apoio à operação',
+  };
 
   /**
    * ADMIN: cria uma conta de analista. O `name` é usado para casar com o
@@ -94,7 +105,11 @@ export class AuthService {
     if ((dto.password ?? '').length < 6) throw new BadRequestException('A senha precisa de ao menos 6 caracteres.');
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new ConflictException('Já existe uma conta com esse e-mail.');
-    const role = dto.role === 'assistente' ? 'assistente' : 'analista';
+    // papel solicitado (padrão analista); conceder admin/contador exige ser admin/dono
+    let role = AuthService.PAPEIS[dto.role ?? ''] ? dto.role! : 'analista';
+    if ((role === 'admin' || role === 'contador') && !this._ehAdmin(currentUser?.role)) {
+      throw new ForbiddenException('Só o dono/administrador pode conceder o papel de admin ou contador.');
+    }
     const user = await this.prisma.user.create({
       data: { name, email, password: await bcrypt.hash(dto.password, 10), role, active: true },
     });
@@ -112,6 +127,23 @@ export class AuthService {
     if (alvo.role === 'owner') throw new ForbiddenException('A conta do dono não pode ser redefinida por aqui.');
     await this.prisma.user.update({ where: { id: userId }, data: { password: await bcrypt.hash(novaSenha, 10) } });
     return { ok: true, usuario: { id: alvo.id, name: alvo.name, email: alvo.email } };
+  }
+
+  /** ADMIN: define os PODERES (papel) de um usuário da equipe. */
+  async definirPapel(currentUser: any, userId: string, papel: string) {
+    if (!this._ehAdmin(currentUser?.role)) throw new ForbiddenException('Só o dono/administrador pode alterar poderes.');
+    if (!AuthService.PAPEIS[papel]) throw new BadRequestException(`Papel inválido. Use: ${Object.keys(AuthService.PAPEIS).join(', ')}.`);
+    const alvo = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true, name: true, email: true } });
+    if (!alvo) throw new NotFoundException('Usuário não encontrado.');
+    if (alvo.role === 'owner') throw new ForbiddenException('O papel do dono não pode ser alterado.');
+    if (alvo.id === currentUser?.id || alvo.id === currentUser?.sub) throw new ForbiddenException('Você não pode alterar o seu próprio papel.');
+    await this.prisma.user.update({ where: { id: userId }, data: { role: papel } });
+    return { ok: true, usuario: { id: alvo.id, name: alvo.name, email: alvo.email, role: papel }, papelDescricao: AuthService.PAPEIS[papel] };
+  }
+
+  /** Lista os papéis atribuíveis (para montar o seletor na tela). */
+  papeisDisponiveis() {
+    return Object.entries(AuthService.PAPEIS).map(([valor, descricao]) => ({ valor, descricao }));
   }
 
   /** ADMIN: ativa/desativa uma conta (desligar analista que saiu, sem apagar histórico). */

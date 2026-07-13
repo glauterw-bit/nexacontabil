@@ -36,24 +36,49 @@ export default function GestaoEquipePage() {
   const [novoNome, setNovoNome] = useState('');
   const [novoEmail, setNovoEmail] = useState('');
   const [novaSenhaCriar, setNovaSenhaCriar] = useState('');
+  const [novoPapel, setNovoPapel] = useState('analista');
   const [criando, setCriando] = useState(false);
   const [resetId, setResetId] = useState('');       // usuário em edição de senha
   const [resetSenha, setResetSenha] = useState('');
   const [resetando, setResetando] = useState(false);
+  const [papeis, setPapeis] = useState<{ valor: string; descricao: string }[]>([]);
+  const [meRole, setMeRole] = useState('');         // papel de quem está logado
+  const [mudandoPapel, setMudandoPapel] = useState('');
+
+  const podeGerirPapeis = ['owner', 'admin'].includes(meRole);
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     try {
-      const [uR, aR] = await Promise.all([
+      const [uR, aR, pR, meR] = await Promise.all([
         fetch(`${API}/api/v1/auth/users`, { headers: authHeaders() }),
         fetch(`${API}/api/v1/workflow/assignments?active=true`, { headers: authHeaders() }),
+        fetch(`${API}/api/v1/auth/admin/papeis`, { headers: authHeaders() }),
+        fetch(`${API}/api/v1/auth/me`, { headers: authHeaders() }),
       ]);
       const u = uR.ok ? await uR.json() : [];
       setUsers(Array.isArray(u) ? u : []);
       const a = await aR.json();
       setAssignments(Array.isArray(a) ? a : []);
+      if (pR.ok) { const p = await pR.json(); setPapeis(Array.isArray(p) ? p : []); }
+      if (meR.ok) { const m = await meR.json(); setMeRole(m?.role ?? ''); }
     } catch {}
+  }
+
+  async function mudarPapel(userId: string, papel: string) {
+    setMudandoPapel(userId);
+    try {
+      const r = await fetch(`${API}/api/v1/auth/admin/definir-papel`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ userId, papel }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d?.message ?? 'Falha ao alterar papel');
+      toast.push('Poderes atualizados ✅', { variant: 'success' });
+      setUsers((us) => us.map((x) => x.id === userId ? { ...x, role: papel } : x));
+    } catch (e: any) { toast.push(e.message, { variant: 'error' }); }
+    finally { setMudandoPapel(''); }
   }
 
   const companies = compData?.companies ?? [];
@@ -124,13 +149,13 @@ export default function GestaoEquipePage() {
     try {
       const r = await fetch(`${API}/api/v1/auth/admin/criar-analista`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ name: novoNome.trim(), email: novoEmail.trim(), password: novaSenhaCriar }),
+        body: JSON.stringify({ name: novoNome.trim(), email: novoEmail.trim(), password: novaSenhaCriar, role: novoPapel }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d?.message ?? 'Falha ao criar');
-      toast.push(`Analista criado · ${d.clientesVinculados} cliente(s) já vinculados pelo nome`, { variant: 'success' });
+      toast.push(`Conta criada (${d.role}) · ${d.clientesVinculados} cliente(s) já vinculados pelo nome`, { variant: 'success' });
       if (d.clientesVinculados === 0) toast.push('Atenção: nenhum cliente com esse nome de responsável. Confira se o nome bate com a carteira.', { variant: 'warning' });
-      setNovoNome(''); setNovoEmail(''); setNovaSenhaCriar(''); load();
+      setNovoNome(''); setNovoEmail(''); setNovaSenhaCriar(''); setNovoPapel('analista'); load();
     } catch (e: any) { toast.push(e.message, { variant: 'error' }); }
     finally { setCriando(false); }
   }
@@ -270,14 +295,25 @@ export default function GestaoEquipePage() {
         </p>
 
         {/* criar analista */}
-        <div className="grid sm:grid-cols-4 gap-2 mb-4">
+        <div className="grid sm:grid-cols-5 gap-2 mb-1">
           <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Nome (igual ao responsável)" className="input-aura sm:col-span-1" />
           <input value={novoEmail} onChange={(e) => setNovoEmail(e.target.value)} placeholder="E-mail de acesso" className="input-aura sm:col-span-1" />
           <input value={novaSenhaCriar} onChange={(e) => setNovaSenhaCriar(e.target.value)} placeholder="Senha inicial (mín. 6)" type="text" className="input-aura sm:col-span-1" />
+          <select value={novoPapel} onChange={(e) => setNovoPapel(e.target.value)} className="input-aura sm:col-span-1"
+            title={podeGerirPapeis ? 'Poderes da conta' : 'Só o dono/admin pode criar admin ou contador'}>
+            {(papeis.length ? papeis : [{ valor: 'analista', descricao: 'Analista' }, { valor: 'assistente', descricao: 'Assistente' }]).map((p) => (
+              <option key={p.valor} value={p.valor} disabled={!podeGerirPapeis && (p.valor === 'admin' || p.valor === 'contador')}>
+                {p.valor.charAt(0).toUpperCase() + p.valor.slice(1)}
+              </option>
+            ))}
+          </select>
           <button onClick={criarAnalista} disabled={criando} className="btn-primary justify-center">
-            <UserPlus className="h-3.5 w-3.5" /> {criando ? 'Criando…' : 'Criar analista'}
+            <UserPlus className="h-3.5 w-3.5" /> {criando ? 'Criando…' : 'Criar conta'}
           </button>
         </div>
+        <p className="text-[10px] text-tx-muted mb-4">
+          {papeis.find((p) => p.valor === novoPapel)?.descricao ?? 'Escolha os poderes da conta.'}
+        </p>
 
         {/* lista com redefinir senha */}
         <div className="space-y-1 max-h-80 overflow-y-auto">
@@ -285,9 +321,23 @@ export default function GestaoEquipePage() {
           {users.map((u) => (
             <div key={u.id} className="flex items-center gap-2 p-2 border-b border-line/60">
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-tx-strong truncate">{u.name} <span className="text-[10px] text-tx-muted">({u.role})</span></p>
+                <p className="text-sm text-tx-strong truncate">{u.name}</p>
                 <p className="text-[11px] text-tx-muted truncate">{u.email}</p>
               </div>
+              {/* poderes (papel) */}
+              {podeGerirPapeis && u.role !== 'owner' ? (
+                <select value={u.role} disabled={mudandoPapel === u.id}
+                  onChange={(e) => mudarPapel(u.id, e.target.value)}
+                  className="input-aura" style={{ padding: '5px 8px', fontSize: 12, width: 130 }}
+                  title="Definir poderes">
+                  {(papeis.length ? papeis : [{ valor: u.role, descricao: u.role }]).map((p) => (
+                    <option key={p.valor} value={p.valor}>{p.valor.charAt(0).toUpperCase() + p.valor.slice(1)}</option>
+                  ))}
+                  {!papeis.some((p) => p.valor === u.role) && <option value={u.role}>{u.role}</option>}
+                </select>
+              ) : (
+                <span className="text-[10px] text-tx-muted px-2 py-1 rounded" style={{ background: COLORS.surface2 }}>{u.role}</span>
+              )}
               {resetId === u.id ? (
                 <div className="flex items-center gap-1.5">
                   <input value={resetSenha} onChange={(e) => setResetSenha(e.target.value)} placeholder="Nova senha" type="text"
