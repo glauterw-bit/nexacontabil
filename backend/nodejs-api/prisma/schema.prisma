@@ -1649,3 +1649,21 @@ model SolicitacaoDoc {
   @@index([competencia, status])
   @@map("solicitacoes_doc")
 }
+
+// ─── Checklist de fechamento por departamento (fiscal|contabil|folha) ───
+model ChecklistState {
+  id          String   @id @default(uuid())
+  companyId   String
+  competencia String   // YYYY-MM
+  departamento String  // fiscal|contabil|folha
+  itemKey     String   // chave do item no template
+  feito       Boolean  @default(false)
+  feitoEm     DateTime?
+  feitoPor    String?
+  obs         String?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, competencia, departamento, itemKey])
+  @@index([companyId, competencia, departamento])
+  @@map("checklist_states")
+}
