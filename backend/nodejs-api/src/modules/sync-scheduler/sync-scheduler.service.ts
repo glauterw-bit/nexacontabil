@@ -291,8 +291,9 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         //       (emitente/destinatário dominante). Sem isso, UF e SEFAZ ficam impossíveis.
         await passo('sefazInferirCnpj', () => this.sefaz.inferirCnpjsReais());
         // 5a-0b. importa em lote os certificados A1 das pastas dos clientes (senha via
-        //        CNPJ + arquivos senha.txt) → SEFAZ funciona SEM procuração p/ esses.
-        await passo('importarCertificados', () => this.analise.importarCertificadosDrive({ timeBudgetMs: 3 * 60_000 }));
+        //        senha padrão do escritório [env] + CNPJ + arquivos senha.txt) → SEFAZ
+        //        funciona SEM procuração p/ esses.
+        await passo('importarCertificados', () => this.analise.importarCertificadosDrive({ senhaPadrao: process.env.CERT_SENHA_PADRAO || undefined, timeBudgetMs: 3 * 60_000 }));
         // 5a. pré-requisito — preenche a UF que falta (cUFAutor exigido), via BrasilAPI.
         //     Budget alto p/ zerar a fila logo; quando não falta nada é no-op.
         await passo('sefazPreencherUF', () => this.sefaz.preencherUFsFaltantes({ timeBudgetMs: 8 * 60_000 }));

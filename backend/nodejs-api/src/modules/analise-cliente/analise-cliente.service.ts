@@ -649,11 +649,15 @@ export class AnaliseClienteService {
     });
     if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
 
-    // certificados .pfx/.p12 já capturados, ignorando os já tentados sem sucesso
+    // com senha padrão nova → retenta os que ficaram "sem senha" (não os expirados)
+    if (opts?.senhaPadrao) {
+      await this.prisma.document.updateMany({ where: { status: 'cert_semsenha' }, data: { status: 'completed' } }).catch(() => undefined);
+    }
+    // certificados .pfx/.p12 já capturados, ignorando os já tentados sem sucesso (sem senha ou expirados)
     const certs = await this.prisma.document.findMany({
       where: {
         OR: [{ originalFilename: { endsWith: '.pfx' } }, { originalFilename: { endsWith: '.p12' } }],
-        fileUrl: { contains: '|' }, NOT: { status: 'cert_falhou' },
+        fileUrl: { contains: '|' }, NOT: { status: { in: ['cert_semsenha', 'cert_expirado'] } },
       },
       select: { id: true, companyId: true, fileUrl: true, originalFilename: true },
       take: opts?.limit ?? 400,
@@ -699,12 +703,12 @@ export class AnaliseClienteService {
 
       let parsed: any = null, senhaOk = '';
       for (const s of cands) { try { parsed = parsePfxReal(b64, s); senhaOk = s; break; } catch { /* senha errada */ } }
-      if (!parsed) { semSenha++; await this.prisma.document.update({ where: { id: c.id }, data: { status: 'cert_falhou' } }).catch(() => undefined); continue; }
+      if (!parsed) { semSenha++; await this.prisma.document.update({ where: { id: c.id }, data: { status: 'cert_semsenha' } }).catch(() => undefined); continue; }
 
       const cnpjCert = (parsed.cnpjCpf ?? '').replace(/\D/g, '');
       if (parsed.dataValidade && new Date(parsed.dataValidade).getTime() < Date.now()) {
         expirados++; detalhe.push({ empresa: company.name, arquivo: c.originalFilename, motivo: 'certificado expirado' });
-        await this.prisma.document.update({ where: { id: c.id }, data: { status: 'cert_falhou' } }).catch(() => undefined);
+        await this.prisma.document.update({ where: { id: c.id }, data: { status: 'cert_expirado' } }).catch(() => undefined);
         continue;
       }
       // casa pelo CNPJ (se a empresa tem CNPJ real): evita cadastrar cert de terceiro
