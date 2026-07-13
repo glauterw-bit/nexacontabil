@@ -41,7 +41,27 @@ export default function DriveConectadoPage() {
 
   // resync completo (puxa todo e qualquer arquivo)
   const [resync, setResync] = useState<{ rodando: boolean; processados: number; restantes: number; novos: number } | null>(null);
+  const [reparse, setReparse] = useState<{ rodando: boolean; corrigidos: number; restantes: number } | null>(null);
   const pararRef = (typeof window !== 'undefined') ? (window as any) : {};
+
+  async function corrigirDatas() {
+    if (reparse?.rodando) { pararRef.__pararReparse = true; return; }
+    pararRef.__pararReparse = false;
+    let corrigidos = 0, restantes = 1;
+    setReparse({ rodando: true, corrigidos: 0, restantes: 0 });
+    try {
+      while (restantes > 0 && !pararRef.__pararReparse) {
+        const r = await fetch(`${API}/api/v1/analise-cliente/reparsear-sem-data`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ limit: 400 }),
+        });
+        if (!r.ok) { toast.push('Falha ao corrigir datas.', { variant: 'error' }); break; }
+        const d = await r.json();
+        corrigidos += d.corrigidos ?? 0; restantes = d.restantes ?? 0;
+        setReparse({ rodando: restantes > 0 && !pararRef.__pararReparse, corrigidos, restantes });
+      }
+      toast.push(`${corrigidos} documento(s) tiveram a data corrigida.`, { variant: 'success' });
+    } finally { setReparse((s) => s ? { ...s, rodando: false } : null); }
+  }
 
   async function puxarTudo() {
     if (resync?.rodando) { pararRef.__pararResync = true; return; }
@@ -171,6 +191,15 @@ export default function DriveConectadoPage() {
               {resync.rodando && resync.restantes > 0 && ` · ${resync.restantes} restantes`}
             </span>
           )}
+        </div>
+        <div className="flex items-center gap-3 flex-wrap pt-2 mt-1" style={{ borderTop: `1px solid ${tint(COLORS.acao, 15)}` }}>
+          <button onClick={corrigirDatas} className="btn-secondary" style={{ fontSize: 12.5 }}>
+            {reparse?.rodando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Pausar</> : <><Calendar className="h-3.5 w-3.5" /> Corrigir datas dos documentos</>}
+          </button>
+          <span className="text-[11px] text-tx-muted">
+            reprocessa NFS-e/CT-e que ficaram sem data (bug antigo) → passam a contar no ano/mês certo
+            {reparse && <> · <b className="text-tx">{reparse.corrigidos}</b> corrigidos{reparse.rodando && reparse.restantes > 0 ? ` · ${reparse.restantes} restantes` : ''}</>}
+          </span>
         </div>
       </div>
 

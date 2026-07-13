@@ -46,4 +46,10 @@ export class AnaliseClienteController {
   revalidar() {
     return this.svc.revalidarDocumentos();
   }
+
+  /** Re-processa os documentos sem data (NFS-e/CT-e com namespace). Loop até restantes=0. */
+  @Post('reparsear-sem-data')
+  reparsearSemData(@Body() body: { limit?: number }) {
+    return this.svc.reparsearSemData(body?.limit ?? 400);
+  }
 }

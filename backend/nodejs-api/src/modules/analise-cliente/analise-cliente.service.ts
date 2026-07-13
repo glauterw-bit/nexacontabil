@@ -381,6 +381,48 @@ export class AnaliseClienteService {
     return { revalidados, comInconsistencia, totalInconsistencias: totalInconsist, semRegra, divergencias };
   }
 
+  /**
+   * RE-PROCESSA os documentos que ficaram SEM DATA (bug antigo do parser em NFS-e/CT-e
+   * com namespace). Re-baixa só esses (pelo fileUrl driveId|id já guardado) e re-parseia
+   * com o parser corrigido — aí a data aparece e o doc passa a contar no ano/mês certo.
+   * Chamável em loop até restantes=0. Não re-varre o drive inteiro.
+   */
+  async reparsearSemData(limit = 400) {
+    const conn = await this.prisma.cloudConnection.findFirst({
+      where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' },
+    });
+    if (!conn) throw new BadRequestException('Nenhuma conexão OneDrive ativa.');
+    const pendentes = await this.prisma.document.count({
+      where: { issueDate: null, fileUrl: { contains: '|' }, extractedData: { not: null } },
+    });
+    const docs = await this.prisma.document.findMany({
+      where: { issueDate: null, fileUrl: { contains: '|' }, extractedData: { not: null } },
+      select: { id: true, fileUrl: true }, take: limit,
+    });
+    let corrigidos = 0, semRef = 0, falhou = 0;
+    for (const d of docs) {
+      const [driveId, fileId] = (d.fileUrl ?? '').split('|');
+      if (!fileId || driveId === 'sieg' || driveId === 'sefaz') { semRef++; continue; }
+      try {
+        const { buffer } = await this.onedrive.downloadFile(conn.id, fileId, driveId);
+        const nf = parseNfe(buffer.toString('utf8'));
+        if (nf?.dataEmissao) {
+          await this.prisma.document.update({
+            where: { id: d.id },
+            data: {
+              issueDate: new Date(nf.dataEmissao),
+              number: nf.numero ? String(nf.numero) : undefined,
+              totalValue: nf.valorTotal ?? undefined,
+              extractedData: JSON.stringify(nf),
+            },
+          });
+          corrigidos++;
+        } else falhou++;
+      } catch { falhou++; }
+    }
+    return { processados: docs.length, corrigidos, semReferencia: semRef, semDataApos: falhou, restantes: Math.max(0, pendentes - docs.length) };
+  }
+
   /** Limpa as análises (documentos) e zera as flags pra re-análise limpa. */
   async resetAnalises() {
     const clientes = await this.prisma.company.findMany({ where: { sharepointItemId: { not: null } }, select: { id: true } });
@@ -423,13 +465,7 @@ function parseNfe(xml: string): null | {
     tipo,
     numero: pick(xml, 'nNF'),
     chave: (xml.match(/Id="NFe(\d{44})"/) ?? [])[1],
-    dataEmissao: (
-      pick(xml, 'dhEmi') ?? pick(xml, 'dEmi') ??           // NF-e / CT-e
-      pick(xml, 'DataEmissao') ?? pick(xml, 'dtEmissao') ?? // NFS-e (ABRASF e variantes)
-      pick(xml, 'DataEmissaoRps') ?? pick(xml, 'dhProc') ??
-      pick(xml, 'dhRecbto') ?? pick(xml, 'dCompet') ??      // competência
-      pick(xml, 'Competencia') ?? pick(xml, 'dhEvento')
-    )?.slice(0, 10),
+    dataEmissao: extrairData(xml),
     valorTotal: num(pick(totalBloco, 'vNF')),
     natOp: pick(xml, 'natOp'),
     totais: {
@@ -451,8 +487,33 @@ function parseNfe(xml: string): null | {
     itens,
   };
 }
+/** Data de emissão robusta: NF-e, CT-e e as muitas variantes de NFS-e municipal. */
+function extrairData(xml: string): string | undefined {
+  const tags = [
+    'dhEmi', 'dEmi',                                   // NF-e / CT-e
+    'DataEmissao', 'dtEmissao', 'DataEmissaoNfse', 'dEmiNfse', 'DtEmi', 'dtEmi', 'data_emissao', 'dataEmissao',
+    'DataEmissaoRps', 'dhProc', 'dhRecbto', 'dCompet', 'Competencia', 'competencia', 'dhEvento',
+  ];
+  for (const t of tags) {
+    const v = pick(xml, t);
+    if (v) { const iso = normalizarData(v); if (iso) return iso; }
+  }
+  // fallback: qualquer tag cujo nome contenha "emiss"/"compet" com uma data dentro
+  const m = xml.match(/<(?:[\w.-]+:)?[\w.-]*(?:emiss|compet)[\w.-]*(?:\s[^>]*)?>\s*(\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4})/i);
+  if (m) return normalizarData(m[1]);
+  return undefined;
+}
+/** Normaliza para YYYY-MM-DD (aceita ISO e dd/mm/aaaa). */
+function normalizarData(v: string): string | undefined {
+  const s = v.trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/); if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return undefined;
+}
 function pick(xml: string, tag: string): string | undefined {
-  const m = xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`));
+  // Tolera prefixo de namespace (<ns2:DataEmissao>) e atributos (<dhEmi xmlns="...">),
+  // comuns em NFS-e municipais e CT-e. Sem isso, esses XMLs entravam SEM data/campos.
+  const m = xml.match(new RegExp(`<(?:[\\w.-]+:)?${tag}(?:\\s[^>]*)?>([^<]*)</(?:[\\w.-]+:)?${tag}>`, 'i'));
   return m?.[1]?.trim();
 }
 function num(s?: string): number | undefined { if (s == null) return undefined; const n = parseFloat(s.replace(',', '.')); return isNaN(n) ? undefined : n; }
