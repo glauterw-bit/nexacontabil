@@ -4,6 +4,7 @@ import { AnaliseClienteService } from '../analise-cliente/analise-cliente.servic
 import { FiscalCalendarService } from '../fiscal-calendar/fiscal-calendar.service';
 import { SolicitacoesService } from '../solicitacoes/solicitacoes.service';
 import { NcmInteligenteService } from '../ncm-inteligente/ncm-inteligente.service';
+import { SefazDistribuicaoService } from '../sefaz/sefaz-distribuicao.service';
 import { PrismaService } from '../../database/prisma.service';
 
 /**
@@ -33,6 +34,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     private readonly fiscalCalendar: FiscalCalendarService,
     private readonly solicitacoes: SolicitacoesService,
     private readonly ncm: NcmInteligenteService,
+    private readonly sefaz: SefazDistribuicaoService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -124,6 +126,10 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       await passo('recibosRecheck', () => this.fluxo.reverificarRecibosPendentes(competencia, 6, 60));
       // 5. higiene do calendário fiscal
       await passo('obrigacoesVencidas', () => this.fiscalCalendar.markOverdue());
+      // 5b. SEFAZ — puxa NF-e direto da Receita (DistribuiçãoDFe) p/ todos os clientes
+      //     elegíveis, usando o certificado do escritório. Limitado a ~4min por ciclo e
+      //     respeitando o limite de consumo (pula quem drenou a fila há < 55min).
+      await passo('sefazVarredura', () => this.sefaz.varrerTodos({ timeBudgetMs: 4 * 60_000 }));
       // 6. início do mês (dia 01/02): solicitações de documentos + garante o calendário
       //    fiscal do ano (só p/ quem não tem — idempotente). Automatiza o "Configurar tudo".
       if (startedAt.getDate() <= 2) {
@@ -147,7 +153,8 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         `sync ${origem} ok em ${Math.round(resultado.duracaoMs / 1000)}s — ` +
         `xmls novos: ${resultado.capturaIncremental?.novosDocs ?? 0} · ` +
         `recibos: +${(resultado.recibosNovos?.recibosEncontrados ?? 0) + (resultado.recibosRecheck?.recibosEncontrados ?? 0)} · ` +
-        `vencidas: ${resultado.obrigacoesVencidas?.updated ?? 0}`,
+        `vencidas: ${resultado.obrigacoesVencidas?.updated ?? 0} · ` +
+        `sefaz: +${resultado.sefazVarredura?.novosTotal ?? 0} (${resultado.sefazVarredura?.processados ?? 0} clientes)`,
       );
     }
     return resultado;

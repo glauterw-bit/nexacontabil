@@ -117,10 +117,95 @@ export class SefazDistribuicaoService {
   }
 
   /**
+   * VARREDURA EM LOTE — passa por todos os clientes elegíveis (CNPJ real + UF) e puxa o
+   * que der do SEFAZ. Monta o certificado do ESCRITÓRIO UMA vez e reusa (mTLS) p/ todos.
+   * Respeita o limite: pula quem já drenou a fila e foi consultado há < 55 min (evita cStat
+   * 656). Limitado por tempo (timeBudgetMs) p/ caber num ciclo do scheduler.
+   */
+  async varrerTodos(opts?: { timeBudgetMs?: number; maxClientes?: number; maxIteracoesPorCliente?: number }) {
+    const timeBudgetMs = opts?.timeBudgetMs ?? 5 * 60_000;
+    const maxIteracoes = opts?.maxIteracoesPorCliente ?? 30;
+    const COOLDOWN_MS = 55 * 60_000;
+    const inicio = Date.now();
+
+    // certificado do escritório montado UMA vez (evita reparsear o PFX por cliente)
+    let agentEsc: import('https').Agent | undefined;
+    const esc = await this.certificados.temEscritorio();
+    if (esc.tem) {
+      try { agentEsc = await this.certificados.getHttpsAgentEscritorio(); } catch { agentEsc = undefined; }
+    }
+
+    const candidatos = await this.prisma.company.findMany({
+      where: { active: true, uf: { not: null } },
+      select: { id: true, name: true, cnpj: true, uf: true, sefazUltConsultaEm: true, sefazUltNSU: true, sefazMaxNSU: true },
+      orderBy: [{ sefazUltConsultaEm: { sort: 'asc', nulls: 'first' } }],
+    });
+
+    const agora = Date.now();
+    const elegiveis = candidatos.filter((c) => {
+      const cnpj = (c.cnpj ?? '').replace(/\D/g, '');
+      if (!cnpj || cnpj.startsWith('7')) return false;
+      if (!this.UF[(c.uf ?? '').toUpperCase()]) return false;
+      // pula quem já chegou ao fim da fila e foi consultado há < 55 min
+      if (c.sefazUltConsultaEm && c.sefazUltNSU && c.sefazMaxNSU &&
+          BigInt(c.sefazUltNSU) >= BigInt(c.sefazMaxNSU) &&
+          (agora - new Date(c.sefazUltConsultaEm).getTime()) < COOLDOWN_MS) return false;
+      return true;
+    });
+
+    const limite = opts?.maxClientes ?? elegiveis.length;
+    let processados = 0, novosTotal = 0, docsTotal = 0, duplicadosTotal = 0, erros = 0, bloqueados656 = 0;
+    const detalhe: any[] = [];
+
+    for (const c of elegiveis) {
+      if (processados >= limite) break;
+      if (Date.now() - inicio > timeBudgetMs) break;
+      try {
+        const r = await this.buscarCliente(c.id, undefined, maxIteracoes, agentEsc);
+        processados++;
+        novosTotal += r.novos ?? 0;
+        docsTotal += r.docsRecebidos ?? 0;
+        duplicadosTotal += r.duplicados ?? 0;
+        if (r.cStat === '656') bloqueados656++;
+        if ((r.novos ?? 0) > 0 || r.cStat === '656') detalhe.push({ cliente: c.name, novos: r.novos, docs: r.docsRecebidos, cStat: r.cStat });
+      } catch (e: any) {
+        erros++;
+        if (detalhe.length < 60) detalhe.push({ cliente: c.name, erro: (e?.message ?? 'erro').slice(0, 120) });
+      }
+    }
+
+    return {
+      temCertificadoEscritorio: esc.tem,
+      elegiveis: elegiveis.length,
+      processados,
+      restantes: Math.max(0, elegiveis.length - processados),
+      novosTotal, docsTotal, duplicadosTotal, bloqueados656, erros,
+      duracaoS: Math.round((Date.now() - inicio) / 1000),
+      detalhe: detalhe.slice(0, 40),
+    };
+  }
+
+  /** Progresso PÚBLICO da varredura do SEFAZ (só contadores) — p/ acompanhar de fora. */
+  async progressoPublico() {
+    const [elegiveis, jaConsultados, docsSefaz] = await Promise.all([
+      this.prisma.company.count({ where: { active: true, uf: { not: null } } }),
+      this.prisma.company.count({ where: { active: true, sefazUltConsultaEm: { not: null } } }),
+      this.prisma.document.count({ where: { fileUrl: { startsWith: 'sefaz|' } } }),
+    ]);
+    const esc = await this.certificados.temEscritorio();
+    return {
+      certificadoEscritorio: esc.tem ? { cnpj: esc.cnpj, validade: esc.validade } : null,
+      clientesElegiveis: elegiveis,
+      clientesJaConsultados: jaConsultados,
+      docsCapturadosDoSefaz: docsSefaz,
+    };
+  }
+
+  /**
    * Busca as NF-e do cliente no SEFAZ desde o último NSU e ingere no pipeline.
    * @param maxIteracoes teto de lotes por chamada (cada lote ~ até 50 docs).
    */
-  async buscarCliente(companyId: string, senha?: string, maxIteracoes = 20) {
+  async buscarCliente(companyId: string, senha?: string, maxIteracoes = 20, agentPronto?: import('https').Agent) {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
       select: { id: true, name: true, cnpj: true, uf: true, sefazUltNSU: true },
@@ -131,16 +216,20 @@ export class SefazDistribuicaoService {
     const cUF = company.uf ? this.UF[company.uf.toUpperCase()] : undefined;
     if (!cUF) throw new BadRequestException('Defina a UF do cliente (cUFAutor é exigido pelo SEFAZ).');
 
-    // mTLS: usa o certificado PRÓPRIO do cliente se houver; senão, o do ESCRITÓRIO
-    // (um só p/ todos, autorizado por procuração e-CAC).
+    // mTLS: usa um agente já montado (varredura em lote reusa o do escritório), senão o
+    // certificado PRÓPRIO do cliente se houver, senão o do ESCRITÓRIO (um p/ todos via procuração).
     let httpsAgent: import('https').Agent;
-    try {
-      httpsAgent = await this.certificados.getHttpsAgent(companyId, senha);
-    } catch {
+    if (agentPronto) {
+      httpsAgent = agentPronto;
+    } else {
       try {
-        httpsAgent = await this.certificados.getHttpsAgentEscritorio(senha);
-      } catch (e: any) {
-        throw new BadRequestException('Certificado indisponível: carregue o A1 do cliente OU configure o certificado do ESCRITÓRIO (com procuração e-CAC do cliente).');
+        httpsAgent = await this.certificados.getHttpsAgent(companyId, senha);
+      } catch {
+        try {
+          httpsAgent = await this.certificados.getHttpsAgentEscritorio(senha);
+        } catch (e: any) {
+          throw new BadRequestException('Certificado indisponível: carregue o A1 do cliente OU configure o certificado do ESCRITÓRIO (com procuração e-CAC do cliente).');
+        }
       }
     }
 

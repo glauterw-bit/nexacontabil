@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../../common/public.decorator';
 import { SefazDistribuicaoService } from './sefaz-distribuicao.service';
 
 @Controller('sefaz')
@@ -29,5 +30,18 @@ export class SefazController {
   @Post('certificado-escritorio')
   salvarEscritorio(@Body() body: { pfxBase64: string; senha: string; nome: string }) {
     return this.service.salvarCertEscritorio(body.pfxBase64, body.senha, body.nome);
+  }
+
+  /** Varredura em lote: puxa NF-e do SEFAZ de TODOS os clientes elegíveis. */
+  @Post('buscar-todos')
+  buscarTodos(@Body() body?: { timeBudgetMs?: number; maxClientes?: number; maxIteracoesPorCliente?: number }) {
+    return this.service.varrerTodos(body ?? {});
+  }
+
+  /** Progresso PÚBLICO da varredura do SEFAZ (só contadores). */
+  @Public()
+  @Get('progresso')
+  progresso() {
+    return this.service.progressoPublico();
   }
 }
