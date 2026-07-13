@@ -545,7 +545,8 @@ export class AnaliseClienteService {
       where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' },
     });
     if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
-    const filtro = { totalValue: null, originalFilename: { endsWith: '.xml' }, fileUrl: { contains: '|' } } as const;
+    // exclui os já tentados sem sucesso (status sentinela) p/ não repetir o mesmo lote
+    const filtro: any = { totalValue: null, originalFilename: { endsWith: '.xml' }, fileUrl: { contains: '|' }, NOT: { status: 'xml_sem_valor' } };
     const pendentes = await this.prisma.document.count({ where: filtro });
     const docs = await this.prisma.document.findMany({
       where: filtro, select: { id: true, companyId: true, fileUrl: true }, take: limit,
@@ -572,10 +573,56 @@ export class AnaliseClienteService {
             },
           });
           if (nf.valorTotal != null) corrigidos++; else semValorAinda++;
-        } else semValorAinda++;
+        } else {
+          // parser não extraiu valor nem emitente — marca p/ não repetir (evento/cancelamento/layout raro)
+          await this.prisma.document.update({ where: { id: d.id }, data: { status: 'xml_sem_valor' } }).catch(() => undefined);
+          semValorAinda++;
+        }
       } catch { falhou++; }
     }
     return { pendentesAntes: pendentes, processados: docs.length, corrigidos, semValorAinda, semReferencia: semRef, falhou, restantes: Math.max(0, pendentes - corrigidos) };
+  }
+
+  /**
+   * DIAGNÓSTICO: baixa alguns XMLs SEM VALOR e retorna só a ESTRUTURA (nomes de tags,
+   * raiz, flags de padrões conhecidos) — sem expor valores/CNPJ. Serve p/ descobrir por
+   * que o parser não extrai (evento? cancelamento? layout municipal diferente?).
+   */
+  async diagnosticarXmlSemValor(n = 6) {
+    const conn = await this.prisma.cloudConnection.findFirst({
+      where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' },
+    });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    const docs = await this.prisma.document.findMany({
+      where: { totalValue: null, originalFilename: { endsWith: '.xml' }, fileUrl: { contains: '|' } },
+      select: { id: true, originalFilename: true, fileUrl: true }, take: n, orderBy: { createdAt: 'desc' },
+    });
+    const amostras: any[] = [];
+    for (const d of docs) {
+      const [driveId, fileId] = (d.fileUrl ?? '').split('|');
+      if (!fileId) continue;
+      try {
+        const { buffer } = await this.onedrive.downloadFile(conn.id, fileId, driveId);
+        const xml = buffer.toString('utf8');
+        const tags = [...new Set((xml.match(/<([A-Za-z_][\w.:-]*)/g) ?? []).map((t) => t.slice(1)))].slice(0, 60);
+        const raiz = (xml.match(/<\?xml[^>]*\?>\s*<([\w.:-]+)/) ?? xml.match(/<([\w.:-]+)/) ?? [])[1];
+        const tem = (re: RegExp) => re.test(xml);
+        amostras.push({
+          arquivo: (d.originalFilename ?? '').slice(-45),
+          raiz,
+          tamanho: xml.length,
+          ehEvento: tem(/procEventoNFe|retEvento|<evento|<Cancelamento|<CancelarNfse|<SubstituicaoNfse/i),
+          temValorServicos: tem(/ValorServicos/i),
+          temValorNfse: tem(/ValorNfse|ValorLiquidoNfse|ValorTotalNota|ValorTotalRecebido/i),
+          temPrestador: tem(/Prestador/i),
+          temEmit: tem(/<emit\b/i),
+          temInfNfse: tem(/InfNfse|CompNfse/i),
+          temValoresGenerico: tem(/<Valor(?:es)?\b/i),
+          tags,
+        });
+      } catch (e: any) { amostras.push({ arquivo: (d.originalFilename ?? '').slice(-45), erro: (e?.message ?? 'erro').slice(0, 60) }); }
+    }
+    return { amostras };
   }
 
   /** Limpa as análises (documentos) e zera as flags pra re-análise limpa. */

@@ -41,6 +41,13 @@ class SyncSchedulerController {
   diagnostico() {
     return this.service.diagnosticoDocs();
   }
+
+  /** Amostra PÚBLICA da estrutura de XMLs sem valor (só tags) — descobrir o layout. */
+  @Public()
+  @Get('amostra-xml')
+  amostraXml() {
+    return this.service.amostraXmlSemValor();
+  }
 }
 
 @Module({

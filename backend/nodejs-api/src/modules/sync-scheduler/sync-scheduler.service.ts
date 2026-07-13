@@ -85,6 +85,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     };
   }
 
+  /** Amostra pública da ESTRUTURA de XMLs sem valor (só nomes de tags) — diagnóstico. */
+  async amostraXmlSemValor() {
+    return this.analise.diagnosticarXmlSemValor(6);
+  }
+
   /** Progresso PÚBLICO (só contadores, sem dados sensíveis) — para acompanhar a 1ª volta do Delta. */
   async progressoPublico() {
     const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
