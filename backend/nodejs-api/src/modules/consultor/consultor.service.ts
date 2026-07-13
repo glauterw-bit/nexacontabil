@@ -27,7 +27,15 @@ export class ConsultorService {
 
     // 1) ENCONTRA os documentos (linguagem natural → filtros → busca no acervo)
     const achado: any = await this.busca.buscar(q);
-    const docs: any[] = achado?.resultados ?? [];
+    const todosResultados: any[] = achado?.resultados ?? [];
+
+    // 2) FILTRA para documentos FISCAIS REAIS — o acervo tem muitos arquivos de apoio
+    //    (PDF, .txt, senhas, requerimentos, certificados) que não são notas e distorcem
+    //    a análise. Analisa só o que é nota (nfe/nfse/cte/nfce) ou tem valor/emitente.
+    const FISCAIS = new Set(['nfe', 'nfse', 'cte', 'nfce', 'nf-e']);
+    const ehFiscal = (d: any) => FISCAIS.has((d.tipo ?? '').toLowerCase()) || d.valor != null || !!d.emitente;
+    const docs: any[] = todosResultados.filter(ehFiscal);
+    const arquivosApoio = todosResultados.length - docs.length;
 
     // 2) monta um resumo enxuto do que foi achado p/ alimentar a análise
     const topo = docs.slice(0, 15).map((d) => ({
@@ -37,12 +45,14 @@ export class ConsultorService {
       inconsistencias: (d.inconsistencias ?? []).slice(0, 4),
     }));
     const totInc = docs.reduce((s, d) => s + ((d.inconsistencias ?? []).length ? 1 : 0), 0);
+    const valorFiscal = docs.reduce((s, d) => s + (d.valor ?? 0), 0);
 
     const resumo = {
-      encontrados: achado?.encontrados ?? docs.length,
+      encontrados: docs.length,          // só documentos fiscais
       totalDisponivel: achado?.totalDisponivel ?? docs.length,
-      valorTotal: achado?.valorTotal ?? 0,
-      comInconsistencia: achado?.comInconsistencia ?? totInc,
+      arquivosApoio,                     // PDFs/recibos ignorados na análise
+      valorTotal: Math.round(valorFiscal * 100) / 100,
+      comInconsistencia: totInc,
       clientes: achado?.clientesEncontrados ?? [],
       clienteNaoEncontrado: !!achado?.clienteNaoEncontrado,
     };
@@ -51,8 +61,10 @@ export class ConsultorService {
     if (!docs.length) {
       const nada = resumo.clienteNaoEncontrado
         ? `Não encontrei um cliente com esse nome. Confira a grafia ou tente o código/CNPJ.`
-        : `Não encontrei documentos para "${q}". Tente por cliente, tipo (nota, boleto), mês ou valor.`;
-      return { resposta: nada, documentos: [], resumo };
+        : arquivosApoio > 0
+          ? `Encontrei ${arquivosApoio} arquivo(s), mas são de apoio (PDF, recibo, planilha) — nenhuma nota fiscal com dados para analisar. Tente pedir "notas fiscais de <cliente>".`
+          : `Não encontrei documentos para "${q}". Tente por cliente, tipo (nota, boleto), mês ou valor.`;
+      return { resposta: nada, documentos: [], resumo: { ...resumo, arquivosApoio } };
     }
 
     const contextoDocs =
