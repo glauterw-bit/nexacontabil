@@ -117,6 +117,45 @@ export class SefazDistribuicaoService {
   }
 
   /**
+   * PREENCHE A UF que falta em cada cliente (cUFAutor é exigido pelo SEFAZ). Consulta a
+   * BrasilAPI pelo CNPJ (mesma fonte já usada no Radar e-CAC) e grava uf/município/cep.
+   * Bounded por tempo; roda em rotação até cobrir todos. Idempotente (só mexe em uf null).
+   */
+  async preencherUFsFaltantes(opts?: { timeBudgetMs?: number; max?: number }) {
+    const timeBudgetMs = opts?.timeBudgetMs ?? 60_000;
+    const inicio = Date.now();
+    const semUF = await this.prisma.company.findMany({
+      where: { active: true, uf: null },
+      select: { id: true, cnpj: true, name: true },
+    });
+    let atualizados = 0, falhas = 0, pulados = 0;
+    for (const c of semUF) {
+      if (Date.now() - inicio > timeBudgetMs) break;
+      if (opts?.max && atualizados + falhas >= opts.max) break;
+      const cnpj = (c.cnpj ?? '').replace(/\D/g, '');
+      if (cnpj.length !== 14 || cnpj.startsWith('7')) { pulados++; continue; }
+      try {
+        const { data } = await axios.get(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, { timeout: 12000 });
+        const uf = String(data?.uf ?? '').toUpperCase().trim();
+        if (uf && this.UF[uf]) {
+          await this.prisma.company.update({
+            where: { id: c.id },
+            data: {
+              uf,
+              municipio: data?.municipio ? String(data.municipio) : undefined,
+              codigoMunicipio: data?.codigo_municipio_ibge ? String(data.codigo_municipio_ibge) : undefined,
+              cep: data?.cep ? String(data.cep).replace(/\D/g, '') : undefined,
+            },
+          });
+          atualizados++;
+        } else { falhas++; }
+      } catch { falhas++; }
+      await this.pausa(600); // respeita o rate limit da BrasilAPI
+    }
+    return { semUF: semUF.length, atualizados, falhas, pulados, restantes: Math.max(0, semUF.length - atualizados) };
+  }
+
+  /**
    * VARREDURA EM LOTE — passa por todos os clientes elegíveis (CNPJ real + UF) e puxa o
    * que der do SEFAZ. Monta o certificado do ESCRITÓRIO UMA vez e reusa (mTLS) p/ todos.
    * Respeita o limite: pula quem já drenou a fila e foi consultado há < 55 min (evita cStat
@@ -187,15 +226,20 @@ export class SefazDistribuicaoService {
 
   /** Progresso PÚBLICO da varredura do SEFAZ (só contadores) — p/ acompanhar de fora. */
   async progressoPublico() {
-    const [elegiveis, jaConsultados, docsSefaz] = await Promise.all([
+    const [totalAtivos, comUF, semUF, jaConsultados, docsSefaz] = await Promise.all([
+      this.prisma.company.count({ where: { active: true } }),
       this.prisma.company.count({ where: { active: true, uf: { not: null } } }),
+      this.prisma.company.count({ where: { active: true, uf: null } }),
       this.prisma.company.count({ where: { active: true, sefazUltConsultaEm: { not: null } } }),
       this.prisma.document.count({ where: { fileUrl: { startsWith: 'sefaz|' } } }),
     ]);
     const esc = await this.certificados.temEscritorio();
     return {
       certificadoEscritorio: esc.tem ? { cnpj: esc.cnpj, validade: esc.validade } : null,
-      clientesElegiveis: elegiveis,
+      clientesAtivos: totalAtivos,
+      clientesComUF: comUF,
+      clientesSemUF: semUF,
+      clientesElegiveis: comUF,
       clientesJaConsultados: jaConsultados,
       docsCapturadosDoSefaz: docsSefaz,
     };

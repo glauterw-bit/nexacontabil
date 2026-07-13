@@ -32,6 +32,12 @@ export class SefazController {
     return this.service.salvarCertEscritorio(body.pfxBase64, body.senha, body.nome);
   }
 
+  /** Preenche a UF que falta em cada cliente (via BrasilAPI) — pré-requisito da varredura. */
+  @Post('preencher-uf')
+  preencherUf(@Body() body?: { timeBudgetMs?: number; max?: number }) {
+    return this.service.preencherUFsFaltantes(body ?? {});
+  }
+
   /** Varredura em lote: puxa NF-e do SEFAZ de TODOS os clientes elegíveis. */
   @Post('buscar-todos')
   buscarTodos(@Body() body?: { timeBudgetMs?: number; maxClientes?: number; maxIteracoesPorCliente?: number }) {

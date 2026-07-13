@@ -126,6 +126,9 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       await passo('recibosRecheck', () => this.fluxo.reverificarRecibosPendentes(competencia, 6, 60));
       // 5. higiene do calendário fiscal
       await passo('obrigacoesVencidas', () => this.fiscalCalendar.markOverdue());
+      // 5a. SEFAZ pré-requisito — preenche a UF que falta em cada cliente (cUFAutor exigido),
+      //     via BrasilAPI. Roda em rotação (~1min/ciclo) até todos terem UF; depois é no-op.
+      await passo('sefazPreencherUF', () => this.sefaz.preencherUFsFaltantes({ timeBudgetMs: 60_000 }));
       // 5b. SEFAZ — puxa NF-e direto da Receita (DistribuiçãoDFe) p/ todos os clientes
       //     elegíveis, usando o certificado do escritório. Limitado a ~4min por ciclo e
       //     respeitando o limite de consumo (pula quem drenou a fila há < 55min).
