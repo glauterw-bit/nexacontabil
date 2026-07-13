@@ -153,38 +153,44 @@ export class SefazDistribuicaoService {
 
     let inferidos = 0, semDocs = 0, semConsenso = 0, conflitos = 0;
     const detalhe: any[] = [];
+    const amostraDiag: any[] = [];
     for (const c of alvos) {
+      // só XMLs — PDFs (guias DAS, extratos) trazem CNPJs de terceiros e poluem a contagem
       const docs = await this.prisma.document.findMany({
-        where: { companyId: c.id },
+        where: { companyId: c.id, originalFilename: { endsWith: '.xml' } },
         select: { issuerCnpj: true, recipientCnpj: true },
         take: 800,
       });
-      if (docs.length < minDocs) { semDocs++; continue; }
-      const contagem = new Map<string, number>();
-      for (const d of docs) {
-        const vistos = new Set<string>();
-        for (const raw of [d.issuerCnpj, d.recipientCnpj]) {
-          const n = (raw ?? '').replace(/\D/g, '');
-          if (n.length === 14 && !vistos.has(n) && this.cnpjValido(n)) {
-            vistos.add(n);
-            contagem.set(n, (contagem.get(n) ?? 0) + 1);
-          }
+      // conta emitente e destinatário SEPARADOS: o cliente domina UM dos lados
+      // (compras → sempre destinatário; vendas → sempre emitente). Misturar dilui.
+      const contaLado = (docs2: any[], campo: 'issuerCnpj' | 'recipientCnpj') => {
+        const cont = new Map<string, number>();
+        let uteis = 0;
+        for (const d of docs2) {
+          const n = ((d[campo] ?? '') as string).replace(/\D/g, '');
+          if (n.length === 14 && this.cnpjValido(n)) { uteis++; cont.set(n, (cont.get(n) ?? 0) + 1); }
         }
-      }
-      let top: string | null = null, topN = 0;
-      for (const [cnpj, n] of contagem) if (n > topN) { top = cnpj; topN = n; }
-      if (!top || topN / docs.length < minShare) { semConsenso++; continue; }
-      if (emUso.has(top)) { conflitos++; detalhe.push({ cliente: c.name, cnpj: top, motivo: 'já usado por outro cliente' }); continue; }
+        let top: string | null = null, topN = 0;
+        for (const [cnpj, n] of cont) if (n > topN) { top = cnpj; topN = n; }
+        return { top, topN, uteis, share: uteis ? topN / uteis : 0 };
+      };
+      const emit = contaLado(docs, 'issuerCnpj');
+      const dest = contaLado(docs, 'recipientCnpj');
+      const melhor = dest.share >= emit.share ? dest : emit;
+      if (amostraDiag.length < 5) amostraDiag.push({ docs: docs.length, emitUteis: emit.uteis, destUteis: dest.uteis, shareEmit: +emit.share.toFixed(2), shareDest: +dest.share.toFixed(2) });
+      if (melhor.topN < minDocs) { (docs.length < minDocs ? semDocs++ : semConsenso++); continue; }
+      if (!melhor.top || melhor.share < minShare) { semConsenso++; continue; }
+      if (emUso.has(melhor.top)) { conflitos++; detalhe.push({ cliente: c.name, cnpj: melhor.top, motivo: 'já usado por outro cliente' }); continue; }
       try {
-        await this.prisma.company.update({ where: { id: c.id }, data: { cnpj: top } });
-        emUso.add(top);
+        await this.prisma.company.update({ where: { id: c.id }, data: { cnpj: melhor.top } });
+        emUso.add(melhor.top);
         inferidos++;
-        detalhe.push({ cliente: c.name, cnpj: top, docs: docs.length, presenca: Math.round((topN / docs.length) * 100) + '%' });
-        this.logger.log(`CNPJ inferido p/ ${c.name}: ${top} (${topN}/${docs.length} docs)`);
+        detalhe.push({ cliente: c.name, cnpj: melhor.top, docsXml: docs.length, presenca: Math.round(melhor.share * 100) + '%' });
+        this.logger.log(`CNPJ inferido p/ ${c.name}: ${melhor.top} (${melhor.topN}/${melhor.uteis} no lado dominante)`);
       } catch { conflitos++; }
     }
     const r = { candidatos: alvos.length, inferidos, semDocs, semConsenso, conflitos, detalhe: detalhe.slice(0, 60) };
-    this.ultimoInferirCnpj = { ...r, detalhe: undefined, em: new Date().toISOString() };
+    this.ultimoInferirCnpj = { ...r, detalhe: undefined, amostraDiag, em: new Date().toISOString() };
     return r;
   }
 
