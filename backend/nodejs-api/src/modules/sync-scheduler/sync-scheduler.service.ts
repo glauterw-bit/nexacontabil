@@ -118,6 +118,25 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.mapearPastasOneDrive({ limitClientes: 120, timeBudgetMs: 4 * 60_000 });
   }
 
+  /**
+   * Amostra como os COMPROVANTES estão nomeados (valida a reconciliação): conta e mostra
+   * exemplos de documentos cujo nome contém palavras de obrigação (DAS, DCTFWeb, FGTS...).
+   */
+  async amostraComprovantes() {
+    const grupos: Record<string, string[]> = {
+      DAS: ['das', 'pgdas', 'simei'], DCTFWeb: ['dctf'], FGTS: ['fgts'], ESOCIAL: ['esocial'],
+      'EFD-REINF': ['reinf'], DARF: ['darf'], SPED: ['sped', 'efd'], ECD_ECF: ['ecd', 'ecf'], GUIA: ['guia', 'comprovante', 'recibo'],
+    };
+    const out: any = {};
+    for (const [g, kws] of Object.entries(grupos)) {
+      const where = { originalFilename: { endsWith: '.pdf' as const }, OR: kws.map((k) => ({ originalFilename: { contains: k, mode: 'insensitive' as const } })) };
+      const total = await this.prisma.document.count({ where });
+      const amostra = await this.prisma.document.findMany({ where, select: { originalFilename: true }, take: 5, orderBy: { createdAt: 'desc' } });
+      out[g] = { total, exemplos: amostra.map((d) => (d.originalFilename ?? '').slice(0, 60)) };
+    }
+    return out;
+  }
+
   /** Progresso PÚBLICO (só contadores, sem dados sensíveis) — para acompanhar a 1ª volta do Delta. */
   async progressoPublico() {
     const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);

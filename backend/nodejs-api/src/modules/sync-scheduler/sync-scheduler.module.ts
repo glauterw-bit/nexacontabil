@@ -56,6 +56,13 @@ class SyncSchedulerController {
   mapaPastas() {
     return this.service.mapearPastas();
   }
+
+  /** Amostra PÚBLICA de como os comprovantes estão nomeados (valida a reconciliação). */
+  @Public()
+  @Get('amostra-comprovantes')
+  amostraComprovantes() {
+    return this.service.amostraComprovantes();
+  }
 }
 
 @Module({
