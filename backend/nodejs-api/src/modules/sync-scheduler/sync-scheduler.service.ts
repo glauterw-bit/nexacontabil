@@ -153,6 +153,9 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         await passo('obrigacoesVencidas', () => this.fiscalCalendar.markOverdue());
       })();
       const cadeiaSefaz = (async () => {
+        // 5a-0. clientes com CNPJ provisório: infere o real a partir dos próprios XMLs
+        //       (emitente/destinatário dominante). Sem isso, UF e SEFAZ ficam impossíveis.
+        await passo('sefazInferirCnpj', () => this.sefaz.inferirCnpjsReais());
         // 5a. pré-requisito — preenche a UF que falta (cUFAutor exigido), via BrasilAPI.
         //     Budget alto p/ zerar a fila logo; quando não falta nada é no-op.
         await passo('sefazPreencherUF', () => this.sefaz.preencherUFsFaltantes({ timeBudgetMs: 8 * 60_000 }));

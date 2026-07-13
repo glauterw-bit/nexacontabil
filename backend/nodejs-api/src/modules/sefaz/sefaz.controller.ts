@@ -32,6 +32,12 @@ export class SefazController {
     return this.service.salvarCertEscritorio(body.pfxBase64, body.senha, body.nome);
   }
 
+  /** Infere o CNPJ real de clientes com CNPJ provisório a partir dos próprios XMLs. */
+  @Post('inferir-cnpj')
+  inferirCnpj(@Body() body?: { minDocs?: number; minShare?: number }) {
+    return this.service.inferirCnpjsReais(body ?? {});
+  }
+
   /** Preenche a UF que falta em cada cliente (via BrasilAPI) — pré-requisito da varredura. */
   @Post('preencher-uf')
   preencherUf(@Body() body?: { timeBudgetMs?: number; max?: number }) {

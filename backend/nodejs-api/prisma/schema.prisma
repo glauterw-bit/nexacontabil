@@ -868,6 +868,9 @@ model CertificadoDigital {
   // Para A1: PFX criptografado
   pfxEncrypted    String?
   pfxIv           String?
+  // Senha do PFX criptografada (AES-256-GCM, mesma chave do PFX) — sobrevive a reinícios
+  senhaEncrypted  String?
+  senhaIv         String?
   // Para nuvem: credenciais OAuth
   oauthClientId   String?
   oauthToken      String?

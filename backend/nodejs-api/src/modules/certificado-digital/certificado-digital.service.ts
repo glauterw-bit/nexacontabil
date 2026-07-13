@@ -261,7 +261,9 @@ export class CertificadoDigitalService {
         thumbprint: meta.thumbprint,
         pfxEncrypted: encrypted,
         pfxIv: iv,
-        // Guarda senha criptografada em campo auxiliar (se existir no schema)
+        // senha criptografada persiste — mTLS continua funcionando após reinício do app
+        senhaEncrypted: encSenha.encrypted,
+        senhaIv: encSenha.iv,
         active: true,
         alertaDias: 30,
       },
@@ -300,12 +302,7 @@ export class CertificadoDigitalService {
   async getCertificadoParsed(companyId: string, senha?: string): Promise<CertificadoParsed> {
     const { cert: certDb, pfxBuffer } = await this.getCertificadoAtivo(companyId);
 
-    const resolvedSenha =
-      senha ??
-      CertificadoDigitalService._senhaCache.get(certDb.id) ??
-      '';
-
-    return parsePfxReal(pfxBuffer.toString('base64'), resolvedSenha);
+    return parsePfxReal(pfxBuffer.toString('base64'), this._senhaDe(certDb, senha));
   }
 
   // ─── Listar Certificados ──────────────────────────────────────────────────
@@ -384,11 +381,21 @@ export class CertificadoDigitalService {
     return c ? { tem: true, cnpj: c.cnpjCpf, validade: c.dataValidade, nome: c.nome } : { tem: false };
   }
 
+  /** Recupera a senha do PFX: parâmetro → cache de processo → senha persistida (criptografada). */
+  private _senhaDe(cert: any, senha?: string): string {
+    if (senha) return senha;
+    const cacheada = CertificadoDigitalService._senhaCache.get(cert.id);
+    if (cacheada) return cacheada;
+    if (cert.senhaEncrypted && cert.senhaIv) {
+      try { return decryptPfx(cert.senhaEncrypted, cert.senhaIv).toString('utf8'); } catch { /* segue */ }
+    }
+    return '';
+  }
+
   private async _parsedDe(cert: any, senha?: string): Promise<CertificadoParsed> {
     if (!cert?.pfxEncrypted || !cert?.pfxIv) throw new BadRequestException('Certificado sem chave privada.');
     const pfxBuffer = decryptPfx(cert.pfxEncrypted, cert.pfxIv);
-    const s = senha ?? CertificadoDigitalService._senhaCache.get(cert.id) ?? '';
-    return parsePfxReal(pfxBuffer.toString('base64'), s);
+    return parsePfxReal(pfxBuffer.toString('base64'), this._senhaDe(cert, senha));
   }
 
   /** https.Agent com o certificado do ESCRITÓRIO (mTLS) — para consultar todos os clientes. */
@@ -403,6 +410,7 @@ export class CertificadoDigitalService {
   async salvarCertificadoEscritorio(pfxBase64: string, senha: string, nome: string): Promise<CertificadoInfo> {
     const meta = parsePfxReal(pfxBase64, senha);
     const { encrypted, iv } = encryptPfx(pfxBase64);
+    const encSenha = encryptPfx(Buffer.from(senha, 'utf8').toString('base64'));
     // âncora de companyId: usa a primeira empresa ativa (o cert do escritório não é de um cliente)
     const ancora = await this.prisma.company.findFirst({ where: { active: true }, select: { id: true } });
     if (!ancora) throw new BadRequestException('Cadastre ao menos uma empresa antes.');
@@ -412,7 +420,9 @@ export class CertificadoDigitalService {
         companyId: ancora.id, nome, tipo: 'a1', escritorio: true,
         cnpjCpf: meta.cnpjCpf, dataEmissao: meta.dataEmissao, dataValidade: meta.dataValidade,
         emissor: meta.emissor, serialNumber: meta.serialNumber, thumbprint: meta.thumbprint,
-        pfxEncrypted: encrypted, pfxIv: iv, active: true, alertaDias: 30,
+        pfxEncrypted: encrypted, pfxIv: iv,
+        senhaEncrypted: encSenha.encrypted, senhaIv: encSenha.iv,
+        active: true, alertaDias: 30,
       },
     });
     CertificadoDigitalService._senhaCache.set(cert.id, senha);

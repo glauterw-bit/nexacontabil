@@ -24,6 +24,7 @@ export class SefazDistribuicaoService {
   /** Último resultado da varredura/preenchimento de UF — p/ diagnóstico via progresso público. */
   private ultimaVarredura: any = null;
   private ultimoPreencherUF: any = null;
+  private ultimoInferirCnpj: any = null;
   // Ambiente Nacional (hospedado no SVRS) — atende a distribuição de NF-e de todas as UFs.
   private readonly url = 'https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx';
   private readonly tpAmb = process.env.SEFAZ_AMBIENTE === '2' ? 2 : 1; // 1=produção
@@ -117,6 +118,74 @@ export class SefazDistribuicaoService {
   /** Situação do certificado do escritório. */
   async statusEscritorio() {
     return this.certificados.temEscritorio();
+  }
+
+  /** Valida dígitos verificadores de CNPJ (14 dígitos). */
+  private cnpjValido(cnpj: string): boolean {
+    if (!/^\d{14}$/.test(cnpj) || /^(\d)\1{13}$/.test(cnpj)) return false;
+    const calc = (base: string) => {
+      let peso = base.length - 7, soma = 0;
+      for (const ch of base) { soma += parseInt(ch, 10) * peso; peso = peso === 2 ? 9 : peso - 1; }
+      const r = soma % 11;
+      return r < 2 ? 0 : 11 - r;
+    };
+    return calc(cnpj.slice(0, 12)) === +cnpj[12] && calc(cnpj.slice(0, 13)) === +cnpj[13];
+  }
+
+  /**
+   * INFERE O CNPJ REAL de clientes com CNPJ provisório (começa com 7 / inválido), olhando os
+   * PRÓPRIOS documentos do cliente: o CNPJ dele aparece como emitente ou destinatário em quase
+   * todos os XMLs. Regra conservadora: precisa de ≥3 docs e o CNPJ dominante em ≥60% deles,
+   * com dígitos verificadores válidos. Colisão com outro cliente (matriz/filial) é pulada.
+   */
+  async inferirCnpjsReais(opts?: { minDocs?: number; minShare?: number }) {
+    const minDocs = opts?.minDocs ?? 3;
+    const minShare = opts?.minShare ?? 0.6;
+    const todos = await this.prisma.company.findMany({
+      where: { active: true },
+      select: { id: true, cnpj: true, name: true },
+    });
+    const alvos = todos.filter((c) => {
+      const n = (c.cnpj ?? '').replace(/\D/g, '');
+      return !n || n.length !== 14 || n.startsWith('7') || !this.cnpjValido(n);
+    });
+    const emUso = new Set(todos.map((c) => (c.cnpj ?? '').replace(/\D/g, '')));
+
+    let inferidos = 0, semDocs = 0, semConsenso = 0, conflitos = 0;
+    const detalhe: any[] = [];
+    for (const c of alvos) {
+      const docs = await this.prisma.document.findMany({
+        where: { companyId: c.id },
+        select: { issuerCnpj: true, recipientCnpj: true },
+        take: 800,
+      });
+      if (docs.length < minDocs) { semDocs++; continue; }
+      const contagem = new Map<string, number>();
+      for (const d of docs) {
+        const vistos = new Set<string>();
+        for (const raw of [d.issuerCnpj, d.recipientCnpj]) {
+          const n = (raw ?? '').replace(/\D/g, '');
+          if (n.length === 14 && !vistos.has(n) && this.cnpjValido(n)) {
+            vistos.add(n);
+            contagem.set(n, (contagem.get(n) ?? 0) + 1);
+          }
+        }
+      }
+      let top: string | null = null, topN = 0;
+      for (const [cnpj, n] of contagem) if (n > topN) { top = cnpj; topN = n; }
+      if (!top || topN / docs.length < minShare) { semConsenso++; continue; }
+      if (emUso.has(top)) { conflitos++; detalhe.push({ cliente: c.name, cnpj: top, motivo: 'já usado por outro cliente' }); continue; }
+      try {
+        await this.prisma.company.update({ where: { id: c.id }, data: { cnpj: top } });
+        emUso.add(top);
+        inferidos++;
+        detalhe.push({ cliente: c.name, cnpj: top, docs: docs.length, presenca: Math.round((topN / docs.length) * 100) + '%' });
+        this.logger.log(`CNPJ inferido p/ ${c.name}: ${top} (${topN}/${docs.length} docs)`);
+      } catch { conflitos++; }
+    }
+    const r = { candidatos: alvos.length, inferidos, semDocs, semConsenso, conflitos, detalhe: detalhe.slice(0, 60) };
+    this.ultimoInferirCnpj = { ...r, detalhe: undefined, em: new Date().toISOString() };
+    return r;
   }
 
   /**
@@ -258,6 +327,7 @@ export class SefazDistribuicaoService {
       docsCapturadosDoSefaz: docsSefaz,
       ultimaVarredura: ultima,
       ultimoPreencherUF: this.ultimoPreencherUF,
+      ultimoInferirCnpj: this.ultimoInferirCnpj,
     };
   }
 
