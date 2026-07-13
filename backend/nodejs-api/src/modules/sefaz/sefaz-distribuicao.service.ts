@@ -21,6 +21,9 @@ import { AnaliseClienteService } from '../analise-cliente/analise-cliente.servic
 @Injectable()
 export class SefazDistribuicaoService {
   private readonly logger = new Logger('SEFAZ-DFe');
+  /** Último resultado da varredura/preenchimento de UF — p/ diagnóstico via progresso público. */
+  private ultimaVarredura: any = null;
+  private ultimoPreencherUF: any = null;
   // Ambiente Nacional (hospedado no SVRS) — atende a distribuição de NF-e de todas as UFs.
   private readonly url = 'https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx';
   private readonly tpAmb = process.env.SEFAZ_AMBIENTE === '2' ? 2 : 1; // 1=produção
@@ -152,7 +155,9 @@ export class SefazDistribuicaoService {
       } catch { falhas++; }
       await this.pausa(600); // respeita o rate limit da BrasilAPI
     }
-    return { semUF: semUF.length, atualizados, falhas, pulados, restantes: Math.max(0, semUF.length - atualizados) };
+    const r = { semUF: semUF.length, atualizados, falhas, pulados, restantes: Math.max(0, semUF.length - atualizados) };
+    this.ultimoPreencherUF = { ...r, em: new Date().toISOString() };
+    return r;
   }
 
   /**
@@ -213,7 +218,7 @@ export class SefazDistribuicaoService {
       }
     }
 
-    return {
+    const res = {
       temCertificadoEscritorio: esc.tem,
       elegiveis: elegiveis.length,
       processados,
@@ -222,6 +227,8 @@ export class SefazDistribuicaoService {
       duracaoS: Math.round((Date.now() - inicio) / 1000),
       detalhe: detalhe.slice(0, 40),
     };
+    this.ultimaVarredura = { ...res, em: new Date().toISOString() };
+    return res;
   }
 
   /** Progresso PÚBLICO da varredura do SEFAZ (só contadores) — p/ acompanhar de fora. */
@@ -234,6 +241,13 @@ export class SefazDistribuicaoService {
       this.prisma.document.count({ where: { fileUrl: { startsWith: 'sefaz|' } } }),
     ]);
     const esc = await this.certificados.temEscritorio();
+    // amostra de erros da última varredura SEM nomes de clientes (endpoint público)
+    const v = this.ultimaVarredura;
+    const ultima = v ? {
+      em: v.em, processados: v.processados, novos: v.novosTotal, erros: v.erros,
+      bloqueados656: v.bloqueados656,
+      errosAmostra: (v.detalhe ?? []).filter((d: any) => d.erro).slice(0, 5).map((d: any) => d.erro),
+    } : null;
     return {
       certificadoEscritorio: esc.tem ? { cnpj: esc.cnpj, validade: esc.validade } : null,
       clientesAtivos: totalAtivos,
@@ -242,6 +256,8 @@ export class SefazDistribuicaoService {
       clientesElegiveis: comUF,
       clientesJaConsultados: jaConsultados,
       docsCapturadosDoSefaz: docsSefaz,
+      ultimaVarredura: ultima,
+      ultimoPreencherUF: this.ultimoPreencherUF,
     };
   }
 

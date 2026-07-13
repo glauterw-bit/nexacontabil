@@ -136,25 +136,31 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     };
 
     try {
-      // 1. clientes nunca varridos (primeira captura de XMLs + PDFs)
-      await passo('capturaInicial', () => this.analise.analisarLote(8, 150));
-      // 2. rotação da carteira via DELTA do Graph — pega tudo na 1ª vez e só o que muda
-      //    depois. Delta incremental é barato, então cobrimos MUITOS clientes por ciclo
-      //    (rotação completa em poucas passagens → documento novo aparece rápido).
-      await passo('deltaIncremental', () => this.analise.sincronizarDeltaLote(30));
-      // 3. recibos ainda não checados nesta competência
-      await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 8));
-      // 4. re-checa quem estava sem recibo há mais de 1h
-      await passo('recibosRecheck', () => this.fluxo.reverificarRecibosPendentes(competencia, 6, 60));
-      // 5. higiene do calendário fiscal
-      await passo('obrigacoesVencidas', () => this.fiscalCalendar.markOverdue());
-      // 5a. SEFAZ pré-requisito — preenche a UF que falta em cada cliente (cUFAutor exigido),
-      //     via BrasilAPI. Budget alto p/ resolver a 1ª volta em 1–2 ciclos; depois é no-op.
-      await passo('sefazPreencherUF', () => this.sefaz.preencherUFsFaltantes({ timeBudgetMs: 4 * 60_000 }));
-      // 5b. SEFAZ — puxa NF-e direto da Receita (DistribuiçãoDFe) p/ todos os clientes
-      //     elegíveis, usando o certificado do escritório. Respeita o limite de consumo
-      //     (pula quem drenou a fila há < 55min).
-      await passo('sefazVarredura', () => this.sefaz.varrerTodos({ timeBudgetMs: 6 * 60_000 }));
+      // DUAS CADEIAS EM PARALELO — a do Drive (Graph) e a do SEFAZ (Receita) usam APIs
+      // diferentes; em série a cadeia pesada do Drive esfomeava a do SEFAZ (UF nunca
+      // era preenchida e a varredura nunca rodava durante o backfill).
+      const cadeiaDrive = (async () => {
+        // 1. clientes nunca varridos (primeira captura de XMLs + PDFs)
+        await passo('capturaInicial', () => this.analise.analisarLote(8, 150));
+        // 2. rotação da carteira via DELTA do Graph — pega tudo na 1ª vez e só o que muda
+        //    depois. Delta incremental é barato, então cobrimos MUITOS clientes por ciclo.
+        await passo('deltaIncremental', () => this.analise.sincronizarDeltaLote(30));
+        // 3. recibos ainda não checados nesta competência
+        await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 8));
+        // 4. re-checa quem estava sem recibo há mais de 1h
+        await passo('recibosRecheck', () => this.fluxo.reverificarRecibosPendentes(competencia, 6, 60));
+        // 5. higiene do calendário fiscal
+        await passo('obrigacoesVencidas', () => this.fiscalCalendar.markOverdue());
+      })();
+      const cadeiaSefaz = (async () => {
+        // 5a. pré-requisito — preenche a UF que falta (cUFAutor exigido), via BrasilAPI.
+        //     Budget alto p/ zerar a fila logo; quando não falta nada é no-op.
+        await passo('sefazPreencherUF', () => this.sefaz.preencherUFsFaltantes({ timeBudgetMs: 8 * 60_000 }));
+        // 5b. varredura — puxa NF-e da Receita p/ todos os elegíveis com o certificado do
+        //     escritório, respeitando o limite de consumo (pula quem drenou há < 55min).
+        await passo('sefazVarredura', () => this.sefaz.varrerTodos({ timeBudgetMs: 10 * 60_000 }));
+      })();
+      await Promise.all([cadeiaDrive, cadeiaSefaz]);
       // 6. início do mês (dia 01/02): solicitações de documentos + garante o calendário
       //    fiscal do ano (só p/ quem não tem — idempotente). Automatiza o "Configurar tudo".
       if (startedAt.getDate() <= 2) {
