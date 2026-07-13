@@ -39,18 +39,20 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   /** Progresso PÚBLICO (só contadores, sem dados sensíveis) — para acompanhar a 1ª volta do Delta. */
   async progressoPublico() {
     const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
-    const [comPasta, comDelta, docs2026, docsHoje, totalDocs] = await Promise.all([
+    const [comPasta, comDelta, docs2026Rows, docsHoje, totalDocs] = await Promise.all([
       this.prisma.company.count({ where: { active: true, sharepointItemId: { not: null } } }),
       this.prisma.company.count({ where: { active: true, sharepointItemId: { not: null }, sharepointDeltaLink: { not: null } } }),
-      this.prisma.document.count({ where: { issueDate: { gte: new Date(2026, 0, 1) } } }),
+      this.prisma.document.findMany({ where: { issueDate: { gte: new Date(2026, 0, 1) } }, select: { issueDate: true } }),
       this.prisma.document.count({ where: { createdAt: { gte: hoje0 } } }),
       this.prisma.document.count(),
     ]);
+    const porMes2026: Record<string, number> = {};
+    for (const d of docs2026Rows) { if (!d.issueDate) continue; const m = new Date(d.issueDate).toISOString().slice(0, 7); porMes2026[m] = (porMes2026[m] ?? 0) + 1; }
     const pct = comPasta ? Math.round((comDelta / comPasta) * 100) : 0;
     return {
       clientesComPasta: comPasta, clientesLidosPeloDelta: comDelta, pctPrimeiraVolta: pct,
       primeiraVoltaCompleta: comPasta > 0 && comDelta >= comPasta,
-      docs2026, docsHoje, totalDocs,
+      docs2026: docs2026Rows.length, porMes2026, docsHoje, totalDocs,
       executandoAgora: this.running,
       ultimoCiclo: this.lastRun?.finishedAt ?? null,
     };
