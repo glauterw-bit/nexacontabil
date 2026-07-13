@@ -34,6 +34,13 @@ class SyncSchedulerController {
   progresso() {
     return this.service.progressoPublico();
   }
+
+  /** Diagnóstico PÚBLICO da qualidade do acervo (XML parseado × PDF, empresas com docs). */
+  @Public()
+  @Get('diagnostico')
+  diagnostico() {
+    return this.service.diagnosticoDocs();
+  }
 }
 
 @Module({

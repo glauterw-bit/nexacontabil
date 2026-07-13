@@ -42,6 +42,47 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     private readonly prisma: PrismaService,
   ) {}
 
+  /**
+   * DIAGNÓSTICO PÚBLICO da qualidade do acervo — responde "os documentos estão sendo
+   * capturados COM dados?" sem expor nomes. Separa XML (parseado, tem valor/emitente) de
+   * não-XML (PDF/recibo, só referência) e conta empresas com documentos.
+   */
+  async diagnosticoDocs() {
+    const [
+      totalDocs, docsXml, comEmitente, comValor, comData, comExtract,
+      empresasComDoc, empresasAtivas, porTipoRows, docsSefaz,
+      amostraVazios,
+    ] = await Promise.all([
+      this.prisma.document.count(),
+      this.prisma.document.count({ where: { originalFilename: { endsWith: '.xml' } } }),
+      this.prisma.document.count({ where: { issuerName: { not: null } } }),
+      this.prisma.document.count({ where: { totalValue: { not: null } } }),
+      this.prisma.document.count({ where: { issueDate: { not: null } } }),
+      this.prisma.document.count({ where: { extractedData: { not: null } } }),
+      this.prisma.document.findMany({ distinct: ['companyId'], select: { companyId: true } }),
+      this.prisma.company.count({ where: { active: true } }),
+      this.prisma.document.groupBy({ by: ['type'], _count: { id: true } }),
+      this.prisma.document.count({ where: { fileUrl: { startsWith: 'sefaz|' } } }),
+      // amostra de arquivos SEM emitente (p/ ver se são PDFs/NFS-e municipais)
+      this.prisma.document.findMany({ where: { issuerName: null }, select: { originalFilename: true, type: true }, take: 12, orderBy: { createdAt: 'desc' } }),
+    ]);
+    const porTipo = porTipoRows.map((r) => ({ tipo: r.type, n: r._count.id })).sort((a, b) => b.n - a.n);
+    const naoXml = totalDocs - docsXml;
+    return {
+      totalDocs,
+      xml: docsXml, naoXml,
+      comEmitente, comValor, comData, comExtractedData: comExtract,
+      pctXmlComValor: docsXml ? Math.round((comValor / docsXml) * 100) : 0,
+      empresasComDocumentos: empresasComDoc.length, empresasAtivas,
+      docsDoSefaz: docsSefaz,
+      porTipo,
+      amostraSemEmitente: amostraVazios.map((d) => ({ arquivo: (d.originalFilename ?? '').slice(-40), tipo: d.type })),
+      leitura: docsXml && comValor / docsXml > 0.8
+        ? 'XMLs estão sendo parseados com dados; documentos sem campos são PDFs/recibos (referência), não falha.'
+        : 'Parte dos XMLs pode não estar sendo parseada — investigar formato (NFS-e municipal?).',
+    };
+  }
+
   /** Progresso PÚBLICO (só contadores, sem dados sensíveis) — para acompanhar a 1ª volta do Delta. */
   async progressoPublico() {
     const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
