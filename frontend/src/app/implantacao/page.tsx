@@ -35,6 +35,18 @@ export default function ImplantacaoPage() {
   const executar = useCallback(async (acao: string, chave: string) => {
     setRodando(chave); setMsg(null);
     try {
+      // CONFIGURAR TUDO: gera o calendário 2026, atribui responsáveis, aprende o Banco de
+      // NCM e revalida com a base legal — a sequência inteira em um clique.
+      if (acao === 'setup-tudo') {
+        const post = (u: string, b = '{}') => fetch(`${API}/api/v1/${u}`, { method: 'POST', headers: authHeaders(), body: b }).then((r) => r.ok ? r.json() : null).catch(() => null);
+        const cal = await post('fiscal-calendar/regenerar-todos', JSON.stringify({ ano: new Date().getFullYear() }));
+        const atr = await post('paineis/auto-atribuir');
+        await post('ncm-inteligente/aprender-documentos');
+        const rv = await post('analise-cliente/revalidar');
+        setMsg({ tipo: 'ok', texto: `Pronto! Calendário: ${cal?.gerados ?? 0} obrigações · ${atr?.distribuidos ?? 0} clientes atribuídos · ${rv?.revalidados ?? 0} documentos revalidados. A entrega marca sozinha quando o recibo é achado no drive.` });
+        await load();
+        return;
+      }
       // Aplicar base legal: aprende o Banco de NCM dos XMLs + revalida o acervo com a
       // regra de monofásico (Lei 10.485/10.147). Duas chamadas encadeadas.
       if (acao === 'base-legal') {
@@ -103,6 +115,24 @@ export default function ImplantacaoPage() {
           {msg.texto}
         </div>
       )}
+
+      {/* CONFIGURAR TUDO — o botão mestre */}
+      <Card accent={COLORS.ok} style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 11, background: tint(COLORS.ok, 14), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <CheckCircle2 size={20} color={COLORS.ok} />
+          </div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontWeight: 700, fontSize: 15.5, color: COLORS.strong }}>Configurar tudo agora</div>
+            <p style={{ fontSize: 13, color: COLORS.muted, marginTop: 3 }}>
+              Um clique roda a sequência: <b>gera o calendário fiscal de {new Date().getFullYear()}</b>, atribui responsáveis, aprende o Banco de NCM e revalida com a base legal. As entregas passam a ser marcadas sozinhas quando o recibo aparece no drive.
+            </p>
+          </div>
+          <Btn onClick={() => executar('setup-tudo', 'setup-tudo')} disabled={rodando === 'setup-tudo'}>
+            {rodando === 'setup-tudo' ? <><Loader2 size={14} className="animate-spin" /> configurando… (1-2 min)</> : <><CheckCircle2 size={14} /> Configurar tudo</>}
+          </Btn>
+        </div>
+      </Card>
 
       {/* BASE LEGAL / MONOFÁSICO — aprende o Banco de NCM + revalida com a lei */}
       <Card accent={COLORS.acao} style={{ marginBottom: 14 }}>

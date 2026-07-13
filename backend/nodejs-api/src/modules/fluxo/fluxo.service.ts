@@ -130,6 +130,15 @@ export class FluxoService {
       create: { companyId, departamento: dep, competencia, etapa: encontrado ? 'envio_fiscal' : 'validacao', reciboEncontrado: encontrado, reciboArquivo: arquivo, reciboCheckedAt: new Date() },
       update: { reciboEncontrado: encontrado, reciboArquivo: arquivo, reciboCheckedAt: new Date(), ...(encontrado ? { etapa: 'envio_fiscal' } : {}) },
     });
+
+    // recibo encontrado → marca as obrigações do calendário dessa competência como ENTREGUES
+    // (antes o recibo ficava só no fluxo e as obrigações seguiam "pendentes" → 0 entregues).
+    if (encontrado) {
+      await this.prisma.fiscalCalendarItem.updateMany({
+        where: { companyId, competencia: { startsWith: competencia }, status: { in: ['pendente', 'em_apuracao', 'apurada', 'vencida'] } },
+        data: { status: 'entregue' },
+      }).catch(() => undefined);
+    }
     return { reciboEncontrado: encontrado, arquivo };
   }
 

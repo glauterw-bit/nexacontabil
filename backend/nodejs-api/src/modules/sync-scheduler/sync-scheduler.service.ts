@@ -90,8 +90,10 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     try {
       // 1. clientes nunca varridos (primeira captura de XMLs + PDFs)
       await passo('capturaInicial', () => this.analise.analisarLote(8, 150));
-      // 2. rotação da carteira via DELTA do Graph — pega tudo na 1ª vez e só o que muda depois
-      await passo('deltaIncremental', () => this.analise.sincronizarDeltaLote(6));
+      // 2. rotação da carteira via DELTA do Graph — pega tudo na 1ª vez e só o que muda
+      //    depois. Delta incremental é barato, então cobrimos MUITOS clientes por ciclo
+      //    (rotação completa em poucas passagens → documento novo aparece rápido).
+      await passo('deltaIncremental', () => this.analise.sincronizarDeltaLote(30));
       // 3. recibos ainda não checados nesta competência
       await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 8));
       // 4. re-checa quem estava sem recibo há mais de 1h
