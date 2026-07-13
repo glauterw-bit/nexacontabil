@@ -52,6 +52,11 @@ export class PaineisController {
     return this.service.farois();
   }
 
+  @Get('monofasico')
+  monofasico() {
+    return this.service.monofasicoOportunidade();
+  }
+
   @Post('limpar-carteira')
   limparCarteira(@Body() body: { dryRun?: boolean }) {
     return this.service.limparCarteira(body?.dryRun ?? false);

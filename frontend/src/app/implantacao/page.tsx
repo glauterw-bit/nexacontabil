@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   ClipboardCheck, CalendarClock, Users, Building2, Inbox, HardDriveDownload,
-  CheckCircle2, ChevronRight, Loader2, RefreshCw,
+  CheckCircle2, ChevronRight, Loader2, RefreshCw, Scale,
 } from 'lucide-react';
 import { PageHeader, Card, COLORS, tint, Spinner, EmptyState, Btn } from '@/components/ui/kit';
 
@@ -35,6 +35,16 @@ export default function ImplantacaoPage() {
   const executar = useCallback(async (acao: string, chave: string) => {
     setRodando(chave); setMsg(null);
     try {
+      // Aplicar base legal: aprende o Banco de NCM dos XMLs + revalida o acervo com a
+      // regra de monofásico (Lei 10.485/10.147). Duas chamadas encadeadas.
+      if (acao === 'base-legal') {
+        await fetch(`${API}/api/v1/ncm-inteligente/aprender-documentos`, { method: 'POST', headers: authHeaders() }).catch(() => {});
+        const rv = await fetch(`${API}/api/v1/analise-cliente/revalidar`, { method: 'POST', headers: authHeaders() });
+        const j2 = rv.ok ? await rv.json() : null;
+        if (!rv.ok) { setMsg({ tipo: 'erro', texto: 'Não foi possível revalidar agora.' }); return; }
+        setMsg({ tipo: 'ok', texto: `Base legal aplicada: ${j2?.revalidados ?? 0} documentos revalidados · ${j2?.comInconsistencia ?? 0} com apontamento (monofásico já separado de erro).` });
+        return;
+      }
       let url = '', body = '{}';
       if (acao === 'regerar-calendario') { url = `${API}/api/v1/fiscal-calendar/regenerar-todos`; body = JSON.stringify({ ano: d?.ano ?? new Date().getFullYear() }); }
       else if (acao === 'auto-atribuir') url = `${API}/api/v1/paineis/auto-atribuir`;
@@ -93,6 +103,27 @@ export default function ImplantacaoPage() {
           {msg.texto}
         </div>
       )}
+
+      {/* BASE LEGAL / MONOFÁSICO — aprende o Banco de NCM + revalida com a lei */}
+      <Card accent={COLORS.acao} style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: tint(COLORS.ok, 14), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Scale size={17} color={COLORS.ok} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: COLORS.strong }}>Aplicar base legal (monofásico) ao acervo</div>
+            <p style={{ fontSize: 13, color: COLORS.muted, marginTop: 5 }}>
+              Atualiza o Banco de NCM com os XMLs e revalida tudo pela regra de lei: PIS/COFINS 0% na revenda de
+              monofásico deixa de ser "erro" e a cobrança indevida vira <b>oportunidade de recuperação</b>. Depois, veja o resultado em <Link href="/oportunidade-monofasica" style={{ color: COLORS.acao }}>Oportunidade Monofásica</Link>.
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+              <Btn onClick={() => executar('base-legal', 'base-legal')} size="sm" disabled={rodando === 'base-legal'}>
+                {rodando === 'base-legal' ? <><Loader2 size={13} className="animate-spin" /> aplicando… (pode levar 1-2 min)</> : <><Scale size={13} /> Aplicar base legal + revalidar</>}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       {/* PENDENTES */}
       {pendentes.map((it: any, i: number) => {

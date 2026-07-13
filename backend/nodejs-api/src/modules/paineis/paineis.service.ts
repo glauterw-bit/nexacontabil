@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { monofasicoPorNcm } from '../organizacao/classificacao.util';
+import { monofasicoPorNcm, regraMonofasico } from '../organizacao/classificacao.util';
 
 function safe(s: any) { try { return s ? JSON.parse(s) : null; } catch { return null; } }
 const r2 = (n: number) => Math.round((n || 0) * 100) / 100;
@@ -517,6 +517,76 @@ export class PaineisService {
       quedaFaturamento: { emQueda: queda.length, clientes: queda.slice(0, 25) },
       monofasico: { valorTotal: r2(monoTotal), notas: monoNotas, clientesAfetados: mono.length, clientes: mono.slice(0, 20) },
       concentracao: { receitaTotal: r2(receitaTotal), top5Pct: Math.round((top5 / receitaTotal) * 1000) / 10, top10Pct: Math.round((top10 / receitaTotal) * 1000) / 10, topClientes: totais.slice(0, 10).map((x) => ({ ...x, valor: r2(x.valor), pct: Math.round((x.valor / receitaTotal) * 1000) / 10 })) },
+    };
+  }
+
+  /**
+   * OPORTUNIDADE MONOFÁSICA por cliente — o serviço de maior valor da carteira.
+   * Cruza os XMLs de saída com a base LEGAL de monofásico (Lei 10.485/10.147...):
+   *  - valorMono: receita de revenda de produtos monofásicos.
+   *  - recuperavelReais: PIS/COFINS EFETIVAMENTE cobrado na revenda (recolhimento
+   *    indevido, recuperável em até 5 anos) — número de FATO, tirado das notas.
+   *  - Para Simples: aponta a segregação no PGDAS (economia recorrente no DAS).
+   */
+  async monofasicoOportunidade() {
+    const companies = await this.prisma.company.findMany({
+      where: { active: true }, select: { id: true, name: true, taxRegime: true, responsavel: true },
+    });
+    const coById = new Map(companies.map((c) => [c.id, c]));
+    const ids = companies.map((c) => c.id);
+    const docs = await this.prisma.document.findMany({
+      where: { companyId: { in: ids }, extractedData: { not: null } },
+      select: { companyId: true, extractedData: true },
+    });
+
+    type Ag = { valorMono: number; notasMono: number; recuperavel: number; notasIndevidas: number; grupos: Set<string> };
+    const ag = new Map<string, Ag>();
+    for (const d of docs) {
+      const nf = safe(d.extractedData);
+      for (const it of (nf?.itens ?? [])) {
+        const reg = regraMonofasico(it.ncm);
+        if (!reg) continue;
+        const cfop = String(it.cfop ?? '');
+        if (!['5', '6', '7'].includes(cfop[0])) continue; // só revenda (saída)
+        const a = ag.get(d.companyId) ?? { valorMono: 0, notasMono: 0, recuperavel: 0, notasIndevidas: 0, grupos: new Set<string>() };
+        const valor = it.valor ?? 0;
+        a.valorMono += valor; a.notasMono++; a.grupos.add(reg.grupo);
+        const cst = String(it.cst ?? '').trim();
+        const isSimples = cst.length === 3 || coById.get(d.companyId)?.taxRegime === 'SIMPLES_NACIONAL';
+        const pc = (it.pis ?? 0) + (it.cofins ?? 0);
+        // recolhimento indevido só faz sentido fora do Simples (no Simples é via PGDAS)
+        if (!isSimples && pc > 0.01) { a.recuperavel += valor * pc / 100; a.notasIndevidas++; }
+        ag.set(d.companyId, a);
+      }
+    }
+
+    let totalValorMono = 0, totalRecuperavel = 0;
+    const clientes = [...ag.entries()].map(([id, a]) => {
+      totalValorMono += a.valorMono; totalRecuperavel += a.recuperavel;
+      const co = coById.get(id);
+      const simples = co?.taxRegime === 'SIMPLES_NACIONAL';
+      return {
+        companyId: id, nome: co?.name, regime: co?.taxRegime, responsavel: co?.responsavel,
+        grupos: [...a.grupos],
+        valorMono: r2(a.valorMono), notasMono: a.notasMono,
+        recuperavelReais: r2(a.recuperavel), notasIndevidas: a.notasIndevidas,
+        // Simples: estimativa de economia recorrente ao segregar a receita monofásica
+        // no PGDAS (~PIS+COFINS do Anexo I, faixa média). É estimativa, confirmar por faixa.
+        economiaSimplesAnoEstimada: simples ? r2(a.valorMono * 0.0328) : 0,
+        acao: simples
+          ? 'Segregar a receita monofásica no PGDAS-D → reduz o DAS todo mês. Restituir/compensar os últimos 5 anos.'
+          : a.recuperavel > 0
+            ? 'Recuperar o PIS/COFINS cobrado indevidamente na revenda (últimos 5 anos) + parar de recolher.'
+            : 'Revenda já sem PIS/COFINS — conferir se há créditos anteriores a recuperar.',
+      };
+    }).sort((x, y) => (y.recuperavelReais + y.economiaSimplesAnoEstimada) - (x.recuperavelReais + x.economiaSimplesAnoEstimada) || y.valorMono - x.valorMono);
+
+    return {
+      totalClientes: clientes.length,
+      totalValorMono: r2(totalValorMono),
+      totalRecuperavelReais: r2(totalRecuperavel),
+      totalEconomiaSimplesAno: r2(clientes.reduce((s, c) => s + c.economiaSimplesAnoEstimada, 0)),
+      clientes,
     };
   }
 

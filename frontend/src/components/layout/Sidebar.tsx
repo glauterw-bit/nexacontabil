@@ -11,7 +11,7 @@ import {
   Banknote, ClipboardList, Landmark, Scale, Package, FileCode, FileText,
   UserCheck, Award, Globe, DollarSign, Megaphone, Store, Bot,
   Workflow, Boxes, FileDown, Inbox, Search, ArrowLeftRight, Hash, FolderTree,
-  ClipboardCheck,
+  ClipboardCheck, Coins,
 } from 'lucide-react';
 import { useCompany, Company } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -102,7 +102,8 @@ const MODULOS: NavGroup[] = [
   {
     label: 'Fiscal avançado',
     items: [
-      { href: '/sefaz',            icon: Landmark,    label: 'Buscar no SEFAZ' },
+      { href: '/sefaz',                  icon: Landmark, label: 'Buscar no SEFAZ' },
+      { href: '/oportunidade-monofasica', icon: Coins,   label: 'Oportunidade Monofásica' },
       { href: '/simples-nacional', icon: Award,       label: 'Simples Nacional' },
       { href: '/sped',             icon: FileCode,    label: 'SPED / EFD' },
       { href: '/fiscal',           icon: Receipt,     label: 'NF-e / NFS-e' },
