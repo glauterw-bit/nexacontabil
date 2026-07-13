@@ -725,6 +725,73 @@ export class AnaliseClienteService {
     };
   }
 
+  /** Cache do mapa de pastas (calcular é caro — 1 chamada Graph por cliente). */
+  private static _mapaPastas: any = null;
+
+  /**
+   * MAPEIA A ESTRUTURA DE PASTAS do OneDrive: para cada cliente, lista as subpastas
+   * (Fiscal, Contábil, Folha, Certificado, ...) e agrega quais são comuns na carteira.
+   * Resultado é cacheado; passe refresh=true p/ recalcular.
+   */
+  async mapearPastasOneDrive(opts?: { limitClientes?: number; timeBudgetMs?: number; refresh?: boolean; profundidade?: number }) {
+    if (AnaliseClienteService._mapaPastas && !opts?.refresh) return AnaliseClienteService._mapaPastas;
+    const conn = await this.prisma.cloudConnection.findFirst({
+      where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' },
+    });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    const inicio = Date.now();
+    const timeBudgetMs = opts?.timeBudgetMs ?? 5 * 60_000;
+    const prof = opts?.profundidade ?? 1;
+    const empresas = await this.prisma.company.findMany({
+      where: { active: true, sharepointItemId: { not: null } },
+      select: { id: true, name: true, sharepointDriveId: true, sharepointItemId: true },
+      take: opts?.limitClientes ?? 300,
+    });
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const freq = new Map<string, { rotulo: string; clientes: number }>();
+    const exemplos: any[] = [];
+    let mapeados = 0, semAcesso = 0;
+
+    const listarSub = async (driveId: string, itemId: string): Promise<string[]> => {
+      try {
+        const filhos = await this.onedrive.listAllChildren(conn.id, driveId, itemId);
+        return filhos.filter((f: any) => f.isFolder).map((f: any) => ({ name: f.name, id: f.id, driveId })) as any;
+      } catch { return []; }
+    };
+
+    for (const e of empresas) {
+      if (Date.now() - inicio > timeBudgetMs) break;
+      if (!e.sharepointDriveId || !e.sharepointItemId) continue;
+      const nivel1: any[] = await listarSub(e.sharepointDriveId, e.sharepointItemId);
+      if (!nivel1.length) { semAcesso++; continue; }
+      const estrutura: any = {};
+      for (const p of nivel1) {
+        const k = norm(p.name);
+        const cur = freq.get(k) ?? { rotulo: p.name, clientes: 0 };
+        cur.clientes++; freq.set(k, cur);
+        // 2º nível (opcional) — subpastas dentro de cada pasta principal
+        if (prof >= 2 && Date.now() - inicio < timeBudgetMs) {
+          const sub = await listarSub(p.driveId, p.id);
+          estrutura[p.name] = sub.map((s: any) => s.name);
+        } else {
+          estrutura[p.name] = null;
+        }
+      }
+      if (exemplos.length < 10) exemplos.push({ cliente: e.name, pastas: Object.keys(estrutura), subpastas: prof >= 2 ? estrutura : undefined });
+      mapeados++;
+    }
+    const ranking = [...freq.values()].sort((a, b) => b.clientes - a.clientes);
+    const resultado = {
+      clientesMapeados: mapeados, semAcesso, totalEmpresas: empresas.length,
+      profundidade: prof,
+      pastasComuns: ranking.slice(0, 50),
+      exemplos,
+      calculadoEm: new Date().toISOString(),
+    };
+    AnaliseClienteService._mapaPastas = resultado;
+    return resultado;
+  }
+
   /** Limpa as análises (documentos) e zera as flags pra re-análise limpa. */
   async resetAnalises() {
     const clientes = await this.prisma.company.findMany({ where: { sharepointItemId: { not: null } }, select: { id: true } });

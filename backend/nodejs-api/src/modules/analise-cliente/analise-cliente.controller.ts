@@ -59,6 +59,12 @@ export class AnaliseClienteController {
     return this.svc.importarCertificadosDrive(body ?? {});
   }
 
+  /** Mapeia a estrutura de pastas do OneDrive (Fiscal/Contábil/Folha/... por cliente). */
+  @Post('mapear-pastas')
+  mapearPastas(@Body() body: { limitClientes?: number; profundidade?: number; refresh?: boolean; timeBudgetMs?: number }) {
+    return this.svc.mapearPastasOneDrive(body ?? {});
+  }
+
   /** Limpa análises e zera flags (pra re-análise com parser novo). */
   @Post('reset')
   reset() {

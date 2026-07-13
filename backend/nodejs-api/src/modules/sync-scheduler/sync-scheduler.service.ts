@@ -113,6 +113,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.diagnosticarXmlSemValor(6);
   }
 
+  /** Mapa das pastas do OneDrive (cacheado) — nomes de pasta agregados por cliente. */
+  async mapearPastas() {
+    return this.analise.mapearPastasOneDrive({ limitClientes: 120, timeBudgetMs: 4 * 60_000 });
+  }
+
   /** Progresso PÚBLICO (só contadores, sem dados sensíveis) — para acompanhar a 1ª volta do Delta. */
   async progressoPublico() {
     const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);

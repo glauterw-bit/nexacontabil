@@ -49,6 +49,13 @@ class SyncSchedulerController {
   amostraXml() {
     return this.service.amostraXmlSemValor();
   }
+
+  /** Mapa PÚBLICO das pastas do OneDrive (só nomes de pasta agregados). */
+  @Public()
+  @Get('mapa-pastas')
+  mapaPastas() {
+    return this.service.mapearPastas();
+  }
 }
 
 @Module({
