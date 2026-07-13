@@ -491,6 +491,7 @@ export class SefazDistribuicaoService {
       }
       if (cStat && !['137', '138'].includes(cStat)) {
         // 137 = nenhum doc · 138 = documentos localizados · outros = erro (cert, CNPJ sem credenciamento, etc)
+        await this.prisma.company.update({ where: { id: companyId }, data: { sefazUltCStat: cStat, sefazUltMotivo: motivo?.slice(0, 200), sefazUltConsultaEm: new Date() } }).catch(() => undefined);
         throw new BadRequestException(`SEFAZ recusou (cStat ${cStat}): ${motivo}`);
       }
 
@@ -525,6 +526,9 @@ export class SefazDistribuicaoService {
       if (respUlt && respMax && BigInt(respUlt) >= BigInt(respMax)) break;
       await this.pausa(this.PAUSA_MS);
     }
+
+    // registra o último status do SEFAZ p/ este cliente (138/137=ok · outros=diagnóstico)
+    await this.prisma.company.update({ where: { id: companyId }, data: { sefazUltCStat: cStatFinal || null, sefazUltMotivo: motivo?.slice(0, 200) || null } }).catch(() => undefined);
 
     return {
       cliente: company.name, cnpj, cUF,

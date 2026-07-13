@@ -28,6 +28,16 @@ export default function VerificacaoFinalPage() {
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
+  async function copiarTextoProcuracao() {
+    try {
+      const r = await fetch(`${API}/api/v1/verificacao-final/texto-procuracao`, { headers: authHeaders() });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.message ?? 'Falha');
+      await navigator.clipboard.writeText(j.texto);
+      toast.push(`Texto copiado! Procurador: ${j.procuradorCnpj}. Cole no WhatsApp/e-mail do cliente.`, { variant: 'success' });
+    } catch (e: any) { toast.push(e.message ?? 'Erro ao copiar', { variant: 'error' }); }
+  }
+
   async function rodarAnalise() {
     setAnalisando(true);
     toast.push('Análise garantidora iniciada (NCM → revalidação → auditoria). Pode levar alguns minutos…');
@@ -58,6 +68,9 @@ export default function VerificacaoFinalPage() {
             <button className="btn-ghost" onClick={carregar} disabled={carregando} style={{ display: 'inline-flex', gap: 6, fontSize: 13 }}>
               <RefreshCw size={14} className={carregando ? 'animate-spin' : undefined} /> Atualizar
             </button>
+            <button className="btn-ghost" onClick={copiarTextoProcuracao} style={{ display: 'inline-flex', gap: 6, fontSize: 13 }}>
+              <FileText size={14} /> Texto p/ pedir procuração
+            </button>
             <button className="btn-primary" onClick={rodarAnalise} disabled={analisando} style={{ display: 'inline-flex', gap: 6, fontSize: 13 }}>
               {analisando ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Rodar análise garantidora
             </button>
@@ -74,6 +87,8 @@ export default function VerificacaoFinalPage() {
             <Kpi label="Completos" value={resumo.completos} cor={COLORS.ok} onClick={() => setFiltro('completos')} active={filtro === 'completos'} />
             <Kpi label="Com pendência" value={resumo.comPendencia} cor={resumo.comPendencia ? COLORS.atencao : COLORS.ok} onClick={() => setFiltro('pendencia')} active={filtro === 'pendencia'} />
             <Kpi label="Docs no acervo" value={resumo.docs.total.toLocaleString('pt-BR')} sub={`${resumo.docs.doSefaz.toLocaleString('pt-BR')} do SEFAZ · ${resumo.docs.doAno.toLocaleString('pt-BR')} de ${resumo.ano}`} />
+            {(resumo.faltaProcuracao ?? 0) > 0 && <Kpi label="Falta procuração e-CAC" value={resumo.faltaProcuracao} cor={COLORS.atencao} sub="autorizar o escritório na Receita" />}
+            {(resumo.sefazOk ?? 0) > 0 && <Kpi label="SEFAZ autorizado" value={resumo.sefazOk} cor={COLORS.ok} sub="puxando notas da Receita" />}
             <Kpi label="Obrigações entregues" value={resumo.obrigacoes.entregues.toLocaleString('pt-BR')} cor={COLORS.ok} sub={`de ${resumo.obrigacoes.total.toLocaleString('pt-BR')} em ${resumo.ano}`} />
             <Kpi label="Faltantes" value={resumo.obrigacoes.faltantes.toLocaleString('pt-BR')} cor={resumo.obrigacoes.faltantes ? COLORS.atencao : COLORS.ok} />
             <Kpi label="Vencidas" value={resumo.obrigacoes.vencidas.toLocaleString('pt-BR')} cor={resumo.obrigacoes.vencidas ? COLORS.erro : COLORS.ok} />

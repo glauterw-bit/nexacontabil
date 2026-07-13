@@ -37,6 +37,7 @@ export class VerificacaoFinalService {
         id: true, name: true, cnpj: true, uf: true,
         sharepointItemId: true, sharepointDeltaLink: true,
         sefazUltConsultaEm: true, sefazUltNSU: true, sefazMaxNSU: true,
+        sefazUltCStat: true, sefazUltMotivo: true,
       },
       orderBy: { name: 'asc' },
     });
@@ -76,12 +77,16 @@ export class VerificacaoFinalService {
       const totalObr = Object.values(obr).reduce((s, n) => s + n, 0);
 
       const cnpjNum = (c.cnpj ?? '').replace(/\D/g, '');
+      // cStat 593 (ou 594/596) = escritório sem procuração e-CAC daquele cliente
+      const faltaProcuracao = ['593', '594', '596'].includes((c.sefazUltCStat ?? ''));
+      const sefazOk = ['137', '138'].includes((c.sefazUltCStat ?? ''));
       const pend: string[] = [];
       if (!c.sharepointItemId) pend.push('sem pasta no Drive');
       else if (!c.sharepointDeltaLink) pend.push('Delta 1ª volta pendente');
       if (!c.uf) pend.push('sem UF');
       if (!cnpjNum || cnpjNum.startsWith('7')) pend.push('CNPJ provisório');
       else if (c.uf && !c.sefazUltConsultaEm) pend.push('SEFAZ não consultado');
+      if (faltaProcuracao) pend.push('falta procuração e-CAC (SEFAZ)');
       if (total === 0) pend.push('nenhum documento carregado');
       if (vencidas > 0) pend.push(`${vencidas} obrigação(ões) vencida(s)`);
 
@@ -93,6 +98,7 @@ export class VerificacaoFinalService {
           deltaLido: !!c.sharepointDeltaLink,
           sefazConsultado: !!c.sefazUltConsultaEm,
           sefazFilaDrenada: !!(c.sefazUltNSU && c.sefazMaxNSU && BigInt(c.sefazUltNSU) >= BigInt(c.sefazMaxNSU)),
+          sefazOk, faltaProcuracao,
         },
         obrigacoes: { total: totalObr, entregues, faltantes, vencidas },
         pendencias: pend,
@@ -108,6 +114,8 @@ export class VerificacaoFinalService {
       semDocumentos: linhas.filter((l) => l.docs.total === 0).length,
       semUF: linhas.filter((l) => !l.uf).length,
       sefazNaoConsultado: linhas.filter((l) => l.uf && !l.fontes.sefazConsultado).length,
+      sefazOk: linhas.filter((l) => l.fontes.sefazOk).length,
+      faltaProcuracao: linhas.filter((l) => l.fontes.faltaProcuracao).length,
       deltaPendente: linhas.filter((l) => l.fontes.pastaDrive && !l.fontes.deltaLido).length,
       obrigacoes: {
         total: linhas.reduce((s, l) => s + l.obrigacoes.total, 0),
@@ -185,6 +193,23 @@ export class VerificacaoFinalService {
     };
     this.logger.log(`cadastro oficial: ${cnpjsCorrigidos} CNPJs, ${regimes} regimes, ${inativados} inativados, ${semMatch} sem match, ${foraDaPlanilha.length} fora da planilha`);
     return r;
+  }
+
+  /** Texto pronto para pedir a procuração e-CAC ao cliente (WhatsApp/e-mail). */
+  async textoProcuracao() {
+    const esc = await this.prisma.certificadoDigital.findFirst({ where: { escritorio: true, active: true }, select: { cnpjCpf: true, nome: true } });
+    const cnpj = (esc?.cnpjCpf ?? '').replace(/\D/g, '');
+    const cnpjFmt = cnpj.length === 14 ? `${cnpj.slice(0, 2)}.${cnpj.slice(2, 5)}.${cnpj.slice(5, 8)}/${cnpj.slice(8, 12)}-${cnpj.slice(12)}` : (esc?.cnpjCpf ?? '—');
+    const texto =
+      `Olá! Para automatizarmos a captura das suas notas fiscais direto na Receita ` +
+      `(sem você precisar enviar nada), pedimos uma *procuração eletrônica* rápida no e-CAC:\n\n` +
+      `1) Acesse *gov.br/receitafederal* → e-CAC (login gov.br)\n` +
+      `2) Menu *Senhas e Procurações* → *Procuração eletrônica* → *Cadastrar procuração*\n` +
+      `3) CNPJ do procurador: *${cnpjFmt}* (nosso escritório)\n` +
+      `4) Marque o serviço *"NFe Distribuição de DF-e (NFe-DistDFe)"*\n` +
+      `5) Defina a validade (sugerimos 5 anos) e confirme\n\n` +
+      `Pronto! A partir daí cuidamos de tudo automaticamente. Qualquer dúvida, estamos à disposição.`;
+    return { procuradorCnpj: cnpjFmt, escritorio: esc?.nome ?? null, texto };
   }
 
   /** Análise garantidora: aprende NCM dos XMLs → revalida o acervo → auditoria. */

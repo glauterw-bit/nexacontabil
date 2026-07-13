@@ -79,6 +79,8 @@ model Company {
   sefazUltNSU          String?   // último NSU já lido (retoma de onde parou)
   sefazMaxNSU          String?   // maior NSU informado pelo SEFAZ na última consulta
   sefazUltConsultaEm   DateTime? // quando consultou o SEFAZ por último (respeita o limite de consumo)
+  sefazUltCStat        String?   // último cStat do SEFAZ (138/137=ok · 593=falta procuração e-CAC)
+  sefazUltMotivo       String?   // xMotivo da última consulta (diagnóstico)
 
   honorarios           Honorario[]
   crmClientes          CrmCliente[]

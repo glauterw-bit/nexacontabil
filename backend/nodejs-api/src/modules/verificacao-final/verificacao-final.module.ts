@@ -35,6 +35,12 @@ class VerificacaoFinalController {
   aplicarCadastro() {
     return this.service.aplicarCadastroOficial();
   }
+
+  /** Texto pronto (WhatsApp/e-mail) pedindo a procuração e-CAC ao cliente. */
+  @Get('texto-procuracao')
+  textoProcuracao() {
+    return this.service.textoProcuracao();
+  }
 }
 
 @Module({
