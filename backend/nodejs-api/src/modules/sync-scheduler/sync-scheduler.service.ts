@@ -100,13 +100,17 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       await passo('recibosRecheck', () => this.fluxo.reverificarRecibosPendentes(competencia, 6, 60));
       // 5. higiene do calendário fiscal
       await passo('obrigacoesVencidas', () => this.fiscalCalendar.markOverdue());
-      // 6. no início do mês (dia 01/02): gera as solicitações de documentos aos clientes.
-      //    Idempotente (unique cliente+competência) — rodar em vários ciclos não duplica.
+      // 6. início do mês (dia 01/02): solicitações de documentos + garante o calendário
+      //    fiscal do ano (só p/ quem não tem — idempotente). Automatiza o "Configurar tudo".
       if (startedAt.getDate() <= 2) {
         await passo('solicitacoesMensais', () => this.solicitacoes.gerarSolicitacoesMensais());
+        await passo('calendarioAno', () => this.fiscalCalendar.garantirAno(startedAt.getFullYear()));
       }
-      // 7. auditoria semanal do Banco de NCM (segunda-feira) — completude + pendências.
+      // 7. semanal (segunda): aprende o Banco de NCM dos XMLs, revalida o acervo com a
+      //    base legal e audita — mantém as inconsistências corretas sem clique manual.
       if (startedAt.getDay() === 1) {
+        await passo('aprenderNcm', () => this.ncm.aprenderDeDocumentos());
+        await passo('revalidarAcervo', () => this.analise.revalidarDocumentos());
         await passo('auditoriaNcm', () => this.ncm.auditoria());
       }
     } finally {

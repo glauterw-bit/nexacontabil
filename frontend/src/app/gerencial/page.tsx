@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   LayoutDashboard, AlertTriangle, Lightbulb, ChevronRight, Users,
-  CheckCircle2, Mail, Bell, Workflow, Inbox, Briefcase, CalendarClock, FileWarning,
+  CheckCircle2, Mail, Bell, Workflow, Inbox, Briefcase, CalendarClock, FileWarning, TrendingUp,
 } from 'lucide-react';
 import { PageHeader, Kpi, Card, SectionTitle, COLORS, tint, Spinner, EmptyState, Dot, THead } from '@/components/ui/kit';
 import { useCompetencia, fmtCompetencia } from '@/contexts/CompetenciaContext';
@@ -25,7 +25,12 @@ export default function GerencialPage() {
   const [loading, setLoading] = useState(true);
   const [ca, setCa] = useState<any>(null);
   const [em, setEm] = useState<any>(null);
+  const [pan, setPan] = useState<any>(null);
   const { competencia } = useCompetencia();
+
+  const carregarPanorama = useCallback(() => {
+    fetch(`${API}/api/v1/paineis/panorama`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : null).then((x) => x && setPan(x)).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,7 +48,9 @@ export default function GerencialPage() {
       setEm(re.ok ? await re.json() : null);
     } catch {} finally { setLoading(false); }
   }, [competencia]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); carregarPanorama(); }, [load, carregarPanorama]);
+  // painel vivo: o pulso e os insights atualizam sozinhos a cada 40s
+  useEffect(() => { const t = setInterval(carregarPanorama, 40000); return () => clearInterval(t); }, [carregarPanorama]);
 
   if (loading) return <Spinner />;
   if (!torre && !d) return <EmptyState icon={<Inbox size={32} />} title="Sem dados do escritório" sub="Verifique a conexão com o backend." />;
@@ -57,6 +64,9 @@ export default function GerencialPage() {
     <div className="page">
       <PageHeader icon={<LayoutDashboard size={22} color={COLORS.acao} />} title="Painel Gerencial"
         subtitle={`Pulso do escritório em ${fmtCompetencia(torre?.competencia ?? '')} — produção, SLA, gargalos e equipe.`} />
+
+      {/* ── PANORAMA AO VIVO: pulso + feed de insights (atualiza sozinho) ── */}
+      {pan && <PanoramaVivo pan={pan} />}
 
       {/* ── PULSO OPERACIONAL (torre de controle) ── */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -249,6 +259,60 @@ export default function GerencialPage() {
 }
 
 /** Carteira dos analistas — clareza sobre carga, obrigações que faltam e performance. */
+/** Panorama ao vivo: pulso da operação + feed de insights acionáveis (auto-refresh). */
+function PanoramaVivo({ pan }: { pan: any }) {
+  const p = pan.pulso ?? {}; const k = pan.kpis ?? {};
+  const CORI: Record<string, { bg: string; fg: string; ic: any }> = {
+    critico:      { bg: tint(COLORS.dotErro, 10),    fg: COLORS.erro,    ic: AlertTriangle },
+    alerta:       { bg: tint(COLORS.dotAtencao, 10), fg: COLORS.atencao, ic: Bell },
+    oportunidade: { bg: tint(COLORS.dotOk, 10),      fg: COLORS.ok,      ic: TrendingUp },
+    ok:           { bg: tint(COLORS.dotOk, 8),       fg: COLORS.ok,      ic: CheckCircle2 },
+  };
+  return (
+    <div style={{ marginBottom: 18 }}>
+      {/* pulso */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '10px 14px', background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 12, marginBottom: 10 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: COLORS.strong, fontWeight: 600 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 99, background: COLORS.ok, boxShadow: `0 0 0 0 ${COLORS.ok}`, animation: 'pulse 2s infinite' }} /> Ao vivo
+        </span>
+        <PulsoItem n={(p.docsHoje ?? 0)} label="docs capturados hoje" cor={COLORS.acao} />
+        <PulsoItem n={(p.docs2026 ?? 0)} label="documentos de 2026" cor={p.docs2026 > 0 ? COLORS.ok : COLORS.erro} />
+        <PulsoItem n={`${k.pctEntrega ?? 0}%`} label="obrigações entregues" cor={(k.pctEntrega ?? 0) >= 80 ? COLORS.ok : COLORS.atencao} />
+        <span style={{ marginLeft: 'auto', fontSize: 11.5, color: COLORS.faint }}>
+          drive lido {p.driveLidoHaMin == null ? '—' : p.driveLidoHaMin < 1 ? 'agora' : `há ${p.driveLidoHaMin} min`}
+        </span>
+        <style>{`@keyframes pulse{0%{box-shadow:0 0 0 0 ${tint(COLORS.dotOk, 60)}}70%{box-shadow:0 0 0 6px transparent}100%{box-shadow:0 0 0 0 transparent}}`}</style>
+      </div>
+
+      {/* feed de insights */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+        {(pan.insights ?? []).map((it: any, i: number) => {
+          const c = CORI[it.nivel] ?? CORI.alerta; const Ic = c.ic;
+          return (
+            <Link key={i} href={it.rota} style={{ textDecoration: 'none' }}>
+              <div style={{ display: 'flex', gap: 10, padding: '10px 12px', background: c.bg, border: `1px solid ${tint(c.fg, 22)}`, borderRadius: 10, alignItems: 'flex-start', height: '100%' }}>
+                <Ic size={16} color={c.fg} style={{ flexShrink: 0, marginTop: 1 }} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.strong }}>{it.titulo}</div>
+                  <div style={{ fontSize: 11.5, color: COLORS.muted, lineHeight: 1.35 }}>{it.texto}</div>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+function PulsoItem({ n, label, cor }: { n: any; label: string; cor: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 5 }}>
+      <b className="num" style={{ fontSize: 17, fontWeight: 800, color: cor }}>{typeof n === 'number' ? n.toLocaleString('pt-BR') : n}</b>
+      <span style={{ fontSize: 11.5, color: COLORS.faint }}>{label}</span>
+    </span>
+  );
+}
+
 /** Entregas por mês: documentos capturados + obrigações entregues, com destaque de 2026. */
 function EntregasMensais({ em }: { em: any }) {
   const linha = em.linha ?? [];

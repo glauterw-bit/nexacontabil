@@ -256,6 +256,25 @@ export class FiscalCalendarService {
    * que ainda NÃO foram pagos/entregues (preserva histórico de comprovantes) e cria
    * de novo. Ideal para aplicar as regras novas em massa.
    */
+  /**
+   * GARANTE o calendário do ano — gera SÓ para os clientes que ainda não têm nenhuma
+   * obrigação do ano. Idempotente e barato: pode rodar no agendador sem apagar nada.
+   */
+  async garantirAno(ano: number) {
+    const companies = await this.prisma.company.findMany({ where: { active: true }, select: { id: true } });
+    const comItens = new Set(
+      (await this.prisma.fiscalCalendarItem.findMany({
+        where: { competencia: { startsWith: String(ano) } }, select: { companyId: true }, distinct: ['companyId'],
+      })).map((x) => x.companyId),
+    );
+    let empresas = 0, gerados = 0;
+    for (const c of companies) {
+      if (comItens.has(c.id)) continue;
+      try { const r = await this.gerarAnual(c.id, ano); gerados += r.generated; empresas++; } catch { /* regime inválido — pula */ }
+    }
+    return { empresas, gerados, ano };
+  }
+
   async regenerarTodos(ano: number) {
     const companies = await this.prisma.company.findMany({
       where: { active: true }, select: { id: true },

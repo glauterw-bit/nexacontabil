@@ -67,6 +67,11 @@ export class PaineisController {
     return this.service.entregasMensais();
   }
 
+  @Get('panorama')
+  panorama() {
+    return this.service.panorama();
+  }
+
   @Post('limpar-carteira')
   limparCarteira(@Body() body: { dryRun?: boolean }) {
     return this.service.limparCarteira(body?.dryRun ?? false);

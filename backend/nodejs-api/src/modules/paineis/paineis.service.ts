@@ -914,6 +914,74 @@ export class PaineisService {
   }
 
   /**
+   * PANORAMA AO VIVO — o pulso da operação para o gestor, num payload só e barato:
+   * o que está entrando agora, o que vence, o que precisa de ação — com um FEED de
+   * insights priorizados e acionáveis (cada um com rota). Feito para auto-refresh.
+   */
+  async panorama() {
+    const now = new Date();
+    const hoje0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
+    const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const em7 = new Date(now.getTime() + 7 * 86400000);
+    const nowComp = now.toISOString().slice(0, 7);
+
+    const [companies, docsHoje, docs2026, ult, obrigMes, docsMes] = await Promise.all([
+      this.prisma.company.findMany({ where: { active: true }, select: { id: true, responsavel: true, cnpj: true } }),
+      this.prisma.document.count({ where: { createdAt: { gte: hoje0 } } }),
+      this.prisma.document.count({ where: { issueDate: { gte: new Date(2026, 0, 1) } } }),
+      this.prisma.company.aggregate({ where: { active: true }, _max: { sharepointAnalisadoEm: true } }),
+      this.prisma.fiscalCalendarItem.findMany({ where: { dataVencimento: { gte: inicioMes, lte: fimMes } }, select: { status: true, dataVencimento: true } }),
+      this.prisma.document.findMany({ where: { issueDate: { gte: inicioMes } }, select: { companyId: true } }),
+    ]);
+
+    const totalClientes = companies.length;
+    const semResponsavel = companies.filter((c) => !c.responsavel).length;
+    const cnpjProvisorio = companies.filter((c) => (c.cnpj ?? '').replace(/\D/g, '').startsWith('7')).length;
+    const comDocMes = new Set(docsMes.map((d) => d.companyId));
+    const semDocMes = companies.filter((c) => !comDocMes.has(c.id)).length;
+
+    const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    let obrigTotal = 0, obrigVencidas = 0, obrigVencem7 = 0, obrigEntregues = 0;
+    for (const o of obrigMes) {
+      obrigTotal++;
+      const v = new Date(o.dataVencimento);
+      if (ENTREGUE.has(o.status)) { obrigEntregues++; continue; }
+      if (o.status === 'vencida' || v < now) obrigVencidas++;
+      else if (v <= em7) obrigVencem7++;
+    }
+    const pctEntrega = obrigTotal ? Math.round((obrigEntregues / obrigTotal) * 100) : 0;
+
+    const driveLidoEm = ult._max.sharepointAnalisadoEm ?? null;
+    const minAtras = driveLidoEm ? Math.round((now.getTime() - new Date(driveLidoEm).getTime()) / 60000) : null;
+
+    // ── FEED DE INSIGHTS (priorizado, acionável) ──
+    const insights: { nivel: 'critico' | 'alerta' | 'oportunidade' | 'ok'; titulo: string; texto: string; rota: string }[] = [];
+    if (obrigVencidas > 0) insights.push({ nivel: 'critico', titulo: `${obrigVencidas} obrigação(ões) vencida(s)`, texto: 'Prazos do mês já vencidos — priorizar a entrega hoje.', rota: '/prazos' });
+    if (obrigVencem7 > 0) insights.push({ nivel: 'alerta', titulo: `${obrigVencem7} vencem em 7 dias`, texto: 'Obrigações da competência com prazo próximo.', rota: '/prazos' });
+    if (obrigTotal === 0) insights.push({ nivel: 'alerta', titulo: 'Calendário fiscal vazio', texto: `Nenhuma obrigação gerada para ${nowComp}. Configure em Saúde da Implantação.`, rota: '/implantacao' });
+    if (semDocMes > 0) insights.push({ nivel: 'alerta', titulo: `${semDocMes} clientes sem documentos no mês`, texto: 'Não enviaram/capturamos notas deste mês — cobrar ou puxar do SEFAZ.', rota: '/solicitacoes' });
+    if (semResponsavel > 0) insights.push({ nivel: 'alerta', titulo: `${semResponsavel} clientes sem responsável`, texto: 'Atribua para destravar o Meu Dia e a carteira dos analistas.', rota: '/implantacao' });
+    if (cnpjProvisorio > 0) insights.push({ nivel: 'alerta', titulo: `${cnpjProvisorio} CNPJs provisórios`, texto: 'Sem CNPJ real não há SEFAZ, situação fiscal nem NFS-e nacional.', rota: '/carteira' });
+    if (docs2026 > 0) insights.push({ nivel: 'oportunidade', titulo: `${docs2026.toLocaleString('pt-BR')} documentos de 2026 no acervo`, texto: 'Rode a base legal para converter em análise (monofásico, inconsistências).', rota: '/oportunidade-monofasica' });
+    if (docs2026 === 0) insights.push({ nivel: 'critico', titulo: 'Nenhum documento de 2026', texto: 'Sincronize o drive (Delta) ou puxe do SEFAZ/SIEG.', rota: '/drive-conectado' });
+    if (!insights.some((i) => i.nivel === 'critico')) insights.push({ nivel: 'ok', titulo: 'Operação sob controle', texto: 'Sem alertas críticos no momento.', rota: '/operacao' });
+
+    return {
+      atualizadoEm: now.toISOString(),
+      pulso: {
+        docsHoje, docs2026, driveLidoEm, driveLidoHaMin: minAtras,
+        totalClientes,
+      },
+      kpis: {
+        obrigVencidas, obrigVencem7, obrigEntregues, obrigTotal, pctEntrega,
+        semDocMes, semResponsavel, cnpjProvisorio,
+      },
+      insights: insights.slice(0, 8),
+    };
+  }
+
+  /**
    * ENTREGAS POR MÊS — documentos capturados por mês de emissão + obrigações entregues
    * por competência. Responde "quantos docs de 2026?" e "entregas por mês" numa tela.
    */
