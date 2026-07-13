@@ -356,15 +356,24 @@ export class SefazDistribuicaoService {
       return true;
     });
 
+    // clientes que já têm CERTIFICADO PRÓPRIO ativo — pra esses usamos o cert deles
+    // (dispensa procuração e-CAC); os demais usam o certificado do escritório.
+    const comCertProprio = new Set(
+      (await this.prisma.certificadoDigital.findMany({ where: { active: true, escritorio: false }, select: { companyId: true } })).map((c) => c.companyId),
+    );
+
     const limite = opts?.maxClientes ?? elegiveis.length;
-    let processados = 0, novosTotal = 0, docsTotal = 0, duplicadosTotal = 0, erros = 0, bloqueados656 = 0;
+    let processados = 0, novosTotal = 0, docsTotal = 0, duplicadosTotal = 0, erros = 0, bloqueados656 = 0, viaCertProprio = 0;
     const detalhe: any[] = [];
 
     for (const c of elegiveis) {
       if (processados >= limite) break;
       if (Date.now() - inicio > timeBudgetMs) break;
       try {
-        const r = await this.buscarCliente(c.id, undefined, maxIteracoes, agentEsc);
+        // cert próprio do cliente → passa undefined (buscarCliente resolve o dele); senão o do escritório
+        const proprio = comCertProprio.has(c.id);
+        if (proprio) viaCertProprio++;
+        const r = await this.buscarCliente(c.id, undefined, maxIteracoes, proprio ? undefined : agentEsc);
         processados++;
         novosTotal += r.novos ?? 0;
         docsTotal += r.docsRecebidos ?? 0;
@@ -380,7 +389,7 @@ export class SefazDistribuicaoService {
     const res = {
       temCertificadoEscritorio: esc.tem,
       elegiveis: elegiveis.length,
-      processados,
+      processados, viaCertProprio,
       restantes: Math.max(0, elegiveis.length - processados),
       novosTotal, docsTotal, duplicadosTotal, bloqueados656, erros,
       duracaoS: Math.round((Date.now() - inicio) / 1000),
