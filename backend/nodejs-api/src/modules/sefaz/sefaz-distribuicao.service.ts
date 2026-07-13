@@ -25,6 +25,8 @@ export class SefazDistribuicaoService {
   private ultimaVarredura: any = null;
   private ultimoPreencherUF: any = null;
   private ultimoInferirCnpj: any = null;
+  /** Clientes cuja inferência fraca já foi REJEITADA na Receita — não reconsultar todo ciclo. */
+  private inferenciaRejeitada = new Set<string>();
   // Ambiente Nacional (hospedado no SVRS) — atende a distribuição de NF-e de todas as UFs.
   private readonly url = 'https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx';
   private readonly tpAmb = process.env.SEFAZ_AMBIENTE === '2' ? 2 : 1; // 1=produção
@@ -118,6 +120,11 @@ export class SefazDistribuicaoService {
   /** Situação do certificado do escritório. */
   async statusEscritorio() {
     return this.certificados.temEscritorio();
+  }
+
+  /** O certificado do escritório está USÁVEL (existe E a senha abre o PFX)? */
+  async certificadoEscritorioUsavel(): Promise<boolean> {
+    try { await this.certificados.getHttpsAgentEscritorio(); return true; } catch { return false; }
   }
 
   /** Valida dígitos verificadores de CNPJ (14 dígitos). */
@@ -236,10 +243,11 @@ export class SefazDistribuicaoService {
       // sinal FRACO (1–2 evidências, mas unânimes): confirma na BrasilAPI comparando a
       // razão social/fantasia com o nome do cliente antes de aceitar.
       if (melhor.top && melhor.topN >= 1 && melhor.topN < minDocs && melhor.share >= 0.99 &&
-          !emUso.has(melhor.top) && apiChecks < MAX_API_CHECKS) {
+          !emUso.has(melhor.top) && !this.inferenciaRejeitada.has(c.id) && apiChecks < MAX_API_CHECKS) {
         apiChecks++;
         const bate = await this.nomeConfereNaReceita(melhor.top, c.name).catch(() => false);
         await this.pausa(600);
+        if (!bate) this.inferenciaRejeitada.add(c.id); // não reconsultar todo ciclo
         if (bate) {
           try {
             await this.prisma.company.update({ where: { id: c.id }, data: { cnpj: melhor.top } });

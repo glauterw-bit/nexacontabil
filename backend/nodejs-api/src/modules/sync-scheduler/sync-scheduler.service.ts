@@ -105,15 +105,27 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     this.timer.unref?.();
   }
 
-  /** Ainda há trabalho de 1ª volta? (UF faltando, cliente elegível nunca consultado, Delta incompleto) */
+  /**
+   * Ainda há trabalho de 1ª volta que o sistema CONSEGUE fazer sozinho?
+   * Pendências que dependem de humano (CNPJ não inferível, certificado não reposto,
+   * pasta inexistente) NÃO contam — senão o modo acelerado nunca desliga e a
+   * auditoria diária nunca roda.
+   */
   private async pendenteBackfill(): Promise<boolean> {
-    const [semUF, naoConsultados, comPasta, comDelta] = await Promise.all([
-      this.prisma.company.count({ where: { active: true, uf: null } }),
+    const [semUFRows, naoConsultados, comPasta, comDelta] = await Promise.all([
+      this.prisma.company.findMany({ where: { active: true, uf: null }, select: { cnpj: true } }),
       this.prisma.company.count({ where: { active: true, uf: { not: null }, sefazUltConsultaEm: null } }),
       this.prisma.company.count({ where: { active: true, sharepointItemId: { not: null } } }),
       this.prisma.company.count({ where: { active: true, sharepointItemId: { not: null }, sharepointDeltaLink: { not: null } } }),
     ]);
-    return semUF > 0 || naoConsultados > 0 || comDelta < comPasta;
+    // UF só é acionável se o CNPJ for real (dá pra consultar a BrasilAPI)
+    const semUFAcionavel = semUFRows.filter((c) => {
+      const n = (c.cnpj ?? '').replace(/\D/g, '');
+      return n.length === 14 && !n.startsWith('7');
+    }).length;
+    // SEFAZ só é acionável com certificado usável (existe e a senha abre)
+    const certUsavel = naoConsultados > 0 ? await this.sefaz.certificadoEscritorioUsavel() : false;
+    return semUFAcionavel > 0 || (naoConsultados > 0 && certUsavel) || comDelta < comPasta;
   }
 
   status() {
