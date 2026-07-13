@@ -530,16 +530,20 @@ Responda sempre em português brasileiro, de forma clara e profissional. Para c�
     opts?: { system?: string; maxTokens?: number },
   ): Promise<string> {
     if (!this.hasKey) return 'Configure ANTHROPIC_API_KEY para ativar o consultor de IA.';
-    const smart = process.env.ANTHROPIC_MODEL_CONSULTOR || 'claude-sonnet-4-6';
+    // Econômico por padrão (Haiku). A inteligência vem principalmente do CONTEXTO RICO
+    // (perfil do cliente + números reais) que o Consultor injeta — funciona bem no Haiku.
+    // Para máximo raciocínio, basta ANTHROPIC_MODEL_CONSULTOR=claude-sonnet-4-6 (ou opus-4-8).
+    const smart = process.env.ANTHROPIC_MODEL_CONSULTOR || this.model; // this.model = haiku
     const system = opts?.system ?? 'Você é um consultor fiscal/contábil sênior brasileiro.';
     const messages: Anthropic.MessageParam[] = [
       ...historico.map((h) => ({ role: h.role, content: h.content })),
       { role: 'user', content: mensagem },
     ];
+    // thinking adaptativo só nos modelos 4.6+ (no Haiku 4.5 encarece e nem é suportado)
+    const suportaThinking = /(sonnet-4-6|opus-4-[6-9]|fable-5|mythos-5)/.test(smart);
     try {
-      // thinking adaptativo (Claude 4.6+) — melhora análise fiscal; passado como any p/
-      // tolerar versões do SDK sem o tipo. Extrai o bloco de texto (ignora o thinking).
-      const params: any = { model: smart, max_tokens: opts?.maxTokens ?? 3072, system, messages, thinking: { type: 'adaptive' } };
+      const params: any = { model: smart, max_tokens: opts?.maxTokens ?? 2048, system, messages };
+      if (suportaThinking) { params.thinking = { type: 'adaptive' }; params.max_tokens = opts?.maxTokens ?? 3072; }
       const msg: any = await this.client.messages.create(params);
       const txt = (msg.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
       if (txt) return txt;
@@ -547,7 +551,7 @@ Responda sempre em português brasileiro, de forma clara e profissional. Para c�
     } catch (err: any) {
       this.logger.warn(`chatInteligente (${smart}) falhou: ${err?.message}; usando modelo padrão`);
       try {
-        const msg = await this.client.messages.create({ model: this.model, max_tokens: opts?.maxTokens ?? 2048, system, messages });
+        const msg = await this.client.messages.create({ model: this.model, max_tokens: 2048, system, messages });
         return msg.content[0]?.type === 'text' ? (msg.content[0] as any).text : 'Sem resposta.';
       } catch (e: any) {
         return `Não consegui consultar a IA agora (${e?.message}).`;
