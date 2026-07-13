@@ -519,6 +519,42 @@ Responda sempre em português brasileiro, de forma clara e profissional. Para c�
     }
   }
 
+  /**
+   * CHAT INTELIGENTE — modelo forte (Sonnet 4.6 por padrão) + raciocínio adaptativo, para
+   * o Consultor de Documentos. Degrada com segurança para o modelo padrão se algo falhar.
+   * Modelo sobrescrevível por env ANTHROPIC_MODEL_CONSULTOR (ex.: claude-opus-4-8).
+   */
+  async chatInteligente(
+    mensagem: string,
+    historico: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+    opts?: { system?: string; maxTokens?: number },
+  ): Promise<string> {
+    if (!this.hasKey) return 'Configure ANTHROPIC_API_KEY para ativar o consultor de IA.';
+    const smart = process.env.ANTHROPIC_MODEL_CONSULTOR || 'claude-sonnet-4-6';
+    const system = opts?.system ?? 'Você é um consultor fiscal/contábil sênior brasileiro.';
+    const messages: Anthropic.MessageParam[] = [
+      ...historico.map((h) => ({ role: h.role, content: h.content })),
+      { role: 'user', content: mensagem },
+    ];
+    try {
+      // thinking adaptativo (Claude 4.6+) — melhora análise fiscal; passado como any p/
+      // tolerar versões do SDK sem o tipo. Extrai o bloco de texto (ignora o thinking).
+      const params: any = { model: smart, max_tokens: opts?.maxTokens ?? 3072, system, messages, thinking: { type: 'adaptive' } };
+      const msg: any = await this.client.messages.create(params);
+      const txt = (msg.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim();
+      if (txt) return txt;
+      throw new Error('resposta sem texto');
+    } catch (err: any) {
+      this.logger.warn(`chatInteligente (${smart}) falhou: ${err?.message}; usando modelo padrão`);
+      try {
+        const msg = await this.client.messages.create({ model: this.model, max_tokens: opts?.maxTokens ?? 2048, system, messages });
+        return msg.content[0]?.type === 'text' ? (msg.content[0] as any).text : 'Sem resposta.';
+      } catch (e: any) {
+        return `Não consegui consultar a IA agora (${e?.message}).`;
+      }
+    }
+  }
+
   // ─── Stubs (fallback sem API Key) ─────────────────────────────────────────
 
   private _stubDocumento(): DocumentoExtraido {

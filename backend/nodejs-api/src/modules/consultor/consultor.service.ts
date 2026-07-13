@@ -57,37 +57,78 @@ export class ConsultorService {
       clienteNaoEncontrado: !!achado?.clienteNaoEncontrado,
     };
 
-    // 3) ANÁLISE — a IA redige um parecer curto e prático sobre o que foi encontrado
+    // 3) CONTEXTO RICO da empresa (regime, faturamento, entradas, obrigações) — deixa a
+    //    IA raciocinar com dados reais, não só a amostra de documentos.
+    const empresaCtx = await this._contextoEmpresa(resumo.clientes ?? []);
+
+    const systemPrompt =
+      `Você é um CONSULTOR FISCAL e CONTÁBIL SÊNIOR brasileiro, especialista em Simples Nacional, ` +
+      `Lucro Presumido/Real, NF-e, NFS-e, ISS, ICMS, PIS/COFINS (inclusive monofásico), SPED e obrigações ` +
+      `acessórias. Fala com um gestor de contabilidade. Regras: use APENAS os dados reais fornecidos (nunca ` +
+      `invente números, CNPJ, datas ou valores); seja objetivo e acionável; responda em bullets curtos; sempre ` +
+      `cite valores/percentuais quando existirem e termine com o PRÓXIMO PASSO. Marque risco fiscal com 🚨 e ` +
+      `situação regular com ✅. Se faltar dado para concluir, diga o que precisa em vez de supor.`;
+
+    // 3a) SEM documentos fiscais: ainda assim responde de forma inteligente (pergunta
+    //     geral de tributação, ou cliente encontrado mas sem notas no período).
     if (!docs.length) {
-      const nada = resumo.clienteNaoEncontrado
-        ? `Não encontrei um cliente com esse nome. Confira a grafia ou tente o código/CNPJ.`
-        : arquivosApoio > 0
-          ? `Encontrei ${arquivosApoio} arquivo(s), mas são de apoio (PDF, recibo, planilha) — nenhuma nota fiscal com dados para analisar. Tente pedir "notas fiscais de <cliente>".`
-          : `Não encontrei documentos para "${q}". Tente por cliente, tipo (nota, boleto), mês ou valor.`;
-      return { resposta: nada, documentos: [], resumo: { ...resumo, arquivosApoio } };
+      if (resumo.clienteNaoEncontrado) {
+        return { resposta: `Não encontrei um cliente com esse nome. Confira a grafia, ou tente pelo código/CNPJ.`, documentos: [], resumo: { ...resumo, arquivosApoio } };
+      }
+      const ctx = empresaCtx ? `\n\nDADOS DO CLIENTE:\n${empresaCtx}` : '';
+      const obs = arquivosApoio > 0 ? `\n(Observação: há ${arquivosApoio} arquivo(s) de apoio na pasta, mas nenhuma nota fiscal com dados no período.)` : '';
+      const resposta = await this.ai.chatInteligente(`${q}${ctx}${obs}`, historico, { system: systemPrompt });
+      return { resposta, documentos: [], resumo: { ...resumo, arquivosApoio } };
     }
 
-    const contextoDocs =
-      `Consulta do usuário: "${q}"\n` +
-      `Encontrados: ${resumo.encontrados} de ${resumo.totalDisponivel} · Valor somado: R$ ${Number(resumo.valorTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} · Com inconsistência: ${resumo.comInconsistencia}\n` +
-      `Documentos (amostra):\n${JSON.stringify(topo, null, 1)}`;
-
-    const instrucao =
-      `Você é um consultor fiscal/contábil. Analise os documentos abaixo e responda em português, ` +
-      `de forma CURTA e prática (bullets), para um gestor de contabilidade. Cubra: (a) o que foi encontrado ` +
-      `em uma frase; (b) pontos de atenção fiscais/tributários (inconsistências de imposto/NCM, valores atípicos, ` +
-      `datas); (c) uma recomendação objetiva de próximo passo. Não invente dados que não estão nos documentos. ` +
-      `Se estiver tudo certo, diga que está regular.\n\n${contextoDocs}`;
+    // 3b) COM documentos: análise fiscal fundamentada nos docs + no perfil do cliente
+    const contexto =
+      `PERGUNTA DO USUÁRIO: "${q}"\n\n` +
+      (empresaCtx ? `PERFIL DO CLIENTE:\n${empresaCtx}\n\n` : '') +
+      `DOCUMENTOS ENCONTRADOS: ${resumo.encontrados} (de ${resumo.totalDisponivel} no acervo) · ` +
+      `valor somado R$ ${Number(resumo.valorTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} · ` +
+      `${resumo.comInconsistencia} com inconsistência fiscal detectada\n` +
+      `AMOSTRA (até 15):\n${JSON.stringify(topo, null, 1)}`;
 
     let resposta: string;
     try {
-      resposta = await this.ai.chat(instrucao, historico);
+      resposta = await this.ai.chatInteligente(contexto, historico, { system: systemPrompt, maxTokens: 3072 });
     } catch (e: any) {
       this.logger.warn(`IA indisponível: ${e?.message ?? e}`);
       resposta = this._analiseSemIA(resumo, topo);
     }
 
     return { resposta, documentos: docs.slice(0, 30), resumo };
+  }
+
+  /** Reúne perfil + números reais do cliente (1ª empresa casada) para a IA raciocinar. */
+  private async _contextoEmpresa(nomes: string[]): Promise<string | null> {
+    if (!nomes?.length) return null;
+    const comp = await this.prisma.company.findFirst({
+      where: { name: nomes[0] },
+      select: { id: true, name: true, cnpj: true, taxRegime: true, segmentoFiscal: true, uf: true },
+    });
+    if (!comp) return null;
+    const ano = new Date().getFullYear();
+    const cnpj = (comp.cnpj ?? '').replace(/\D/g, '');
+    const ini = new Date(ano, 0, 1);
+    const [emit, receb, obrig] = await Promise.all([
+      this.prisma.document.aggregate({ where: { companyId: comp.id, issuerCnpj: cnpj, issueDate: { gte: ini } }, _sum: { totalValue: true }, _count: { id: true } }),
+      this.prisma.document.aggregate({ where: { companyId: comp.id, recipientCnpj: cnpj, issueDate: { gte: ini } }, _sum: { totalValue: true }, _count: { id: true } }),
+      this.prisma.fiscalCalendarItem.groupBy({ by: ['status'], where: { companyId: comp.id, competencia: { startsWith: String(ano) } }, _count: { id: true } }),
+    ]);
+    const om: Record<string, number> = {};
+    for (const o of obrig) om[o.status] = o._count.id;
+    const entregues = ['entregue', 'paga', 'apurada', 'isenta'].reduce((s, k) => s + (om[k] ?? 0), 0);
+    const pendentes = (om['pendente'] ?? 0) + (om['em_apuracao'] ?? 0);
+    const vencidas = om['vencida'] ?? 0;
+    const fmt = (v?: number | null) => `R$ ${Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    return [
+      `Nome: ${comp.name} · CNPJ: ${comp.cnpj ?? '—'} · Regime: ${comp.taxRegime} · UF: ${comp.uf ?? '—'} · Segmento: ${comp.segmentoFiscal ?? '—'}`,
+      `Faturamento ${ano} (notas emitidas): ${fmt(emit._sum.totalValue)} em ${emit._count.id} nota(s)`,
+      `Entradas ${ano} (notas recebidas): ${fmt(receb._sum.totalValue)} em ${receb._count.id} nota(s)`,
+      `Obrigações ${ano}: ${entregues} entregues · ${pendentes} pendentes · ${vencidas} vencidas`,
+    ].join('\n');
   }
 
   /** Fallback determinístico quando a IA não está configurada/disponível. */
