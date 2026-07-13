@@ -1672,3 +1672,12 @@ model ChecklistState {
   @@index([companyId, competencia, departamento])
   @@map("checklist_states")
 }
+
+// ─── Alíquota interna de ICMS por UF (banco atualizável — auditoria semanal) ───
+model AliquotaInternaUF {
+  uf           String   @id  // sigla do estado
+  aliquota     Float
+  atualizadoPor String?
+  updatedAt    DateTime @updatedAt
+  @@map("aliquotas_internas_uf")
+}

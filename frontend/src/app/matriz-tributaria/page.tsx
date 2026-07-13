@@ -19,10 +19,24 @@ export default function MatrizPage() {
   const [d, setD] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [audit, setAudit] = useState<any>(null);
+  const [ufs, setUfs] = useState<any[]>([]);
+  const [editUf, setEditUf] = useState<string>('');
+  const [editVal, setEditVal] = useState<string>('');
 
+  function carregarUfs() {
+    fetch(`${API}/api/v1/ncm-inteligente/aliquotas-uf`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : []).then((x) => setUfs(Array.isArray(x) ? x : [])).catch(() => {});
+  }
   useEffect(() => {
     fetch(`${API}/api/v1/ncm-inteligente/auditoria`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : null).then(setAudit).catch(() => {});
+    carregarUfs();
   }, []);
+
+  async function salvarUf(uf: string) {
+    const val = parseFloat(editVal.replace(',', '.'));
+    if (isNaN(val)) { setEditUf(''); return; }
+    await fetch(`${API}/api/v1/ncm-inteligente/aliquotas-uf`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ uf, aliquota: val }) });
+    setEditUf(''); setEditVal(''); carregarUfs();
+  }
 
   async function consultar() {
     const n = ncm.replace(/\D/g, '');
@@ -102,6 +116,28 @@ export default function MatrizPage() {
           <p style={{ fontSize: 11, color: COLORS.faint }}>{d.fonteAliquotasInternas}</p>
         </div>
       )}
+
+      {/* Banco de atualizações: alíquotas internas por UF, editáveis */}
+      <details style={{ marginTop: 22 }}>
+        <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COLORS.strong, marginBottom: 10 }}>
+          Alíquotas internas por UF <span style={{ color: COLORS.faint, fontWeight: 400 }}>— banco atualizável (clique num valor p/ editar)</span>
+        </summary>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
+          {ufs.map((u) => (
+            <div key={u.uf} onClick={() => { setEditUf(u.uf); setEditVal(String(u.aliquota)); }}
+              style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${u.editado ? tint(COLORS.acao, 35) : COLORS.border}`, background: u.editado ? tint(COLORS.acao, 6) : COLORS.surface, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <b style={{ color: COLORS.strong, width: 26 }}>{u.uf}</b>
+              {editUf === u.uf ? (
+                <input autoFocus value={editVal} onChange={(e) => setEditVal(e.target.value)} onBlur={() => salvarUf(u.uf)} onKeyDown={(e) => e.key === 'Enter' && salvarUf(u.uf)}
+                  className="input-aura" style={{ width: 60, padding: '3px 6px', fontSize: 13 }} />
+              ) : (
+                <span className="num" style={{ color: u.editado ? COLORS.acao : COLORS.muted }}>{u.aliquota}%{u.editado && u.aliquota !== u.padrao ? ` (era ${u.padrao})` : ''}</span>
+              )}
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: 11, color: COLORS.faint, marginTop: 8 }}>A interestadual (4/7/12%) e o DIFAL são calculados por lei; estes valores internos alimentam o DIFAL e a operação interna.</p>
+      </details>
     </div>
   );
 }

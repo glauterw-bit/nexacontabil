@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { regraMonofasico } from '../organizacao/classificacao.util';
-import { ICMS_INTERNO_UF, aliquotaInterestadual, difal } from './matriz-tributaria.util';
+import { ICMS_INTERNO_UF, aliquotaInterestadual } from './matriz-tributaria.util';
 
 export interface Divergencia {
   campo: string;
@@ -433,13 +433,41 @@ Retorne:
    * interestadual e DIFAL (determinísticos por lei), ST/MVA/CEST, IPI, e PIS/COFINS com
    * CST de entrada e saída — já ciente de monofásico.
    */
+  /** Alíquotas internas por UF EFETIVAS: padrão (2025/2026) + overrides do banco atualizável. */
+  async aliquotasEfetivas(): Promise<Record<string, number>> {
+    const over = await this.prisma.aliquotaInternaUF.findMany();
+    const map: Record<string, number> = { ...ICMS_INTERNO_UF };
+    for (const o of over) map[o.uf.toUpperCase()] = o.aliquota;
+    return map;
+  }
+
+  /** Lista as alíquotas internas (com flag de editado) para a tela de manutenção. */
+  async listarAliquotasUF() {
+    const over = new Map((await this.prisma.aliquotaInternaUF.findMany()).map((o) => [o.uf.toUpperCase(), o]));
+    return Object.keys(ICMS_INTERNO_UF).sort().map((uf) => ({
+      uf, aliquota: over.get(uf)?.aliquota ?? ICMS_INTERNO_UF[uf], padrao: ICMS_INTERNO_UF[uf],
+      editado: over.has(uf), atualizadoEm: over.get(uf)?.updatedAt ?? null,
+    }));
+  }
+
+  /** Atualiza a alíquota interna de uma UF (banco de atualizações — auditoria). */
+  async setAliquotaUF(uf: string, aliquota: number, por?: string) {
+    const u = (uf || '').toUpperCase();
+    if (!ICMS_INTERNO_UF[u]) throw new BadRequestException('UF inválida.');
+    if (!(aliquota >= 0 && aliquota <= 40)) throw new BadRequestException('Alíquota fora da faixa (0–40%).');
+    await this.prisma.aliquotaInternaUF.upsert({ where: { uf: u }, update: { aliquota, atualizadoPor: por }, create: { uf: u, aliquota, atualizadoPor: por } });
+    return { uf: u, aliquota };
+  }
+
   async matriz(input: { ncm: string; origem: string; destino: string; segmento?: string; importado?: boolean }) {
     const rule: any = await this.lookup(input.ncm, input.segmento, input.destino);
     const mono = regraMonofasico(input.ncm);
-    const interno = { origem: ICMS_INTERNO_UF[(input.origem || '').toUpperCase()] ?? null, destino: ICMS_INTERNO_UF[(input.destino || '').toUpperCase()] ?? null };
+    const internas = await this.aliquotasEfetivas();
+    const uO = (input.origem || '').toUpperCase(), uD = (input.destino || '').toUpperCase();
+    const interno = { origem: internas[uO] ?? null, destino: internas[uD] ?? null };
     const inter = aliquotaInterestadual(input.origem, input.destino, input.importado);
-    const df = difal(input.origem, input.destino, input.importado);
-    const operacaoInterna = (input.origem || '').toUpperCase() === (input.destino || '').toUpperCase();
+    const operacaoInterna = uO === uD;
+    const df = { difal: interno.destino != null ? Math.round(((interno.destino as number) - inter) * 100) / 100 : null };
 
     // PIS/COFINS — base legal do monofásico define os CST de saída/entrada
     const pisCofins = mono

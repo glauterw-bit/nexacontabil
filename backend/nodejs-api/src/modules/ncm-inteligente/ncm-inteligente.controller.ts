@@ -32,6 +32,17 @@ export class NcmInteligenteController {
     return this.svc.auditoria();
   }
 
+  /** Alíquotas internas de ICMS por UF (banco atualizável). */
+  @Get('aliquotas-uf')
+  aliquotasUF() {
+    return this.svc.listarAliquotasUF();
+  }
+
+  @Post('aliquotas-uf')
+  setAliquotaUF(@Body() body: { uf: string; aliquota: number; por?: string }) {
+    return this.svc.setAliquotaUF(body.uf, body.aliquota, body?.por);
+  }
+
   @Post('validar')
   validar(@Body() body: any) {
     return this.svc.validarTributacao(body);
