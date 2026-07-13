@@ -29,6 +29,12 @@ class VerificacaoFinalController {
   analise() {
     return this.service.analiseFinal();
   }
+
+  /** Aplica o cadastro oficial (planilha 2026): CNPJ, regime e Ativa/Inativa. */
+  @Post('aplicar-cadastro')
+  aplicarCadastro() {
+    return this.service.aplicarCadastroOficial();
+  }
 }
 
 @Module({

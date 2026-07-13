@@ -9,6 +9,7 @@ import { FiscalCalendarModule } from '../fiscal-calendar/fiscal-calendar.module'
 import { SolicitacoesModule } from '../solicitacoes/solicitacoes.module';
 import { NcmInteligenteModule } from '../ncm-inteligente/ncm-inteligente.module';
 import { SefazModule } from '../sefaz/sefaz.module';
+import { VerificacaoFinalModule } from '../verificacao-final/verificacao-final.module';
 
 @Controller('sync-drive')
 @UseGuards(JwtAuthGuard)
@@ -36,7 +37,7 @@ class SyncSchedulerController {
 }
 
 @Module({
-  imports: [FluxoModule, AnaliseClienteModule, FiscalCalendarModule, SolicitacoesModule, NcmInteligenteModule, SefazModule],
+  imports: [FluxoModule, AnaliseClienteModule, FiscalCalendarModule, SolicitacoesModule, NcmInteligenteModule, SefazModule, VerificacaoFinalModule],
   controllers: [SyncSchedulerController],
   providers: [SyncSchedulerService, PrismaService],
 })

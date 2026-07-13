@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { AnaliseClienteService } from '../analise-cliente/analise-cliente.service';
 import { NcmInteligenteService } from '../ncm-inteligente/ncm-inteligente.service';
+import { CADASTRO_OFICIAL_2026 } from './cadastro-oficial-2026';
 
 /**
  * VERIFICAÇÃO FINAL — apura, cliente a cliente, se a implantação está completa:
@@ -128,6 +129,62 @@ export class VerificacaoFinalService {
   async resumoPublico(ano?: number) {
     const { resumo } = await this.relatorio(ano);
     return resumo;
+  }
+
+  /**
+   * Aplica o CADASTRO OFICIAL (planilha de controle 2026) ao sistema — fonte da verdade
+   * p/ CNPJ, regime e status Ativa/Inativa. Casa por código Domínio (clienteCodigo) e,
+   * na falta, por nome normalizado. Idempotente: reaplicar não muda nada.
+   * Quem está no sistema mas NÃO na planilha é só REPORTADO (não desativa sozinho).
+   */
+  async aplicarCadastroOficial() {
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const regimeMap: Record<string, string> = {
+      'Simples Nacional': 'SIMPLES_NACIONAL', 'Lucro Presumido': 'LUCRO_PRESUMIDO', 'Lucro Real': 'LUCRO_REAL', 'MEI': 'MEI',
+    };
+    const companies = await this.prisma.company.findMany({
+      select: { id: true, name: true, cnpj: true, taxRegime: true, active: true, clienteCodigo: true },
+    });
+    const porCodigo = new Map(companies.filter((c) => c.clienteCodigo).map((c) => [String(c.clienteCodigo), c]));
+    const porNome = new Map(companies.map((c) => [norm(c.name), c]));
+    const cnpjsEmUso = new Map(companies.map((c) => [(c.cnpj ?? '').replace(/\D/g, ''), c.id]));
+
+    let atualizados = 0, cnpjsCorrigidos = 0, inativados = 0, reativados = 0, regimes = 0, semMatch = 0, conflitos = 0;
+    const naoEncontrados: string[] = [];
+    for (const row of CADASTRO_OFICIAL_2026) {
+      const alvo = porCodigo.get(String(row.codigo)) ?? porNome.get(norm(row.nome)) ??
+        // prefixo: pasta às vezes tem o nome truncado
+        companies.find((c) => { const a = norm(c.name), b = norm(row.nome); return a.length >= 8 && (b.startsWith(a) || a.startsWith(b)); });
+      if (!alvo) { semMatch++; naoEncontrados.push(`${row.codigo} - ${row.nome}`); continue; }
+
+      const data: any = {};
+      const cnpjAtual = (alvo.cnpj ?? '').replace(/\D/g, '');
+      if (row.cnpj && row.cnpj !== cnpjAtual) {
+        const dono = cnpjsEmUso.get(row.cnpj);
+        if (dono && dono !== alvo.id) { conflitos++; } else { data.cnpj = row.cnpj; cnpjsCorrigidos++; cnpjsEmUso.set(row.cnpj, alvo.id); }
+      }
+      const regime = regimeMap[row.regime];
+      if (regime && alvo.taxRegime !== regime) { data.taxRegime = regime; regimes++; }
+      const ativa = /ativa/i.test(row.status) && !/inativa/i.test(row.status);
+      if (alvo.active !== ativa) { data.active = ativa; if (ativa) reativados++; else inativados++; }
+      if (!alvo.clienteCodigo && row.codigo) data.clienteCodigo = String(row.codigo);
+      if (Object.keys(data).length) {
+        try { await this.prisma.company.update({ where: { id: alvo.id }, data }); atualizados++; }
+        catch { conflitos++; }
+      }
+    }
+    const nomesPlanilha = new Set(CADASTRO_OFICIAL_2026.map((r) => norm(r.nome)));
+    const codigosPlanilha = new Set(CADASTRO_OFICIAL_2026.map((r) => String(r.codigo)));
+    const foraDaPlanilha = companies
+      .filter((c) => c.active && !nomesPlanilha.has(norm(c.name)) && !(c.clienteCodigo && codigosPlanilha.has(String(c.clienteCodigo))))
+      .map((c) => c.name);
+    const r = {
+      planilha: CADASTRO_OFICIAL_2026.length, atualizados, cnpjsCorrigidos, regimes,
+      inativados, reativados, conflitos, semMatch, naoEncontrados: naoEncontrados.slice(0, 30),
+      foraDaPlanilha: foraDaPlanilha.slice(0, 60), foraDaPlanilhaTotal: foraDaPlanilha.length,
+    };
+    this.logger.log(`cadastro oficial: ${cnpjsCorrigidos} CNPJs, ${regimes} regimes, ${inativados} inativados, ${semMatch} sem match, ${foraDaPlanilha.length} fora da planilha`);
+    return r;
   }
 
   /** Análise garantidora: aprende NCM dos XMLs → revalida o acervo → auditoria. */

@@ -5,6 +5,7 @@ import { FiscalCalendarService } from '../fiscal-calendar/fiscal-calendar.servic
 import { SolicitacoesService } from '../solicitacoes/solicitacoes.service';
 import { NcmInteligenteService } from '../ncm-inteligente/ncm-inteligente.service';
 import { SefazDistribuicaoService } from '../sefaz/sefaz-distribuicao.service';
+import { VerificacaoFinalService } from '../verificacao-final/verificacao-final.service';
 import { PrismaService } from '../../database/prisma.service';
 
 /**
@@ -37,6 +38,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     private readonly solicitacoes: SolicitacoesService,
     private readonly ncm: NcmInteligenteService,
     private readonly sefaz: SefazDistribuicaoService,
+    private readonly verificacao: VerificacaoFinalService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -177,6 +179,9 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         await passo('obrigacoesVencidas', () => this.fiscalCalendar.markOverdue());
       })();
       const cadeiaSefaz = (async () => {
+        // 5a-00. CADASTRO OFICIAL (planilha 2026): CNPJ, regime e Ativa/Inativa — fonte
+        //        da verdade; idempotente. Resolve a maioria antes de qualquer inferência.
+        await passo('cadastroOficial', () => this.verificacao.aplicarCadastroOficial());
         // 5a-0. clientes com CNPJ provisório: infere o real a partir dos próprios XMLs
         //       (emitente/destinatário dominante). Sem isso, UF e SEFAZ ficam impossíveis.
         await passo('sefazInferirCnpj', () => this.sefaz.inferirCnpjsReais());
