@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { Sun, CalendarClock, FileWarning, CheckCircle2, Building2, ChevronRight, FileX } from 'lucide-react';
+import { Sun, CalendarClock, FileWarning, CheckCircle2, Building2, ChevronRight, FileX, ClipboardList, Circle } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader, Card, COLORS, Kpi, Spinner, tint } from '@/components/ui/kit';
 
@@ -17,6 +17,12 @@ export default function MeuDiaPage() {
   const [analista, setAnalista] = useState('');
   const [nomes, setNomes] = useState<string[]>([]);
   const [ehAnalista, setEhAnalista] = useState(false);
+  const [cobrancas, setCobrancas] = useState<any[]>([]);
+
+  const carregarCobrancas = useCallback(() => {
+    const qs = analista ? `?responsavel=${encodeURIComponent(analista)}&status=aberta` : '?status=aberta';
+    fetch(`${API}/api/v1/cobrancas${qs}`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : []).then((x) => setCobrancas(Array.isArray(x) ? x.filter((c) => c.status !== 'concluida') : [])).catch(() => {});
+  }, [analista]);
 
   useEffect(() => {
     try {
@@ -35,7 +41,12 @@ export default function MeuDiaPage() {
       if (r.ok) setData(await r.json());
     } catch { /* noop */ } finally { setLoading(false); }
   }, [analista]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); carregarCobrancas(); }, [load, carregarCobrancas]);
+
+  async function concluir(id: string) {
+    await fetch(`${API}/api/v1/cobrancas/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ status: 'concluida' }) });
+    carregarCobrancas();
+  }
 
   if (loading) return <Spinner />;
   const r = data?.resumo ?? {};
@@ -62,6 +73,25 @@ export default function MeuDiaPage() {
         <Kpi label="Clientes" value={r.clientes ?? 0} />
       </div>
 
+      {/* COBRANÇAS DO GERENTE — atividades pedidas a você */}
+      {cobrancas.length > 0 && (
+        <div style={{ marginTop: 26 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: COLORS.strong, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ClipboardList size={16} color={COLORS.acao} /> Cobranças do gerente <span style={{ fontSize: 12, fontWeight: 400, color: COLORS.faint }}>({cobrancas.length})</span>
+          </h2>
+          {cobrancas.map((c) => (
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: tint(COLORS.acao, 6), border: `1px solid ${tint(COLORS.acao, 22)}`, borderRadius: 10, padding: '11px 14px', marginBottom: 8 }}>
+              <button onClick={() => concluir(c.id)} title="Concluir" style={{ background: 'none', border: 'none', cursor: 'pointer', color: COLORS.faint, display: 'flex' }}><Circle size={18} /></button>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 13.5, color: COLORS.strong }}>{c.titulo}</div>
+                {(c.cliente || c.criadoPor) && <div style={{ fontSize: 12, color: COLORS.muted }}>{c.cliente ? c.cliente : ''}{c.criadoPor ? ` · de ${c.criadoPor}` : ''}</div>}
+              </div>
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: COLORS.acao, textTransform: 'uppercase' }}>{c.prioridade}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <h2 style={{ fontSize: 15, fontWeight: 600, color: COLORS.strong, marginTop: 26, marginBottom: 12 }}>A fazer</h2>
       {(!data?.aFazer || data.aFazer.length === 0) && (
         <div style={{ padding: 26, textAlign: 'center', color: COLORS.ok, border: `1px dashed ${tint(COLORS.dotOk, 45)}`, background: tint(COLORS.dotOk, 5), borderRadius: 12, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center', fontSize: 14 }}>
@@ -70,7 +100,7 @@ export default function MeuDiaPage() {
       )}
       {data?.aFazer?.map((t: any, i: number) => {
         const destino = t.companyId
-          ? (t.tipo === 'inconsistencia' ? `/cliente-erros?companyId=${t.companyId}` : t.tipo === 'sem_documento' ? `/organizacao?companyId=${t.companyId}` : null)
+          ? (t.tipo === 'inconsistencia' ? `/cliente-erros?companyId=${t.companyId}` : t.tipo === 'sem_documento' ? `/organizacao?companyId=${t.companyId}` : t.tipo === 'obrigacao' ? `/cliente-360?companyId=${t.companyId}` : null)
           : null;
         const clicavel = !!destino;
         const inner = (

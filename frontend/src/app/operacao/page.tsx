@@ -445,8 +445,11 @@ function DetalheCliente({ c, competencia }: { c: any; competencia: string }) {
 
       <h3 style={{ fontSize: 13, fontWeight: 600, color: COLORS.strong, margin: '20px 0 8px' }}>Ações</h3>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Btn href={`/cliente-erros?companyId=${c.companyId}`} size="sm">
-          <ExternalLink size={13} /> Ficha completa e erros
+        <Btn href={`/cliente-360?companyId=${c.companyId}`} size="sm">
+          <ExternalLink size={13} /> Visão 360 do cliente
+        </Btn>
+        <Btn href={`/cliente-erros?companyId=${c.companyId}`} variant="outline" size="sm">
+          <ExternalLink size={13} /> Ficha de erros
         </Btn>
         <Btn href="/solicitacoes" variant="outline" size="sm">
           <ClipboardList size={13} /> Solicitar documentos

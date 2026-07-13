@@ -72,6 +72,11 @@ export class PaineisController {
     return this.service.panorama();
   }
 
+  @Get('cliente-360')
+  clienteVisao360(@Query('companyId') companyId: string) {
+    return this.service.clienteVisao360(companyId);
+  }
+
   @Post('limpar-carteira')
   limparCarteira(@Body() body: { dryRun?: boolean }) {
     return this.service.limparCarteira(body?.dryRun ?? false);

@@ -4,7 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   UserCheck, RefreshCw, AlertTriangle, CheckCircle2, HardDriveDownload,
-  CalendarClock, FileWarning, ChevronRight, Info, HelpCircle,
+  CalendarClock, FileWarning, ChevronRight, Info, HelpCircle, ClipboardList, Circle,
 } from 'lucide-react';
 import { PageHeader, Card, Kpi, COLORS, tint, Spinner, EmptyState, StatusChip, Dot, THead, StatusTone } from '@/components/ui/kit';
 
@@ -42,6 +42,15 @@ function Conteudo() {
   const [d, setD] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [expandido, setExpandido] = useState<string | null>(null);
+  const [cobrancas, setCobrancas] = useState<any[]>([]);
+  const [novaCobranca, setNovaCobranca] = useState('');
+  const [criandoCob, setCriandoCob] = useState(false);
+
+  const carregarCobrancas = useCallback(() => {
+    if (!analistaParam) return;
+    fetch(`${API}/api/v1/cobrancas?responsavel=${encodeURIComponent(analistaParam)}`, { headers: authHeaders() })
+      .then((r) => r.ok ? r.json() : []).then((x) => setCobrancas(Array.isArray(x) ? x : [])).catch(() => {});
+  }, [analistaParam]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,7 +60,20 @@ function Conteudo() {
       if (r.ok) setD(await r.json());
     } catch {} finally { setLoading(false); }
   }, [analistaParam]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); carregarCobrancas(); }, [load, carregarCobrancas]);
+
+  async function criarCobranca() {
+    if (!novaCobranca.trim() || !analistaParam) return;
+    setCriandoCob(true);
+    try {
+      const r = await fetch(`${API}/api/v1/cobrancas`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ responsavel: analistaParam, titulo: novaCobranca.trim(), tipo: 'atividade', prioridade: 'alta' }) });
+      if (r.ok) { setNovaCobranca(''); carregarCobrancas(); }
+    } catch {} finally { setCriandoCob(false); }
+  }
+  async function concluirCobranca(id: string) {
+    await fetch(`${API}/api/v1/cobrancas/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ status: 'concluida' }) });
+    carregarCobrancas();
+  }
 
   if (loading) return <Spinner />;
   if (!d) return <EmptyState icon={<UserCheck size={32} />} title="Sem dados" sub="Verifique a conexão com o backend." />;
@@ -95,6 +117,46 @@ function Conteudo() {
             <button onClick={load} className="btn-secondary" title="Recarregar"><RefreshCw size={14} /></button>
           </div>
         } />
+
+      {/* FERRAMENTAS do analista */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        {[
+          { href: '/ncm-inteligente', label: 'Banco de NCM' },
+          { href: '/matriz-tributaria', label: 'Matriz Tributária' },
+          { href: '/apuracao', label: 'Apuração' },
+          { href: '/inconsistencias', label: 'Inconsistências' },
+          { href: '/buscar-docs', label: 'Buscar Documentos' },
+          { href: '/prazos', label: 'Prazos & SLA' },
+        ].map((t) => (
+          <Link key={t.href} href={t.href} style={{ fontSize: 12.5, padding: '6px 12px', borderRadius: 999, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.muted, textDecoration: 'none' }}>{t.label}</Link>
+        ))}
+      </div>
+
+      {/* COBRANÇAS — o gerente cria atividades/obrigações para o analista */}
+      <Card style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <ClipboardList size={15} color={COLORS.acao} />
+          <span style={{ fontWeight: 700, fontSize: 14, color: COLORS.strong }}>Cobranças & atividades</span>
+          <span style={{ fontSize: 11.5, color: COLORS.faint }}>{cobrancas.filter((c) => c.status !== 'concluida').length} abertas</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <input value={novaCobranca} onChange={(e) => setNovaCobranca(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && criarCobranca()}
+            placeholder={`Cobrar ${d.responsavel} de uma atividade ou obrigação…`} className="input-aura" style={{ flex: 1, fontSize: 13, padding: '8px 10px' }} />
+          <button onClick={criarCobranca} disabled={criandoCob || !novaCobranca.trim()} className="btn-primary" style={{ fontSize: 13 }}>{criandoCob ? '…' : 'Cobrar'}</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {cobrancas.length === 0 && <p style={{ fontSize: 12.5, color: COLORS.faint }}>Nenhuma cobrança. Crie uma acima — ela aparece no Meu Dia do analista.</p>}
+          {cobrancas.map((c) => (
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, background: c.status === 'concluida' ? 'transparent' : tint(COLORS.dotAtencao, 6), border: `1px solid ${c.status === 'concluida' ? COLORS.borderSoft : tint(COLORS.dotAtencao, 20)}` }}>
+              <button onClick={() => concluirCobranca(c.id)} disabled={c.status === 'concluida'} style={{ background: 'none', border: 'none', cursor: c.status === 'concluida' ? 'default' : 'pointer', display: 'flex', color: c.status === 'concluida' ? COLORS.ok : COLORS.faint }}>
+                {c.status === 'concluida' ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+              </button>
+              <span style={{ flex: 1, fontSize: 13, color: c.status === 'concluida' ? COLORS.faint : COLORS.strong, textDecoration: c.status === 'concluida' ? 'line-through' : 'none' }}>{c.titulo}{c.cliente ? ` · ${c.cliente}` : ''}</span>
+              {c.status !== 'concluida' && <span style={{ fontSize: 10.5, fontWeight: 700, color: COLORS.atencao, textTransform: 'uppercase' }}>{c.prioridade}</span>}
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {/* GARANTIA DE LEITURA DO DRIVE */}
       <Card accent={dr.desatualizado + dr.nunca > 0 ? COLORS.dotAtencao : COLORS.dotOk} style={{ marginBottom: 14, padding: '12px 16px' }}>

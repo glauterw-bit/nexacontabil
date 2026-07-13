@@ -637,6 +637,75 @@ export class PaineisService {
     };
   }
 
+  /**
+   * VISÃO 360 DO CLIENTE — para o gestor clicar numa obrigação e ver TUDO: o que foi
+   * entregue, o que falta, e uma análise fiscal + contábil consolidada.
+   */
+  async clienteVisao360(companyId: string) {
+    const co = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true, cnpj: true, taxRegime: true, responsavel: true, uf: true, segmentoFiscal: true },
+    });
+    if (!co) throw new NotFoundException('Cliente não encontrado');
+    const now = new Date();
+    const anoAtual = String(now.getFullYear());
+    const [obrig, docs] = await Promise.all([
+      this.prisma.fiscalCalendarItem.findMany({ where: { companyId, competencia: { startsWith: anoAtual } }, orderBy: { dataVencimento: 'asc' }, select: { tipo: true, descricao: true, competencia: true, dataVencimento: true, status: true } }),
+      this.prisma.document.findMany({ where: { companyId, extractedData: { not: null } }, select: { totalValue: true, issueDate: true, extractedData: true, fiscalValidation: true } }),
+    ]);
+
+    // ── OBRIGAÇÕES: entregues / pendentes / vencidas ──
+    const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    const entregues: any[] = [], pendentes: any[] = [], vencidas: any[] = [];
+    for (const o of obrig) {
+      const item = { tipo: o.tipo, descricao: o.descricao, competencia: o.competencia, vencimento: o.dataVencimento, status: o.status };
+      if (ENTREGUE.has(o.status)) entregues.push(item);
+      else if (o.status === 'vencida' || new Date(o.dataVencimento) < now) vencidas.push(item);
+      else pendentes.push(item);
+    }
+
+    // ── ANÁLISE FISCAL: faturamento, impostos, entradas/saídas, inconsistências, monofásico ──
+    let faturamento = 0, entradas = 0, saidas = 0, tIcms = 0, tPis = 0, tCofins = 0, tIpi = 0;
+    let inconsistencias = 0, notasComErro = 0, valorMono = 0, notasMono = 0;
+    const mesesComDoc = new Set<string>();
+    for (const d of docs) {
+      const nf = safe(d.extractedData);
+      const dir = String(nf?.itens?.[0]?.cfop ?? '')[0];
+      const saida = ['5', '6', '7'].includes(dir);
+      if (saida) { saidas++; faturamento += d.totalValue ?? nf?.totais?.produtos ?? 0; } else if (['1', '2', '3'].includes(dir)) entradas++;
+      tIcms += nf?.totais?.icms ?? 0; tPis += nf?.totais?.pis ?? 0; tCofins += nf?.totais?.cofins ?? 0; tIpi += nf?.totais?.ipi ?? 0;
+      if (d.issueDate) mesesComDoc.add(new Date(d.issueDate).toISOString().slice(0, 7));
+      const inc = safe(d.fiscalValidation)?.inconsistencias ?? [];
+      if (inc.length) { inconsistencias += inc.length; notasComErro++; }
+      for (const it of (nf?.itens ?? [])) { if (monofasicoPorNcm(it.ncm) && saida) { valorMono += it.valor ?? 0; notasMono++; } }
+    }
+
+    // ── SAÚDE / SEMÁFORO ──
+    let status: 'verde' | 'amarelo' | 'vermelho';
+    if (docs.length === 0 || vencidas.length > 0) status = 'vermelho';
+    else if (inconsistencias > 0 || pendentes.length > 0) status = 'amarelo';
+    else status = 'verde';
+
+    return {
+      empresa: { nome: co.name, cnpj: co.cnpj, regime: co.taxRegime, responsavel: co.responsavel, uf: co.uf, segmento: co.segmentoFiscal },
+      status,
+      obrigacoes: { entregues, pendentes, vencidas, totalAno: obrig.length, pctEntrega: obrig.length ? Math.round((entregues.length / obrig.length) * 100) : 0 },
+      documentos: { total: docs.length, entradas, saidas, mesesComMovimento: [...mesesComDoc].sort() },
+      analiseFiscal: {
+        faturamento: r2(faturamento),
+        impostos: { icms: r2(tIcms), pis: r2(tPis), cofins: r2(tCofins), ipi: r2(tIpi), total: r2(tIcms + tPis + tCofins + tIpi) },
+        cargaTributaria: faturamento > 0 ? Math.round(((tIcms + tPis + tCofins + tIpi) / faturamento) * 1000) / 10 : 0,
+        inconsistencias, notasComErro,
+        monofasico: { valor: r2(valorMono), notas: notasMono },
+      },
+      analiseContabil: {
+        entradasFaltando: saidas > 0 && entradas === 0,
+        semMovimentoRecente: !mesesComDoc.has(now.toISOString().slice(0, 7)),
+        observacao: entradas === 0 && saidas > 0 ? 'Sem notas de ENTRADA — crédito de ICMS/PIS/COFINS incompleto; conciliação e apuração ficam parciais.' : 'Movimento de entradas e saídas presente.',
+      },
+    };
+  }
+
   // Detalhe dos erros de UM cliente, com causa + como corrigir.
   async clienteErros(companyId: string) {
     const empresa = await this.prisma.company.findUnique({

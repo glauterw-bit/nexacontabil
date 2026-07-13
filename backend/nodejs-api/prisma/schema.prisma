@@ -1700,3 +1700,25 @@ model IbptAliquota {
   @@index([uf])
   @@map("ibpt_aliquotas")
 }
+
+// ─── Cobranças: gerente cria atividade/obrigação para o analista ───
+model Cobranca {
+  id            String   @id @default(uuid())
+  companyId     String?  // cliente relacionado (opcional)
+  responsavel   String   // analista alvo (casa com User.name)
+  criadoPor     String?  // gestor que criou
+  tipo          String   @default("atividade") // atividade | obrigacao
+  titulo        String
+  descricao     String?
+  obrigacaoTipo String?  // DAS | DCTFWeb | ... (quando tipo=obrigacao)
+  competencia   String?
+  prazo         DateTime?
+  prioridade    String   @default("normal")    // baixa|normal|alta|urgente
+  status        String   @default("aberta")    // aberta|em_andamento|concluida
+  concluidaEm   DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([responsavel, status])
+  @@index([companyId])
+  @@map("cobrancas")
+}
