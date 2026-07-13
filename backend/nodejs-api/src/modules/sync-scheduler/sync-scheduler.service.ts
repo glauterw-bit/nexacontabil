@@ -27,6 +27,8 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   private running = false;
   private lastRun: any = null;
   private proximaEm: Date | null = null;
+  private lastAuditYmd: string | null = null;
+  private aceleradoAgora = false;
 
   constructor(
     private readonly fluxo: FluxoService,
@@ -68,28 +70,48 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return min * 60_000;
   }
 
+  // durante o backfill inicial roda mais rápido; depois relaxa pro intervalo normal
+  private readonly BACKFILL_DELAY_MS = 3 * 60_000;
+
   onApplicationBootstrap() {
     if (!this.enabled) {
       this.logger.log('SYNC_ENABLED=false — sincronização agendada desligada');
       return;
     }
-    // primeiro ciclo 90s após o boot (deixa o app estabilizar), depois o intervalo
-    const first = setTimeout(() => this.runCycle('boot').catch(() => undefined), 90_000);
-    first.unref?.();
-    this.timer = setInterval(() => this.runCycle('agendado').catch(() => undefined), this.intervalMs);
-    this.timer.unref?.();
-    this.proximaEm = new Date(Date.now() + 90_000);
-    this.logger.log(`Sincronização agendada ativa — a cada ${this.intervalMs / 60000} min`);
+    // primeiro ciclo 90s após o boot (deixa o app estabilizar); o loop se reagenda sozinho
+    this.agendarProximo(90_000);
+    this.logger.log('Sincronização agendada ativa — cadência adaptativa (acelera no backfill)');
   }
 
   onModuleDestroy() {
-    if (this.timer) clearInterval(this.timer);
+    if (this.timer) clearTimeout(this.timer);
+  }
+
+  /** Reagenda o próximo ciclo (setTimeout único; sem sobreposição — só arma após terminar). */
+  private agendarProximo(delayMs: number) {
+    if (this.timer) clearTimeout(this.timer);
+    this.proximaEm = new Date(Date.now() + delayMs);
+    this.timer = setTimeout(() => this.runCycle('agendado').catch(() => undefined), delayMs);
+    this.timer.unref?.();
+  }
+
+  /** Ainda há trabalho de 1ª volta? (UF faltando, cliente elegível nunca consultado, Delta incompleto) */
+  private async pendenteBackfill(): Promise<boolean> {
+    const [semUF, naoConsultados, comPasta, comDelta] = await Promise.all([
+      this.prisma.company.count({ where: { active: true, uf: null } }),
+      this.prisma.company.count({ where: { active: true, uf: { not: null }, sefazUltConsultaEm: null } }),
+      this.prisma.company.count({ where: { active: true, sharepointItemId: { not: null } } }),
+      this.prisma.company.count({ where: { active: true, sharepointItemId: { not: null }, sharepointDeltaLink: { not: null } } }),
+    ]);
+    return semUF > 0 || naoConsultados > 0 || comDelta < comPasta;
   }
 
   status() {
     return {
       enabled: this.enabled,
       intervaloMin: this.intervalMs / 60000,
+      cadenciaAtualMin: (this.aceleradoAgora ? this.BACKFILL_DELAY_MS : this.intervalMs) / 60000,
+      backfillAcelerado: this.aceleradoAgora,
       executandoAgora: this.running,
       ultimaExecucao: this.lastRun,
       proximaEm: this.running ? null : this.proximaEm,
@@ -127,38 +149,50 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       // 5. higiene do calendário fiscal
       await passo('obrigacoesVencidas', () => this.fiscalCalendar.markOverdue());
       // 5a. SEFAZ pré-requisito — preenche a UF que falta em cada cliente (cUFAutor exigido),
-      //     via BrasilAPI. Roda em rotação (~1min/ciclo) até todos terem UF; depois é no-op.
-      await passo('sefazPreencherUF', () => this.sefaz.preencherUFsFaltantes({ timeBudgetMs: 60_000 }));
+      //     via BrasilAPI. Budget alto p/ resolver a 1ª volta em 1–2 ciclos; depois é no-op.
+      await passo('sefazPreencherUF', () => this.sefaz.preencherUFsFaltantes({ timeBudgetMs: 4 * 60_000 }));
       // 5b. SEFAZ — puxa NF-e direto da Receita (DistribuiçãoDFe) p/ todos os clientes
-      //     elegíveis, usando o certificado do escritório. Limitado a ~4min por ciclo e
-      //     respeitando o limite de consumo (pula quem drenou a fila há < 55min).
-      await passo('sefazVarredura', () => this.sefaz.varrerTodos({ timeBudgetMs: 4 * 60_000 }));
+      //     elegíveis, usando o certificado do escritório. Respeita o limite de consumo
+      //     (pula quem drenou a fila há < 55min).
+      await passo('sefazVarredura', () => this.sefaz.varrerTodos({ timeBudgetMs: 6 * 60_000 }));
       // 6. início do mês (dia 01/02): solicitações de documentos + garante o calendário
       //    fiscal do ano (só p/ quem não tem — idempotente). Automatiza o "Configurar tudo".
       if (startedAt.getDate() <= 2) {
         await passo('solicitacoesMensais', () => this.solicitacoes.gerarSolicitacoesMensais());
         await passo('calendarioAno', () => this.fiscalCalendar.garantirAno(startedAt.getFullYear()));
       }
-      // 7. semanal (segunda): aprende o Banco de NCM dos XMLs, revalida o acervo com a
-      //    base legal e audita — mantém as inconsistências corretas sem clique manual.
-      if (startedAt.getDay() === 1) {
+      // 7. análise + auditoria do acervo: aprende o Banco de NCM, revalida tudo contra a base
+      //    legal e audita. Roda 1x/dia DEPOIS que o backfill assenta (ou toda segunda), pra os
+      //    XMLs recém-puxados entrarem já analisados e auditados. (Cada doc já é validado no ingest.)
+      const ymd = startedAt.toISOString().slice(0, 10);
+      const backfillPend = await this.pendenteBackfill().catch(() => true);
+      resultado.backfillPendente = backfillPend;
+      if (startedAt.getDay() === 1 || (!backfillPend && this.lastAuditYmd !== ymd)) {
         await passo('aprenderNcm', () => this.ncm.aprenderDeDocumentos());
         await passo('revalidarAcervo', () => this.analise.revalidarDocumentos());
         await passo('auditoriaNcm', () => this.ncm.auditoria());
+        this.lastAuditYmd = ymd;
       }
     } finally {
       resultado.finishedAt = new Date().toISOString();
       resultado.duracaoMs = Date.now() - startedAt.getTime();
       this.lastRun = resultado;
-      this.proximaEm = new Date(Date.now() + this.intervalMs);
       this.running = false;
       this.logger.log(
         `sync ${origem} ok em ${Math.round(resultado.duracaoMs / 1000)}s — ` +
         `xmls novos: ${resultado.capturaIncremental?.novosDocs ?? 0} · ` +
         `recibos: +${(resultado.recibosNovos?.recibosEncontrados ?? 0) + (resultado.recibosRecheck?.recibosEncontrados ?? 0)} · ` +
         `vencidas: ${resultado.obrigacoesVencidas?.updated ?? 0} · ` +
-        `sefaz: +${resultado.sefazVarredura?.novosTotal ?? 0} (${resultado.sefazVarredura?.processados ?? 0} clientes)`,
+        `sefaz: +${resultado.sefazVarredura?.novosTotal ?? 0} (${resultado.sefazVarredura?.processados ?? 0} clientes) · ` +
+        `uf: +${resultado.sefazPreencherUF?.atualizados ?? 0}`,
       );
+      // cadência adaptativa: acelera enquanto há 1ª volta pendente, depois relaxa
+      let delay = this.intervalMs;
+      try {
+        this.aceleradoAgora = await this.pendenteBackfill();
+        if (this.aceleradoAgora) delay = Math.min(this.intervalMs, this.BACKFILL_DELAY_MS);
+      } catch { /* mantém intervalo normal */ }
+      if (this.enabled) this.agendarProximo(delay);
     }
     return resultado;
   }
