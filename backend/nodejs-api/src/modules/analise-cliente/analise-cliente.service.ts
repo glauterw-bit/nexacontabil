@@ -283,7 +283,7 @@ export class AnaliseClienteService {
       } catch { ignorados++; }
     }
     const xmls = novos.filter((f) => ehXml(f.name));
-    const CONC = 6;
+    const CONC = 10; // downloads simultâneos por cliente (turbo)
     for (let i = 0; i < xmls.length; i += CONC) {
       const fatia = xmls.slice(i, i + CONC);
       await Promise.all(fatia.map(async (f) => {
@@ -298,7 +298,8 @@ export class AnaliseClienteService {
     return { cliente: c.name, arquivosNoDelta: arquivos.length, novosXml, novosOutros, ignorados, incremental: !!c.sharepointDeltaLink };
   }
 
-  /** Delta em lote (agendador/manual): clientes há mais tempo sem sync, com pasta. */
+  /** Delta em lote (agendador/manual): clientes há mais tempo sem sync, com pasta.
+   *  Processa CLIENTES EM PARALELO (turbo) — muito mais rápido na carga inicial. */
   async sincronizarDeltaLote(limit = 6) {
     const lote = await this.prisma.company.findMany({
       where: { active: true, sharepointItemId: { not: null } },
@@ -306,9 +307,18 @@ export class AnaliseClienteService {
     });
     const pend = await this.prisma.company.count({ where: { active: true, sharepointItemId: { not: null } } });
     let novos = 0; const detalhes: any[] = [];
-    for (const c of lote) {
-      try { const r = await this.sincronizarDelta(c.id); novos += r.novosXml + r.novosOutros; if (r.novosXml + r.novosOutros > 0) detalhes.push({ cliente: c.name, xml: r.novosXml, outros: r.novosOutros }); }
-      catch (e: any) { detalhes.push({ cliente: c.name, erro: e?.message ?? 'erro' }); }
+    const CONC_CLIENTES = 5; // clientes simultâneos (cada um baixa seus XMLs em paralelo)
+    for (let i = 0; i < lote.length; i += CONC_CLIENTES) {
+      const fatia = lote.slice(i, i + CONC_CLIENTES);
+      const rs = await Promise.all(fatia.map((c) =>
+        this.sincronizarDelta(c.id).then((r) => ({ c, r })).catch((e) => ({ c, err: e })),
+      ));
+      for (const x of rs as any[]) {
+        if (x.err) { detalhes.push({ cliente: x.c.name, erro: x.err?.message ?? 'erro' }); continue; }
+        const n = (x.r.novosXml ?? 0) + (x.r.novosOutros ?? 0);
+        novos += n;
+        if (n > 0) detalhes.push({ cliente: x.c.name, xml: x.r.novosXml, outros: x.r.novosOutros });
+      }
     }
     return { processados: lote.length, deUmTotal: pend, novos, detalhes };
   }
