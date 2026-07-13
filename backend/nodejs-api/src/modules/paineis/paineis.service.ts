@@ -1051,6 +1051,45 @@ export class PaineisService {
   }
 
   /**
+   * TENDÊNCIAS (12 meses) — a série histórica que o gestor usa para analisar se está
+   * MELHORANDO ou piorando: documentos, movimento (R$), % de entrega e % de erro por mês.
+   */
+  async tendencias() {
+    const desde = new Date(); desde.setMonth(desde.getMonth() - 13);
+    const [docs, obrig] = await Promise.all([
+      this.prisma.document.findMany({ where: { issueDate: { gte: desde } }, select: { issueDate: true, totalValue: true, fiscalValidation: true } }),
+      this.prisma.fiscalCalendarItem.findMany({ select: { competencia: true, status: true } }),
+    ]);
+    type M = { documentos: number; movimento: number; notasErro: number; obrigTotal: number; obrigEntregues: number };
+    const meses = new Map<string, M>();
+    const get = (m: string): M => { let x = meses.get(m); if (!x) { x = { documentos: 0, movimento: 0, notasErro: 0, obrigTotal: 0, obrigEntregues: 0 }; meses.set(m, x); } return x; };
+    for (const d of docs) {
+      if (!d.issueDate) continue;
+      const m = new Date(d.issueDate).toISOString().slice(0, 7);
+      const x = get(m); x.documentos++; x.movimento += d.totalValue ?? 0;
+      if ((safe(d.fiscalValidation)?.inconsistencias ?? []).length) x.notasErro++;
+    }
+    const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    for (const o of obrig) {
+      const m = (o.competencia || '').slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(m)) continue;
+      const x = get(m); x.obrigTotal++; if (ENTREGUE.has(o.status)) x.obrigEntregues++;
+    }
+    const linha = [...meses.keys()].sort().slice(-12).map((m) => {
+      const x = meses.get(m)!;
+      return {
+        mes: m, documentos: x.documentos, movimento: r2(x.movimento),
+        pctEntrega: x.obrigTotal ? Math.round((x.obrigEntregues / x.obrigTotal) * 100) : 0,
+        pctErro: x.documentos ? Math.round((x.notasErro / x.documentos) * 100) : 0,
+      };
+    });
+    // resumo: variação do último mês fechado vs anterior
+    const n = linha.length;
+    const delta = (campo: 'pctEntrega' | 'pctErro' | 'documentos') => n >= 2 ? (linha[n - 1] as any)[campo] - (linha[n - 2] as any)[campo] : 0;
+    return { linha, variacao: { entrega: delta('pctEntrega'), erro: delta('pctErro'), documentos: delta('documentos') } };
+  }
+
+  /**
    * ENTREGAS POR MÊS — documentos capturados por mês de emissão + obrigações entregues
    * por competência. Responde "quantos docs de 2026?" e "entregas por mês" numa tela.
    */

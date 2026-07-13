@@ -26,6 +26,7 @@ export default function GerencialPage() {
   const [ca, setCa] = useState<any>(null);
   const [em, setEm] = useState<any>(null);
   const [pan, setPan] = useState<any>(null);
+  const [ten, setTen] = useState<any>(null);
   const { competencia } = useCompetencia();
 
   const carregarPanorama = useCallback(() => {
@@ -46,6 +47,7 @@ export default function GerencialPage() {
       setD(rg.ok ? await rg.json() : null);
       setCa(rc.ok ? await rc.json() : null);
       setEm(re.ok ? await re.json() : null);
+      fetch(`${API}/api/v1/paineis/tendencias`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : null).then((x) => x && setTen(x)).catch(() => {});
     } catch {} finally { setLoading(false); }
   }, [competencia]);
   useEffect(() => { load(); carregarPanorama(); }, [load, carregarPanorama]);
@@ -135,6 +137,9 @@ export default function GerencialPage() {
 
       {/* ── CARTEIRA DOS ANALISTAS (visão gerencial rica) ── */}
       {ca?.analistas?.length > 0 && <CarteiraAnalistas ca={ca} />}
+
+      {/* ── TENDÊNCIAS (12 meses) ── */}
+      {ten?.linha?.length > 1 && <Tendencias ten={ten} />}
 
       {/* ── ENTREGAS POR MÊS + acervo do ano ── */}
       {em && <EntregasMensais em={em} />}
@@ -310,6 +315,48 @@ function PulsoItem({ n, label, cor }: { n: any; label: string; cor: string }) {
       <b className="num" style={{ fontSize: 17, fontWeight: 800, color: cor }}>{typeof n === 'number' ? n.toLocaleString('pt-BR') : n}</b>
       <span style={{ fontSize: 11.5, color: COLORS.faint }}>{label}</span>
     </span>
+  );
+}
+
+/** Tendências 12 meses — evolução de entregas, erro e movimento (o gestor vê se melhora). */
+function Tendencias({ ten }: { ten: any }) {
+  const linha = ten.linha ?? [];
+  const v = ten.variacao ?? {};
+  const maxMov = Math.max(1, ...linha.map((l: any) => l.movimento));
+  const seta = (n: number, invertido = false) => {
+    if (n === 0) return { t: '→', c: COLORS.faint };
+    const bom = invertido ? n < 0 : n > 0;
+    return { t: n > 0 ? `▲ +${n}` : `▼ ${n}`, c: bom ? COLORS.ok : COLORS.erro };
+  };
+  const sE = seta(v.entrega), sErr = seta(v.erro, true);
+  const mesLbl = (m: string) => { const [, mm] = m.split('-'); return ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][Number(mm) - 1]; };
+  return (
+    <div style={{ marginTop: 22 }}>
+      <SectionTitle><TrendingUp size={15} color={COLORS.acao} /> Tendências (12 meses)</SectionTitle>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <span style={{ fontSize: 12.5, color: COLORS.muted }}>vs mês anterior — entrega: <b style={{ color: sE.c }}>{sE.t}%</b> · erro: <b style={{ color: sErr.c }}>{sErr.t}%</b></span>
+      </div>
+      <Card style={{ padding: 14, overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', minWidth: 520 }}>
+          {linha.map((l: any) => (
+            <div key={l.mes} style={{ flex: 1, minWidth: 34, textAlign: 'center' }}>
+              {/* barra dupla: entrega (verde) e erro (vermelho) */}
+              <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', justifyContent: 'center', height: 90 }}>
+                <div title={`Entrega ${l.pctEntrega}%`} style={{ width: 10, height: `${Math.max(2, l.pctEntrega)}%`, background: COLORS.ok, borderRadius: '2px 2px 0 0' }} />
+                <div title={`Erro ${l.pctErro}%`} style={{ width: 10, height: `${Math.max(2, Math.min(100, l.pctErro))}%`, background: COLORS.erro, borderRadius: '2px 2px 0 0' }} />
+              </div>
+              <div style={{ fontSize: 10, color: COLORS.faint, marginTop: 4 }}>{mesLbl(l.mes)}</div>
+              <div className="num" style={{ fontSize: 10.5, color: COLORS.muted }}>{l.documentos}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 16, marginTop: 10, fontSize: 11.5, color: COLORS.faint }}>
+          <span><span style={{ display: 'inline-block', width: 9, height: 9, background: COLORS.ok, borderRadius: 2, marginRight: 4 }} /> % entrega</span>
+          <span><span style={{ display: 'inline-block', width: 9, height: 9, background: COLORS.erro, borderRadius: 2, marginRight: 4 }} /> % notas com erro</span>
+          <span style={{ marginLeft: 'auto' }}>nº abaixo = documentos do mês</span>
+        </div>
+      </Card>
+    </div>
   );
 }
 

@@ -72,6 +72,11 @@ export class PaineisController {
     return this.service.panorama();
   }
 
+  @Get('tendencias')
+  tendencias() {
+    return this.service.tendencias();
+  }
+
   @Get('cliente-360')
   clienteVisao360(@Query('companyId') companyId: string) {
     return this.service.clienteVisao360(companyId);
