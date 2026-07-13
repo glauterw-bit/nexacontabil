@@ -83,6 +83,7 @@ import { FluxoModule } from './modules/fluxo/fluxo.module';
 import { SyncSchedulerModule } from './modules/sync-scheduler/sync-scheduler.module';
 import { SiegModule } from './modules/sieg/sieg.module';
 import { SefazModule } from './modules/sefaz/sefaz.module';
+import { VerificacaoFinalModule } from './modules/verificacao-final/verificacao-final.module';
 import { PortalMobileModule } from './modules/portal-mobile/portal-mobile.module';
 import { ChecklistModule } from './modules/checklist/checklist.module';
 import { CobrancasModule } from './modules/cobrancas/cobrancas.module';
@@ -216,6 +217,7 @@ import { TwoFactorModule } from './modules/two-factor/two-factor.module';
     SyncSchedulerModule,
     SiegModule,
     SefazModule,
+    VerificacaoFinalModule,
     PortalMobileModule,
     ChecklistModule,
     CobrancasModule,

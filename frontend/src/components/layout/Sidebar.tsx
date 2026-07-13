@@ -39,6 +39,7 @@ const VISAO: NavItem[] = [
   { href: '/farois',    icon: Lightbulb,       label: 'Faróis' },
   { href: '/meu-dia',   icon: Sun,             label: 'Meu Dia' },
   { href: '/implantacao', icon: ClipboardCheck, label: 'Saúde da Implantação' },
+  { href: '/verificacao-final', icon: ShieldCheck, label: 'Verificação Final' },
 ];
 
 const CAMINHO: Step[] = [
