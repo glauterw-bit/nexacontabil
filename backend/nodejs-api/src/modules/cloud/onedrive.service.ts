@@ -171,6 +171,37 @@ export class OneDriveService {
     return out;
   }
 
+  /**
+   * DELTA QUERY do Graph — a forma EFICIENTE e em tempo real. Uma chamada retorna TODOS
+   * os arquivos descendentes da pasta (recursivo, sem BFS nem teto); com o deltaLink
+   * guardado, as próximas retornam SÓ o que mudou. Devolve os arquivos + o novo deltaLink.
+   */
+  async deltaScan(connectionId: string, driveId: string, folderId: string, deltaLink?: string) {
+    const token = await this.getValidToken(connectionId);
+    const base = `${GRAPH_BASE}/drives/${driveId}`;
+    let url: string | null = deltaLink || `${base}/items/${folderId}/delta?$top=500`;
+    const arquivos: Array<{ id: string; name: string; driveId: string; modified: string | null }> = [];
+    let novoDeltaLink: string | null = deltaLink ?? null;
+    let guard = 0, primeira = true;
+    while (url && guard++ < 400) {
+      const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        // deltaLink expirado (410 Gone) → recomeça leitura completa da pasta uma vez
+        if (primeira && deltaLink) { primeira = false; url = `${base}/items/${folderId}/delta?$top=500`; continue; }
+        break;
+      }
+      primeira = false;
+      const json: any = await res.json();
+      for (const item of (json.value ?? [])) {
+        if (item.deleted || item.folder || !item.file) continue; // só arquivos, ignora pastas/removidos
+        arquivos.push({ id: item.id, name: item.name, driveId, modified: item.lastModifiedDateTime ?? null });
+      }
+      if (json['@odata.nextLink']) url = json['@odata.nextLink'];
+      else { novoDeltaLink = json['@odata.deltaLink'] ?? novoDeltaLink; url = null; }
+    }
+    return { arquivos, deltaLink: novoDeltaLink };
+  }
+
   /** Coleta recursivamente arquivos (por extensão) dentro de uma pasta. */
   async coletarArquivos(connectionId: string, driveId: string, folderId: string, opts: { ext?: string[]; maxFiles?: number; todos?: boolean } = {}) {
     // todos=true → captura QUALQUER arquivo (sem filtro de extensão).

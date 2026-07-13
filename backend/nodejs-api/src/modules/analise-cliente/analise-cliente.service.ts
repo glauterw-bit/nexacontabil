@@ -225,6 +225,94 @@ export class AnaliseClienteService {
     return { sincronizados: lote.length, novosDocs, detalhes };
   }
 
+  /** Cria um Document a partir de um XML já baixado (dedup por nome de arquivo do drive). */
+  private async criarDocDeXml(companyId: string, xml: string, fileName: string, fileUrl: string, segmento?: string, uf?: string): Promise<'novo' | 'invalido'> {
+    const nf = parseNfe(xml);
+    if (!nf) return 'invalido';
+    const incs: string[] = [];
+    for (const it of nf.itens) {
+      if (!it.ncm) continue;
+      try {
+        const v = await this.ncm.validarTributacao({ ncm: it.ncm, segmento, uf, icmsAliquota: it.icms, ipiAliquota: it.ipi, pisAliquota: it.pis, cofinsAliquota: it.cofins, cfop: it.cfop });
+        if (!v.regraEncontrada) incs.push(`NCM ${it.ncm} sem regra no Banco de NCM`);
+        else if (!v.ok) for (const dd of v.divergencias) incs.push((dd as any).obs ? `NCM ${it.ncm}: ${(dd as any).obs}` : `NCM ${it.ncm}: ${dd.campo} veio ${dd.encontrado}% (esperado ${dd.esperado}%)`);
+      } catch { /* segue */ }
+    }
+    try {
+      await this.prisma.document.create({
+        data: {
+          companyId, type: nf.tipo, status: 'completed', originalFilename: fileName, fileUrl,
+          number: nf.numero ? String(nf.numero) : undefined, totalValue: nf.valorTotal,
+          issuerName: nf.emitenteNome, issuerCnpj: nf.emitenteCnpj, recipientName: nf.destNome, recipientCnpj: nf.destCnpj,
+          confidenceScore: 1, extractedData: JSON.stringify(nf),
+          fiscalValidation: JSON.stringify({ ok: incs.length === 0, inconsistencias: incs }),
+          issueDate: nf.dataEmissao ? new Date(nf.dataEmissao) : undefined,
+        },
+      });
+      return 'novo';
+    } catch { return 'invalido'; }
+  }
+
+  /**
+   * SINCRONIZAÇÃO POR DELTA (Graph) — a forma eficiente/tempo real. 1ª vez: lê TODOS os
+   * arquivos da pasta do cliente (recursivo, sem teto → acha 2026 esteja onde estiver);
+   * depois, só o que mudou. Guarda o deltaLink por cliente.
+   */
+  async sincronizarDelta(companyId: string) {
+    const c = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true, sharepointDriveId: true, sharepointItemId: true, sharepointDeltaLink: true, segmentoFiscal: true, uf: true },
+    });
+    if (!c?.sharepointDriveId || !c?.sharepointItemId) throw new BadRequestException('Cliente sem pasta do SharePoint vinculada.');
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) throw new BadRequestException('Nenhuma conexão OneDrive ativa.');
+
+    const { arquivos, deltaLink } = await this.onedrive.deltaScan(conn.id, c.sharepointDriveId, c.sharepointItemId, c.sharepointDeltaLink ?? undefined);
+    const existentes = new Set(
+      (await this.prisma.document.findMany({ where: { companyId }, select: { originalFilename: true } })).map((d) => d.originalFilename),
+    );
+    const ehXml = (n: string) => n.toLowerCase().endsWith('.xml');
+    const extDe = (nome: string) => { const p = nome.split('.'); return p.length > 1 ? p.pop()!.toLowerCase().slice(0, 12) : 'arquivo'; };
+    const novos = arquivos.filter((f) => !existentes.has(f.name));
+
+    let novosXml = 0, novosOutros = 0, ignorados = 0;
+    for (const f of novos.filter((f) => !ehXml(f.name))) {
+      try {
+        await this.prisma.document.create({ data: { companyId, type: extDe(f.name), status: 'recebido', originalFilename: f.name, fileUrl: `${f.driveId}|${f.id}`, confidenceScore: 0, issueDate: f.modified ? new Date(f.modified) : undefined } });
+        novosOutros++;
+      } catch { ignorados++; }
+    }
+    const xmls = novos.filter((f) => ehXml(f.name));
+    const CONC = 6;
+    for (let i = 0; i < xmls.length; i += CONC) {
+      const fatia = xmls.slice(i, i + CONC);
+      await Promise.all(fatia.map(async (f) => {
+        try {
+          const { buffer } = await this.onedrive.downloadFile(conn.id, f.id, f.driveId);
+          const r = await this.criarDocDeXml(companyId, buffer.toString('utf8'), f.name, `${f.driveId}|${f.id}`, c.segmentoFiscal ?? undefined, c.uf ?? undefined);
+          if (r === 'novo') novosXml++; else ignorados++;
+        } catch { ignorados++; }
+      }));
+    }
+    await this.prisma.company.update({ where: { id: companyId }, data: { sharepointDeltaLink: deltaLink ?? c.sharepointDeltaLink, sharepointAnalisadoEm: new Date(), sharepointDocsCount: existentes.size + novosXml + novosOutros } });
+    return { cliente: c.name, arquivosNoDelta: arquivos.length, novosXml, novosOutros, ignorados, incremental: !!c.sharepointDeltaLink };
+  }
+
+  /** Delta em lote (agendador/manual): clientes há mais tempo sem sync, com pasta. */
+  async sincronizarDeltaLote(limit = 6) {
+    const lote = await this.prisma.company.findMany({
+      where: { active: true, sharepointItemId: { not: null } },
+      orderBy: { sharepointAnalisadoEm: 'asc' }, take: limit, select: { id: true, name: true },
+    });
+    const pend = await this.prisma.company.count({ where: { active: true, sharepointItemId: { not: null } } });
+    let novos = 0; const detalhes: any[] = [];
+    for (const c of lote) {
+      try { const r = await this.sincronizarDelta(c.id); novos += r.novosXml + r.novosOutros; if (r.novosXml + r.novosOutros > 0) detalhes.push({ cliente: c.name, xml: r.novosXml, outros: r.novosOutros }); }
+      catch (e: any) { detalhes.push({ cliente: c.name, erro: e?.message ?? 'erro' }); }
+    }
+    return { processados: lote.length, deUmTotal: pend, novos, detalhes };
+  }
+
   /**
    * RE-VARREDURA PROFUNDA de toda a carteira ativa em uma passada.
    * Processa quem ainda não foi tocado NESTA rodada (sharepointAnalisadoEm < desde),

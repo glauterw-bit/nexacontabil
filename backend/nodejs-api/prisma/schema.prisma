@@ -73,6 +73,7 @@ model Company {
   sharepointDriveId    String?  // drive da pasta (pra ler os documentos depois)
   sharepointAnalisadoEm DateTime? // quando a pasta foi varrida (evita re-tentar)
   sharepointDocsCount  Int?     // nº de XMLs analisados na última varredura
+  sharepointDeltaLink  String?  // token do Graph Delta (leitura incremental/tempo real)
 
   // SEFAZ NFeDistribuiçãoDFe: controle de NSU (Número Sequencial Único) por cliente
   sefazUltNSU          String?   // último NSU já lido (retoma de onde parou)

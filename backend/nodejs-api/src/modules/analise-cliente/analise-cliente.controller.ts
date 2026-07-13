@@ -29,6 +29,18 @@ export class AnaliseClienteController {
     return this.svc.resyncLote(body.desde, body?.limit ?? 8, body?.maxFiles ?? 300);
   }
 
+  /** Sincronização por DELTA do Graph (eficiente/tempo real) — 1 cliente. */
+  @Post('delta')
+  delta(@Body() body: { companyId: string }) {
+    return this.svc.sincronizarDelta(body.companyId);
+  }
+
+  /** Delta em lote (chamar em loop). */
+  @Post('delta-lote')
+  deltaLote(@Body() body: { limit?: number }) {
+    return this.svc.sincronizarDeltaLote(body?.limit ?? 6);
+  }
+
   /** Diagnóstico do acervo capturado: por tipo, por ano de emissão, sem-data, "temos 2026?". */
   @Get('diagnostico')
   diagnostico() {

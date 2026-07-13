@@ -42,7 +42,28 @@ export default function DriveConectadoPage() {
   // resync completo (puxa todo e qualquer arquivo)
   const [resync, setResync] = useState<{ rodando: boolean; processados: number; restantes: number; novos: number } | null>(null);
   const [reparse, setReparse] = useState<{ rodando: boolean; corrigidos: number; restantes: number } | null>(null);
+  const [delta, setDelta] = useState<{ rodando: boolean; processados: number; novos: number; total: number } | null>(null);
   const pararRef = (typeof window !== 'undefined') ? (window as any) : {};
+
+  async function sincronizarDelta() {
+    if (delta?.rodando) { pararRef.__pararDelta = true; return; }
+    pararRef.__pararDelta = false;
+    let processados = 0, novos = 0, total = 0, rodadasSemProgresso = 0;
+    setDelta({ rodando: true, processados: 0, novos: 0, total: 0 });
+    try {
+      // roda em loop; delta-lote rotaciona por sharepointAnalisadoEm — paramos quando dá 2 voltas sem novos
+      for (let i = 0; i < 60 && !pararRef.__pararDelta; i++) {
+        const r = await fetch(`${API}/api/v1/analise-cliente/delta-lote`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ limit: 6 }) });
+        if (!r.ok) { toast.push('Falha no delta — verifique a conexão do OneDrive.', { variant: 'error' }); break; }
+        const d = await r.json();
+        processados += d.processados ?? 0; novos += d.novos ?? 0; total = d.deUmTotal ?? total;
+        setDelta({ rodando: !pararRef.__pararDelta, processados, novos, total });
+        if ((d.novos ?? 0) === 0) rodadasSemProgresso++; else rodadasSemProgresso = 0;
+        if (processados >= total || rodadasSemProgresso >= Math.ceil(total / 6) + 1) break;
+      }
+      toast.push(`Delta: ${novos} arquivo(s) novo(s) em ${processados} passagens.`, { variant: 'success' });
+    } finally { setDelta((s) => s ? { ...s, rodando: false } : null); }
+  }
 
   async function corrigirDatas() {
     if (reparse?.rodando) { pararRef.__pararReparse = true; return; }
@@ -191,6 +212,15 @@ export default function DriveConectadoPage() {
               {resync.rodando && resync.restantes > 0 && ` · ${resync.restantes} restantes`}
             </span>
           )}
+        </div>
+        <div className="flex items-center gap-3 flex-wrap pt-2 mt-1" style={{ borderTop: `1px solid ${tint(COLORS.acao, 15)}` }}>
+          <button onClick={sincronizarDelta} className={delta?.rodando ? 'btn-secondary' : 'btn-primary'} style={{ fontSize: 12.5 }}>
+            {delta?.rodando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Pausar</> : <><Cloud className="h-3.5 w-3.5" /> Sincronização inteligente (Delta)</>}
+          </button>
+          <span className="text-[11px] text-tx-muted">
+            forma mais eficiente/tempo real — 1ª vez lê tudo da pasta (acha 2026 onde estiver), depois só o que muda
+            {delta && <> · <b className="text-tx">{delta.novos}</b> novos · {delta.processados}/{delta.total || '…'}</>}
+          </span>
         </div>
         <div className="flex items-center gap-3 flex-wrap pt-2 mt-1" style={{ borderTop: `1px solid ${tint(COLORS.acao, 15)}` }}>
           <button onClick={corrigirDatas} className="btn-secondary" style={{ fontSize: 12.5 }}>
