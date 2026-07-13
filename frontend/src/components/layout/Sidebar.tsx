@@ -95,7 +95,7 @@ const MODULOS: NavGroup[] = [
     items: [
       { href: '/painel-analista',      icon: UserCheck, label: 'Painel do Analista' },
       { href: '/produtividade',        icon: Users,     label: 'Produtividade' },
-      { href: '/atribuir-responsavel', icon: UserCheck, label: 'Atribuir Responsáveis' },
+      { href: '/atribuir-responsavel', icon: UserCheck, label: 'Gestão de Carteira' },
       { href: '/gestao-equipe',        icon: Users,     label: 'Gestão de Equipe' },
       { href: '/dashboard',            icon: Building2, label: 'Painel do Cliente' },
       { href: '/insights',             icon: Boxes,     label: 'Insights de IA' },
