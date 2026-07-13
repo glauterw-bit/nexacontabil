@@ -1,5 +1,7 @@
 import { Module, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../../common/public.decorator';
+import { PrismaService } from '../../database/prisma.service';
 import { SyncSchedulerService } from './sync-scheduler.service';
 import { FluxoModule } from '../fluxo/fluxo.module';
 import { AnaliseClienteModule } from '../analise-cliente/analise-cliente.module';
@@ -23,11 +25,18 @@ class SyncSchedulerController {
   run() {
     return this.service.runCycle('manual');
   }
+
+  /** Progresso PÚBLICO da 1ª volta do Delta (só contadores) — permite acompanhamento externo. */
+  @Public()
+  @Get('progresso')
+  progresso() {
+    return this.service.progressoPublico();
+  }
 }
 
 @Module({
   imports: [FluxoModule, AnaliseClienteModule, FiscalCalendarModule, SolicitacoesModule, NcmInteligenteModule],
   controllers: [SyncSchedulerController],
-  providers: [SyncSchedulerService],
+  providers: [SyncSchedulerService, PrismaService],
 })
 export class SyncSchedulerModule {}

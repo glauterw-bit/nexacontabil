@@ -4,6 +4,7 @@ import { AnaliseClienteService } from '../analise-cliente/analise-cliente.servic
 import { FiscalCalendarService } from '../fiscal-calendar/fiscal-calendar.service';
 import { SolicitacoesService } from '../solicitacoes/solicitacoes.service';
 import { NcmInteligenteService } from '../ncm-inteligente/ncm-inteligente.service';
+import { PrismaService } from '../../database/prisma.service';
 
 /**
  * Sincronização agendada do drive (opção 1 — varredura periódica).
@@ -32,7 +33,28 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     private readonly fiscalCalendar: FiscalCalendarService,
     private readonly solicitacoes: SolicitacoesService,
     private readonly ncm: NcmInteligenteService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  /** Progresso PÚBLICO (só contadores, sem dados sensíveis) — para acompanhar a 1ª volta do Delta. */
+  async progressoPublico() {
+    const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+    const [comPasta, comDelta, docs2026, docsHoje, totalDocs] = await Promise.all([
+      this.prisma.company.count({ where: { active: true, sharepointItemId: { not: null } } }),
+      this.prisma.company.count({ where: { active: true, sharepointItemId: { not: null }, sharepointDeltaLink: { not: null } } }),
+      this.prisma.document.count({ where: { issueDate: { gte: new Date(2026, 0, 1) } } }),
+      this.prisma.document.count({ where: { createdAt: { gte: hoje0 } } }),
+      this.prisma.document.count(),
+    ]);
+    const pct = comPasta ? Math.round((comDelta / comPasta) * 100) : 0;
+    return {
+      clientesComPasta: comPasta, clientesLidosPeloDelta: comDelta, pctPrimeiraVolta: pct,
+      primeiraVoltaCompleta: comPasta > 0 && comDelta >= comPasta,
+      docs2026, docsHoje, totalDocs,
+      executandoAgora: this.running,
+      ultimoCiclo: this.lastRun?.finishedAt ?? null,
+    };
+  }
 
   private get enabled(): boolean {
     return (process.env.SYNC_ENABLED ?? 'true').toLowerCase() !== 'false';
