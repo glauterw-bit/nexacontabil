@@ -57,6 +57,11 @@ export class PaineisController {
     return this.service.monofasicoOportunidade();
   }
 
+  @Get('monofasico-cliente')
+  monofasicoCliente(@Query('companyId') companyId: string) {
+    return this.service.monofasicoCliente(companyId);
+  }
+
   @Post('limpar-carteira')
   limparCarteira(@Body() body: { dryRun?: boolean }) {
     return this.service.limparCarteira(body?.dryRun ?? false);

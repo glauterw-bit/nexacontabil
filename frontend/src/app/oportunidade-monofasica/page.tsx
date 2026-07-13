@@ -106,7 +106,8 @@ export default function MonofasicoPage() {
             <TrendingUp size={15} color={COLORS.ok} style={{ flexShrink: 0, marginTop: 1 }} />
             <span><b>Ação recomendada:</b> {sel.acao}</span>
           </div>
-          <div style={{ marginTop: 10 }}>
+          <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Link href={`/laudo-monofasico?companyId=${sel.companyId}`} className="btn-primary" style={{ fontSize: 12.5 }}>Gerar laudo (PDF) <ChevronRight size={13} /></Link>
             <Link href={`/cliente-erros?companyId=${sel.companyId}`} className="btn-secondary" style={{ fontSize: 12.5 }}>Ver notas do cliente <ChevronRight size={13} /></Link>
           </div>
         </Card>

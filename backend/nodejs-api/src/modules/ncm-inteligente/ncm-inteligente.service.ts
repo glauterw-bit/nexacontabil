@@ -459,6 +459,47 @@ Retorne:
     return { uf: u, aliquota };
   }
 
+  /**
+   * Importa a tabela IBPT (De Olho no Imposto / Lei 12.741) de UMA UF a partir do CSV
+   * baixado no portal do IBPT. Colunas: codigo;ex;tipo;descricao;nacionalfederal;
+   * importadosfederal;estadual;municipal;...  — carga tributária APROXIMADA por NCM.
+   */
+  async importarIbpt(uf: string, csv: string) {
+    const u = (uf || '').toUpperCase();
+    if (!ICMS_INTERNO_UF[u]) throw new BadRequestException('UF inválida.');
+    const linhas = (csv || '').split(/\r?\n/).filter((l) => l.trim());
+    if (!linhas.length) throw new BadRequestException('CSV vazio.');
+    const sep = linhas[0].includes(';') ? ';' : ',';
+    const head = linhas[0].toLowerCase().split(sep).map((h) => h.trim());
+    const idx = (nome: string) => head.findIndex((h) => h.includes(nome));
+    const iCod = idx('codigo') >= 0 ? idx('codigo') : 0;
+    const iTipo = idx('tipo'), iDesc = idx('descricao'), iNac = idx('nacionalfederal'),
+      iImp = idx('importadosfederal'), iEst = idx('estadual'), iMun = idx('municipal'),
+      iVer = idx('versao'), iVig = idx('vigenciafim');
+    const num = (s?: string) => { const n = parseFloat((s ?? '').replace(',', '.')); return isNaN(n) ? 0 : n; };
+    let importados = 0;
+    for (let i = 1; i < linhas.length; i++) {
+      const c = linhas[i].split(sep);
+      if (iTipo >= 0 && c[iTipo]?.trim() !== '0') continue; // tipo 0 = mercadoria por NCM
+      const ncm = (c[iCod] ?? '').replace(/\D/g, '');
+      if (ncm.length !== 8) continue;
+      try {
+        await this.prisma.ibptAliquota.upsert({
+          where: { ncm_uf: { ncm, uf: u } },
+          update: { descricao: c[iDesc]?.trim(), nacionalFederal: num(c[iNac]), importadoFederal: num(c[iImp]), estadual: num(c[iEst]), municipal: num(c[iMun]), versao: c[iVer]?.trim(), vigenciaFim: c[iVig]?.trim(), importadoEm: new Date() },
+          create: { ncm, uf: u, descricao: c[iDesc]?.trim(), nacionalFederal: num(c[iNac]), importadoFederal: num(c[iImp]), estadual: num(c[iEst]), municipal: num(c[iMun]), versao: c[iVer]?.trim(), vigenciaFim: c[iVig]?.trim() },
+        });
+        importados++;
+      } catch { /* linha inválida */ }
+    }
+    return { uf: u, importados, linhas: linhas.length - 1 };
+  }
+
+  async statusIbpt() {
+    const grp = await this.prisma.ibptAliquota.groupBy({ by: ['uf'], _count: { ncm: true }, _max: { versao: true, importadoEm: true } });
+    return { ufs: grp.map((g) => ({ uf: g.uf, ncms: g._count.ncm, versao: g._max.versao, importadoEm: g._max.importadoEm })).sort((a, b) => a.uf.localeCompare(b.uf)) };
+  }
+
   async matriz(input: { ncm: string; origem: string; destino: string; segmento?: string; importado?: boolean }) {
     const rule: any = await this.lookup(input.ncm, input.segmento, input.destino);
     const mono = regraMonofasico(input.ncm);
@@ -468,6 +509,14 @@ Retorne:
     const inter = aliquotaInterestadual(input.origem, input.destino, input.importado);
     const operacaoInterna = uO === uD;
     const df = { difal: interno.destino != null ? Math.round(((interno.destino as number) - inter) * 100) / 100 : null };
+
+    // IBPT (Lei da Transparência) — carga aproximada por NCM na UF de destino, se importada
+    const ncmDig = (input.ncm || '').replace(/\D/g, '');
+    const ibptRow = ncmDig.length === 8 ? await this.prisma.ibptAliquota.findUnique({ where: { ncm_uf: { ncm: ncmDig, uf: uD } } }) : null;
+    const ibpt = ibptRow ? {
+      federal: input.importado ? ibptRow.importadoFederal : ibptRow.nacionalFederal,
+      estadual: ibptRow.estadual, municipal: ibptRow.municipal, versao: ibptRow.versao,
+    } : null;
 
     // PIS/COFINS — base legal do monofásico define os CST de saída/entrada
     const pisCofins = mono
@@ -486,6 +535,7 @@ Retorne:
       st: { tem: !!rule?.icmsSt, mva: rule?.mvaSt ?? null, cest: rule?.cest ?? null },
       ipi: { aliquota: rule?.ipiAliquota ?? null, cst: rule?.ipiCst ?? null },
       pisCofins,
+      ibpt,
       monofasico: mono ? mono.grupo : null,
       regraEncontrada: !!rule,
       fonteAliquotasInternas: '2025/2026 — tabela atualizável (auditoria semanal).',

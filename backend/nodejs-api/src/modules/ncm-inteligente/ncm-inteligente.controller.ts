@@ -43,6 +43,18 @@ export class NcmInteligenteController {
     return this.svc.setAliquotaUF(body.uf, body.aliquota, body?.por);
   }
 
+  /** Importa a tabela IBPT de uma UF (CSV baixado no portal do IBPT). */
+  @Post('ibpt/importar')
+  importarIbpt(@Body() body: { uf: string; csv: string }) {
+    return this.svc.importarIbpt(body.uf, body.csv);
+  }
+
+  /** Status da IBPT importada (por UF, versão, quantidade). */
+  @Get('ibpt/status')
+  statusIbpt() {
+    return this.svc.statusIbpt();
+  }
+
   @Post('validar')
   validar(@Body() body: any) {
     return this.svc.validarTributacao(body);

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { monofasicoPorNcm, regraMonofasico } from '../organizacao/classificacao.util';
 
@@ -587,6 +587,53 @@ export class PaineisService {
       totalRecuperavelReais: r2(totalRecuperavel),
       totalEconomiaSimplesAno: r2(clientes.reduce((s, c) => s + c.economiaSimplesAnoEstimada, 0)),
       clientes,
+    };
+  }
+
+  /** DETALHE do monofásico de UM cliente — base do laudo (PDF): notas com PIS/COFINS
+   *  cobrado na revenda (recuperável), agrupadas por lei, com totais. */
+  async monofasicoCliente(companyId: string) {
+    const co = await this.prisma.company.findUnique({ where: { id: companyId }, select: { name: true, cnpj: true, taxRegime: true, uf: true } });
+    if (!co) throw new NotFoundException('Cliente não encontrado');
+    const simples = co.taxRegime === 'SIMPLES_NACIONAL';
+    const docs = await this.prisma.document.findMany({
+      where: { companyId, extractedData: { not: null } },
+      select: { number: true, issueDate: true, extractedData: true },
+    });
+    const grupos = new Set<string>(); const leis = new Set<string>();
+    let valorMono = 0, notasMono = 0, recuperavel = 0;
+    const notas: any[] = [];
+    for (const d of docs) {
+      const nf = safe(d.extractedData);
+      let indevidoNota = 0, monoNota = 0, pcMax = 0;
+      for (const it of (nf?.itens ?? [])) {
+        const reg = regraMonofasico(it.ncm);
+        if (!reg) continue;
+        const cfop = String(it.cfop ?? '');
+        if (!['5', '6', '7'].includes(cfop[0])) continue;
+        grupos.add(reg.grupo); leis.add(reg.lei);
+        const v = it.valor ?? 0; monoNota += v;
+        const cst = String(it.cst ?? '').trim();
+        const isSimplesNota = cst.length === 3 || simples;
+        const pc = (it.pis ?? 0) + (it.cofins ?? 0);
+        if (!isSimplesNota && pc > 0.01) { indevidoNota += v * pc / 100; pcMax = Math.max(pcMax, pc); }
+      }
+      if (monoNota > 0.005) {
+        valorMono += monoNota; notasMono++;
+        if (indevidoNota > 0.005) recuperavel += indevidoNota;
+        notas.push({ numero: nf?.numero ?? d.number, data: d.issueDate, valorMono: r2(monoNota), pisCofinsPct: pcMax || null, recuperavel: r2(indevidoNota) });
+      }
+    }
+    notas.sort((a, b) => b.recuperavel - a.recuperavel || b.valorMono - a.valorMono);
+    return {
+      empresa: { nome: co.name, cnpj: co.cnpj, regime: co.taxRegime, uf: co.uf },
+      simples, grupos: [...grupos], leis: [...leis],
+      valorMono: r2(valorMono), notasMono, recuperavelReais: r2(recuperavel),
+      economiaSimplesAnoEstimada: simples ? r2(valorMono * 0.0328) : 0,
+      acao: simples
+        ? 'Segregar a receita monofásica no PGDAS-D (reduz o DAS mensal) e pedir restituição/compensação dos últimos 5 anos.'
+        : 'Recuperar o PIS/COFINS recolhido indevidamente na revenda (últimos 5 anos) e parar de recolher.',
+      notas: notas.slice(0, 200),
     };
   }
 

@@ -1681,3 +1681,21 @@ model AliquotaInternaUF {
   updatedAt    DateTime @updatedAt
   @@map("aliquotas_internas_uf")
 }
+
+// ─── Tabela IBPT (carga tributária aproximada por NCM+UF — Lei 12.741/Transparência) ───
+model IbptAliquota {
+  ncm            String
+  uf             String
+  descricao      String?
+  nacionalFederal Float  @default(0)  // % tributos federais (produto nacional)
+  importadoFederal Float @default(0)  // % tributos federais (produto importado)
+  estadual       Float   @default(0)  // % ICMS aproximado (estadual)
+  municipal      Float   @default(0)
+  versao         String?
+  vigenciaFim    String?
+  importadoEm    DateTime @default(now())
+
+  @@id([ncm, uf])
+  @@index([uf])
+  @@map("ibpt_aliquotas")
+}

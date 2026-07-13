@@ -22,6 +22,25 @@ export default function MatrizPage() {
   const [ufs, setUfs] = useState<any[]>([]);
   const [editUf, setEditUf] = useState<string>('');
   const [editVal, setEditVal] = useState<string>('');
+  const [ibptStatus, setIbptStatus] = useState<any>(null);
+  const [ibptUf, setIbptUf] = useState('SP');
+  const [importando, setImportando] = useState(false);
+  const [importMsg, setImportMsg] = useState('');
+
+  function carregarIbpt() {
+    fetch(`${API}/api/v1/ncm-inteligente/ibpt/status`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : null).then(setIbptStatus).catch(() => {});
+  }
+
+  async function importarIbpt(file: File) {
+    setImportando(true); setImportMsg('');
+    try {
+      const csv = await file.text();
+      const r = await fetch(`${API}/api/v1/ncm-inteligente/ibpt/importar`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ uf: ibptUf, csv }) });
+      const j = await r.json();
+      if (r.ok) { setImportMsg(`${j.importados} NCMs importados para ${j.uf}.`); carregarIbpt(); }
+      else setImportMsg(j?.message ?? 'Falha ao importar.');
+    } catch { setImportMsg('Erro ao ler o arquivo.'); } finally { setImportando(false); }
+  }
 
   function carregarUfs() {
     fetch(`${API}/api/v1/ncm-inteligente/aliquotas-uf`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : []).then((x) => setUfs(Array.isArray(x) ? x : [])).catch(() => {});
@@ -29,6 +48,7 @@ export default function MatrizPage() {
   useEffect(() => {
     fetch(`${API}/api/v1/ncm-inteligente/auditoria`, { headers: authHeaders() }).then((r) => r.ok ? r.json() : null).then(setAudit).catch(() => {});
     carregarUfs();
+    carregarIbpt();
   }, []);
 
   async function salvarUf(uf: string) {
@@ -112,6 +132,14 @@ export default function MatrizPage() {
             {d.pisCofins.lei && <Linha k="Base legal" v={d.pisCofins.lei} />}
             {d.pisCofins.obs && <div style={{ fontSize: 12, color: COLORS.faint, marginTop: 4 }}>{d.pisCofins.obs}</div>}
           </Bloco>
+          {d.ibpt && (
+            <Bloco titulo="IBPT — carga aproximada (Lei da Transparência)">
+              <Linha k="Federal" v={pct(d.ibpt.federal)} />
+              <Linha k="Estadual" v={pct(d.ibpt.estadual)} />
+              <Linha k="Municipal" v={pct(d.ibpt.municipal)} />
+              <div style={{ fontSize: 11, color: COLORS.faint, marginTop: 4 }}>Fonte IBPT {d.ibpt.versao ?? ''} — carga total aproximada para o consumidor (Lei 12.741). Não substitui a apuração.</div>
+            </Bloco>
+          )}
           {!d.regraEncontrada && <p style={{ fontSize: 12, color: COLORS.atencao }}>NCM sem regra específica no Banco — ICMS/IPI/ST usam padrão. Rode "Aprender dos XMLs" ou cadastre.</p>}
           <p style={{ fontSize: 11, color: COLORS.faint }}>{d.fonteAliquotasInternas}</p>
         </div>
@@ -137,6 +165,31 @@ export default function MatrizPage() {
           ))}
         </div>
         <p style={{ fontSize: 11, color: COLORS.faint, marginTop: 8 }}>A interestadual (4/7/12%) e o DIFAL são calculados por lei; estes valores internos alimentam o DIFAL e a operação interna.</p>
+      </details>
+
+      {/* Importação da tabela IBPT (Lei da Transparência) */}
+      <details style={{ marginTop: 14 }}>
+        <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: COLORS.strong, marginBottom: 10 }}>
+          Tabela IBPT <span style={{ color: COLORS.faint, fontWeight: 400 }}>— importar CSV do portal do IBPT (carga por NCM, atualiza trimestral)</span>
+        </summary>
+        <Card>
+          <p style={{ fontSize: 12.5, color: COLORS.muted, marginBottom: 10 }}>
+            Baixe a tabela do seu estado em <b>ibpt.org.br</b> (De Olho no Imposto) e importe o CSV aqui. A carga IBPT é a % aproximada de tributos para a Lei da Transparência — <b>referência</b>, não substitui a apuração.
+          </p>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select value={ibptUf} onChange={(e) => setIbptUf(e.target.value)} className="input-aura" style={{ padding: '7px', fontSize: 13 }}>{UFS.map((u) => <option key={u}>{u}</option>)}</select>
+            <label className="btn-primary" style={{ cursor: importando ? 'wait' : 'pointer', fontSize: 13 }}>
+              {importando ? 'Importando…' : `Importar CSV de ${ibptUf}`}
+              <input type="file" accept=".csv,.txt" hidden disabled={importando} onChange={(e) => e.target.files?.[0] && importarIbpt(e.target.files[0])} />
+            </label>
+            {importMsg && <span style={{ fontSize: 12.5, color: COLORS.ok }}>{importMsg}</span>}
+          </div>
+          {ibptStatus?.ufs?.length > 0 && (
+            <div style={{ marginTop: 12, fontSize: 12, color: COLORS.muted }}>
+              Importado: {ibptStatus.ufs.map((u: any) => `${u.uf} (${u.ncms})`).join(' · ')}
+            </div>
+          )}
+        </Card>
       </details>
     </div>
   );
