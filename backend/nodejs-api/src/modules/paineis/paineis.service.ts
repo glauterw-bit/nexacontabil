@@ -227,12 +227,14 @@ export class PaineisService {
     // senão o mês atual. Evita mostrar "0 entregues" num mês ainda não fechado.
     let comp = competencia;
     if (!comp) {
-      // mês mais recente com ENTREGAS reais (recibo achado); senão o atual
-      const ult = await this.prisma.fluxoEstado.findFirst({
-        where: { departamento: 'fiscal', reciboEncontrado: true },
-        orderBy: { competencia: 'desc' }, select: { competencia: true },
+      // mês MENSAL mais recente com obrigações ENTREGUES (calendário reconciliado); senão o atual
+      const entregues = await this.prisma.fiscalCalendarItem.findMany({
+        where: { status: 'entregue', competencia: { contains: '-' } },
+        select: { competencia: true }, distinct: ['competencia'],
+        orderBy: { competencia: 'desc' }, take: 6,
       });
-      comp = ult?.competencia ?? new Date().toISOString().slice(0, 7);
+      comp = entregues.map((e) => e.competencia).find((c) => /^\d{4}-\d{2}$/.test(c))
+        ?? new Date().toISOString().slice(0, 7);
     }
     const companies = await this.prisma.company.findMany({
       where: { active: true }, select: { id: true, name: true, taxRegime: true, responsavel: true, sharepointItemId: true, sharepointAnalisadoEm: true },
@@ -247,14 +249,28 @@ export class PaineisService {
       // frescor: quando o drive foi lido pela última vez e o doc mais novo capturado
       this.prisma.company.aggregate({ where: { active: true }, _max: { sharepointAnalisadoEm: true } }),
       this.prisma.document.aggregate({ where: { companyId: { in: ids } }, _max: { createdAt: true } }),
-      // obrigações do MÊS CORRENTE (fonte única, mesma tabela do calendário)
+      // obrigações da COMPETÊNCIA selecionada (fonte única = calendário reconciliado
+      // pelos comprovantes das pastas). Antes usava o mês atual e ignorava a competência.
       this.prisma.fiscalCalendarItem.findMany({
-        where: { companyId: { in: ids }, dataVencimento: { gte: inicioMes, lte: fimMes } },
-        select: { status: true, dataVencimento: true },
+        where: { companyId: { in: ids }, competencia: { startsWith: comp } },
+        select: { companyId: true, status: true, dataVencimento: true },
       }),
     ]);
     const reciboBy = new Map(fluxos.map((f) => [f.companyId, f.reciboEncontrado]));
     const mesProcessado = fluxos.length > 0; // só pune declaração se o mês já foi verificado
+
+    // OBRIGAÇÕES por cliente da competência (do calendário reconciliado) — fonte da entrega
+    const ENTREGUE_OB = new Set(['paga', 'isenta', 'entregue']);
+    const nowD2 = new Date();
+    const obBy = new Map<string, { entregues: number; vencidas: number; pendentes: number; total: number }>();
+    for (const o of obrigMes) {
+      const m = obBy.get(o.companyId) ?? { entregues: 0, vencidas: 0, pendentes: 0, total: 0 };
+      m.total++;
+      if (ENTREGUE_OB.has(o.status)) m.entregues++;
+      else if (o.status === 'vencida' || new Date(o.dataVencimento) < nowD2) m.vencidas++;
+      else m.pendentes++;
+      obBy.set(o.companyId, m);
+    }
 
     type Ag = { docs: number; entradas: number; saidas: number; inc: number; valorInc: number };
     const ag = new Map<string, Ag>();
@@ -279,7 +295,10 @@ export class PaineisService {
     let totInc = 0, valorInc = 0, clientesInc = 0;
     const clientes = companies.map((c) => {
       const a = ag.get(c.id) ?? { docs: 0, entradas: 0, saidas: 0, inc: 0, valorInc: 0 };
-      const entregue = reciboBy.get(c.id) ?? false;
+      const ob = obBy.get(c.id) ?? { entregues: 0, vencidas: 0, pendentes: 0, total: 0 };
+      // entrega REAL: se há obrigações na competência, entregue = tudo cumprido; senão,
+      // cai no sinal do recibo (fallback). Antes usava só o recibo (quebrado).
+      const entregue = ob.total > 0 ? (ob.vencidas === 0 && ob.pendentes === 0) : (reciboBy.get(c.id) ?? false);
       totDocs += a.docs; if (a.docs > 0) comDocs++; else semDocs++;
       if (a.docs > 0 && a.entradas === 0) semEntradas++;
       if (a.inc > 0) { comInc++; clientesInc++; totInc += a.inc; valorInc += a.valorInc; }
@@ -299,15 +318,17 @@ export class PaineisService {
       if (a.docs > 0 && a.entradas === 0) pend.push('sem entradas');
       if (a.inc > 0) pend.push(`${a.inc} inconsistência(s)`);
       if (!REGIMES.has(c.taxRegime ?? '')) pend.push('sem regime');
-      if (declPendente) pend.push('declaração não entregue');
+      if (ob.vencidas > 0) pend.push(`${ob.vencidas} obrigação(ões) vencida(s)`);
+      else if (declPendente) pend.push('declaração não entregue');
       if (a.docs === 0) { status = 'vermelho'; motivo = 'falta_documento'; }
       else if (a.inc >= 5) { status = 'vermelho'; motivo = 'erro_fiscal'; }
       else if (a.inc > 0) { status = 'amarelo'; motivo = 'erro_fiscal'; }
+      else if (ob.vencidas > 0) { status = 'amarelo'; motivo = null; } // obrigação vencida real → atenção
       else status = 'verde';
       if (status === 'verde') verdes++;
       else if (status === 'amarelo') amarelos++;
       else { vermelhos++; if (motivo === 'falta_documento') vermFalta++; else vermErro++; }
-      return { companyId: c.id, cliente: c.name, regime: c.taxRegime, responsavel: c.responsavel, docs: a.docs, inconsistencias: a.inc, valorInc: Math.round(a.valorInc * 100) / 100, declaracaoEntregue: entregue, status, motivo, pendencias: pend };
+      return { companyId: c.id, cliente: c.name, regime: c.taxRegime, responsavel: c.responsavel, docs: a.docs, inconsistencias: a.inc, valorInc: Math.round(a.valorInc * 100) / 100, declaracaoEntregue: entregue, obrigacoes: { entregues: ob.entregues, vencidas: ob.vencidas, pendentes: ob.pendentes, total: ob.total }, status, motivo, pendencias: pend };
     }).sort((x, y) => ({ vermelho: 0, amarelo: 1, verde: 2 } as any)[x.status] - ({ vermelho: 0, amarelo: 1, verde: 2 } as any)[y.status] || y.inconsistencias - x.inconsistencias);
 
     // COBERTURA DE SINCRONIZAÇÃO da carteira toda (o gestor vê num relance se o drive
@@ -321,8 +342,7 @@ export class PaineisService {
       else syncOk++;
     }
 
-    // OBRIGAÇÕES DO MÊS CORRENTE (agregado da carteira)
-    const ENTREGUE_OB = new Set(['paga', 'isenta', 'entregue']);
+    // OBRIGAÇÕES DA COMPETÊNCIA (agregado da carteira) — reflete o calendário reconciliado
     const nowD = new Date();
     let obTotal = 0, obVencidas = 0, obProximas = 0, obEntregues = 0;
     const em7 = new Date(nowD.getTime() + 7 * 86400000);
@@ -357,8 +377,8 @@ export class PaineisService {
       },
       // cobertura de leitura do drive na carteira inteira
       sincronizacao: { ok: syncOk, desatualizado: syncStale, nunca: syncNunca, semPasta: syncSemPasta },
-      // obrigações do mês corrente (mês de calendário, não a competência processada)
-      obrigacoesMes: { mes: nowComp, total: obTotal, vencidas: obVencidas, proximas7: obProximas, entregues: obEntregues },
+      // obrigações da COMPETÊNCIA selecionada (calendário reconciliado pelos comprovantes)
+      obrigacoesMes: { mes: comp, total: obTotal, vencidas: obVencidas, proximas7: obProximas, entregues: obEntregues },
       porAnalista,
       semaforo: { verdes, amarelos, vermelhos, vermelhoFalta: vermFalta, vermelhoErro: vermErro },
       documentos: { total: totDocs, clientesComDocs: comDocs, clientesSemDocs: semDocs },
