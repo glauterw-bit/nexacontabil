@@ -74,11 +74,28 @@ export class BuscaDocsService {
     if (termoCliente && STOP.has(termoCliente.toLowerCase())) termoCliente = '';
     const pediuCliente = termoCliente.length >= 3;
     if (pediuCliente) {
+      // 1) tentativa direta (substring) — rápida, cobre a maioria
       clienteMatches = await this.prisma.company.findMany({
         where: { name: { contains: termoCliente, mode: 'insensitive' } },
         select: { id: true, name: true },
         take: 30,
       });
+      // 2) fallback ROBUSTO por tokens sem acento — pega "JR chuvisco" vs "J.R. CHUVISCO
+      //    COMERCIO LTDA", ordem trocada, pontuação, acentos. Casa se TODOS os tokens
+      //    (≥2 letras) do termo aparecem no nome normalizado.
+      if (!clienteMatches.length) {
+        const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+        const colar = (s: string) => norm(s).replace(/ /g, ''); // ignora espaços/pontos: "J.R." == "JR"
+        const tokens = norm(termoCliente).split(' ').filter((t) => t.length >= 2);
+        const termoColado = colar(termoCliente);
+        if (tokens.length || termoColado.length >= 3) {
+          const todas = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true } });
+          clienteMatches = todas.filter((c) => {
+            const n = norm(c.name);
+            return (tokens.length && tokens.every((t) => n.includes(t))) || (termoColado.length >= 3 && colar(c.name).includes(termoColado));
+          }).slice(0, 30);
+        }
+      }
       if (clienteMatches.length) companyIds = clienteMatches.map((c) => c.id);
     }
 
