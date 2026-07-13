@@ -24,6 +24,13 @@ class VerificacaoFinalController {
     return this.service.resumoPublico(ano ? parseInt(ano, 10) : undefined);
   }
 
+  /** Diagnóstico da carteira: ativas na planilha oficial × fora dela. */
+  @Public()
+  @Get('carteira')
+  carteira() {
+    return this.service.diagnosticoCarteira();
+  }
+
   /** Dispara a análise garantidora (aprender NCM → revalidar acervo → auditoria). */
   @Post('analise')
   analise() {

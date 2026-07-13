@@ -140,6 +140,38 @@ export class VerificacaoFinalService {
   }
 
   /**
+   * DIAGNÓSTICO DA CARTEIRA: quantas empresas ativas estão na planilha oficial (175 reais)
+   * e quantas estão FORA dela (candidatas a "não existem" — teste/duplicadas/antigas).
+   */
+  async diagnosticoCarteira() {
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const nomesOficiais = new Set(CADASTRO_OFICIAL_2026.map((r) => norm(r.nome)));
+    const codigosOficiais = new Set(CADASTRO_OFICIAL_2026.map((r) => String(r.codigo)));
+    const ativas = await this.prisma.company.findMany({
+      where: { active: true },
+      select: { id: true, name: true, cnpj: true, clienteCodigo: true },
+      orderBy: { name: 'asc' },
+    });
+    const docsPorEmp = new Map((await this.prisma.document.groupBy({ by: ['companyId'], _count: { id: true } })).map((r) => [r.companyId, r._count.id]));
+    const dentro: any[] = [], fora: any[] = [];
+    for (const c of ativas) {
+      const noOficial = (c.clienteCodigo && codigosOficiais.has(String(c.clienteCodigo))) || nomesOficiais.has(norm(c.name));
+      const cnpj = (c.cnpj ?? '').replace(/\D/g, '');
+      const item = { nome: c.name, docs: docsPorEmp.get(c.id) ?? 0, cnpjProvisorio: !cnpj || cnpj.startsWith('7') };
+      (noOficial ? dentro : fora).push(item);
+    }
+    return {
+      ativasTotal: ativas.length,
+      naPlanilhaOficial: dentro.length,
+      foraDaPlanilha: fora.length,
+      planilhaTotal: CADASTRO_OFICIAL_2026.length,
+      foraSemDocs: fora.filter((f) => f.docs === 0).length,
+      foraComCnpjProvisorio: fora.filter((f) => f.cnpjProvisorio).length,
+      amostraFora: fora.slice(0, 40),
+    };
+  }
+
+  /**
    * Aplica o CADASTRO OFICIAL (planilha de controle 2026) ao sistema — fonte da verdade
    * p/ CNPJ, regime e status Ativa/Inativa. Casa por código Domínio (clienteCodigo) e,
    * na falta, por nome normalizado. Idempotente: reaplicar não muda nada.
