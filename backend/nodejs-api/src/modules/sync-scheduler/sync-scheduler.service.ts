@@ -37,6 +37,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   private reconGlobalFeita = false;
   private reconGlobalResultado: any = null;
   private carteiraRealinhada = false;
+  private appScanIndisponivel = false; // desliga o scan app-only no boot se faltar permissão Azure
 
   constructor(
     private readonly fluxo: FluxoService,
@@ -439,6 +440,17 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
           const ano = startedAt.getFullYear();
           return this.analise.reconciliarGlobalPorTipo({ anos: [ano, ano - 1] });
         });
+        // 3b. RECONCILIAÇÃO APP-ONLY (getAllSites → drives → delta) — cobertura 100%, incremental.
+        //     Só roda de verdade quando há permissão de APLICAÇÃO consentida no Azure; enquanto
+        //     não há, retorna erro barato (1 chamada) e é pulada. Auto-desliga no boot se indisponível.
+        if (!this.appScanIndisponivel) {
+          await passo('reconciliarAppOnly', async () => {
+            const ano = startedAt.getFullYear();
+            const r: any = await this.analise.reconciliarAppOnly({ anos: [ano, ano - 1], timeBudgetMs: 6 * 60_000 });
+            if (r?.erro) { this.appScanIndisponivel = true; return { pulado: true, motivo: 'sem permissão de aplicação (Azure)' }; }
+            return r;
+          });
+        }
         // 4. recibo genérico (fallback) p/ quem não casou por documento específico
         await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 6));
         // 5. marca vencidas o que sobrou pendente e já passou do prazo
