@@ -98,6 +98,14 @@ class SyncSchedulerController {
   reconciliarSearch(@Query('ano') ano?: string) {
     return this.service.reconciliarViaSearch(ano ? parseInt(ano, 10) : undefined);
   }
+
+  /** Reconciliação GLOBAL por tipo (PGDASD/DCTF/FGTS...) — acha entregas de qualquer ano. */
+  @Public()
+  @Get('reconciliar-global')
+  reconciliarGlobal(@Query('anos') anos?: string) {
+    const lista = anos ? anos.split(',').map((a) => parseInt(a, 10)).filter(Boolean) : undefined;
+    return this.service.reconciliarGlobal(lista);
+  }
 }
 
 @Module({

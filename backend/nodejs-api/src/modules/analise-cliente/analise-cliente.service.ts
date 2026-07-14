@@ -374,6 +374,80 @@ export class AnaliseClienteService {
     return { ano, empresasProcessadas: proc, comprovantesAchados: achadosTot, clientesComProva: comProva, marcadasEntregue: entregue, marcadasVencida: vencida, marcadasPendente: pendente, semAcesso, detalhe };
   }
 
+  /**
+   * RECONCILIAÇÃO GLOBAL POR TIPO — busca cada TIPO de comprovante no Drive inteiro
+   * (PGDASD, DCTF, FGTS...) e usa o webUrl p/ obter cliente + pasta + competência de cada
+   * arquivo. Casa POR TIPO E COMPETÊNCIA em qualquer ano (acha entregas de meses passados).
+   * Poucas buscas globais (não uma por cliente) → rápido e completo.
+   */
+  async reconciliarGlobalPorTipo(opts?: { anos?: number[] }) {
+    const anos = opts?.anos ?? [2024, 2025, 2026];
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+    // resolução de cliente pelo 1º segmento do caminho ("494 - OCA TECNOLOGIA (SN)")
+    const companies = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true, clienteCodigo: true } });
+    const porCodigo = new Map<string, string>(); const porNome = new Map<string, string>();
+    for (const c of companies) { if (c.clienteCodigo) porCodigo.set(String(c.clienteCodigo), c.id); const n = norm(c.name); if (n) porNome.set(n, c.id); }
+    const resolveClient = (seg: string): string | null => {
+      const codeM = seg.match(/^\s*(\d+)\s*[-–]/);
+      if (codeM && porCodigo.has(codeM[1])) return porCodigo.get(codeM[1])!;
+      const nn = norm(seg.replace(/^\s*\d+\s*[-–]\s*/, '').replace(/\([^)]*\)/g, ''));
+      if (nn.length >= 4 && porNome.has(nn)) return porNome.get(nn)!;
+      if (nn.length >= 6) for (const [n, id] of porNome) if (n.length >= 6 && (nn.includes(n) || n.includes(nn))) return id;
+      return null;
+    };
+    const extractComp = (s: string): string | null => {
+      for (const y of anos) for (let m = 1; m <= 12; m++) {
+        const mm = String(m).padStart(2, '0');
+        if (s.includes(`${mm} ${y}`) || s.includes(`${y} ${mm}`) || s.includes(`${mm}${y}`) || (s.includes(MESES[m - 1]) && s.includes(String(y)))) return `${y}-${mm}`;
+      }
+      return null;
+    };
+
+    // busca cada tipo globalmente; mapeia entregas por cliente|tipo|competência
+    const termos: Record<string, string[]> = { DAS: ['PGDASD'], 'DASN-SIMEI': ['PGMEI', 'DASN'], DCTFWeb: ['DCTF'], FGTS: ['FGTS', 'GRF'], EFD_REINF: ['REINF'], DARF: ['DARF'], ICMS: ['GIA'], ESOCIAL: ['eSocial'] };
+    const entregas = new Map<string, Set<string>>();
+    let arquivosVistos = 0, semCliente = 0, semComp = 0;
+    for (const [tipo, qs] of Object.entries(termos)) {
+      for (const q of qs) {
+        let arquivos: Array<{ name: string; path: string }> = [];
+        try { arquivos = await this.onedrive.buscarNoDriveRaw(conn.id, q); } catch { continue; }
+        for (const f of arquivos) {
+          arquivosVistos++;
+          const seg = (f.path || '').split('/')[0] || '';
+          const cid = resolveClient(seg);
+          if (!cid) { semCliente++; continue; }
+          const comp = extractComp(norm(`${f.name} ${f.path}`));
+          if (!comp) { semComp++; continue; }
+          if (!entregas.has(cid)) entregas.set(cid, new Set());
+          entregas.get(cid)!.add(`${tipo}|${comp}`);
+        }
+      }
+    }
+
+    // aplica às obrigações (todos os anos considerados)
+    const now = new Date();
+    let entregue = 0, vencida = 0, pendente = 0;
+    const anosStr = anos.map(String);
+    const itens = await this.prisma.fiscalCalendarItem.findMany({
+      where: { status: { in: ['pendente', 'vencida', 'entregue'] }, OR: anosStr.map((a) => ({ competencia: { startsWith: a } })) },
+      select: { id: true, companyId: true, tipo: true, competencia: true, dataVencimento: true, status: true },
+    });
+    for (const it of itens) {
+      const set = entregas.get(it.companyId);
+      const achou = !!set && set.has(`${it.tipo}|${it.competencia}`);
+      const novo = achou ? 'entregue' : (new Date(it.dataVencimento) < now ? 'vencida' : 'pendente');
+      if (novo !== it.status) {
+        await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: novo } }).catch(() => undefined);
+        if (novo === 'entregue') entregue++; else if (novo === 'vencida') vencida++; else pendente++;
+      }
+    }
+    return { anos, arquivosVistos, semCliente, semComp, clientesComEntrega: entregas.size, obrigacoes: itens.length, marcadasEntregue: entregue, marcadasVencida: vencida, marcadasPendente: pendente };
+  }
+
   /** Busca global no Drive (Search API) — varre todas as pastas/subpastas por um termo. */
   async buscarNoDrive(query: string) {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });

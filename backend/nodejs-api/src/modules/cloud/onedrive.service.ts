@@ -571,6 +571,28 @@ export class OneDriveService {
     } catch { return ''; }
   }
 
+  /** Busca global CRUA (todos os drives) — retorna {name, path(via webUrl)} sem agregar. */
+  async buscarNoDriveRaw(connectionId: string, query: string, maxDrives = 6): Promise<Array<{ name: string; path: string }>> {
+    const token = await this.getValidToken(connectionId);
+    const drives = [...new Set(
+      (await this.prisma.company.findMany({ where: { active: true, sharepointDriveId: { not: null } }, select: { sharepointDriveId: true } })).map((c) => c.sharepointDriveId),
+    )].filter(Boolean).slice(0, maxDrives) as string[];
+    const out: Array<{ name: string; path: string }> = [];
+    for (const driveId of drives) {
+      let url: string | null = `${GRAPH_BASE}/drives/${driveId}/root/search(q='${encodeURIComponent(query)}')?$top=200&$select=name,webUrl`;
+      let guard = 0, r429 = 0;
+      while (url && guard++ < 60) {
+        const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        if ((res.status === 429 || res.status === 503) && r429 < 5) { r429++; await new Promise((r) => setTimeout(r, Math.min(30, 2 ** r429) * 1000)); guard--; continue; }
+        if (!res.ok) break;
+        const json: any = await res.json();
+        for (const it of (json.value ?? [])) { if (!it.folder) out.push({ name: it.name ?? '', path: this._pastaDoWebUrl(it.webUrl) }); }
+        url = json['@odata.nextLink'] ?? null;
+      }
+    }
+    return out;
+  }
+
   /** Lista itens compartilhados COM a conta (Compartilhados comigo). */
   async listShared(connectionId: string) {
     const token = await this.getValidToken(connectionId);

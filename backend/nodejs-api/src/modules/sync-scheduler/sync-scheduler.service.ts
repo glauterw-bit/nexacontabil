@@ -145,6 +145,12 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.reconciliarViaSearch({ ano, timeBudgetMs: 8 * 60_000 });
   }
 
+  /** Reconciliação GLOBAL por tipo (acha entregas de qualquer ano) — gera calendários antes. */
+  async reconciliarGlobal(anos = [2024, 2025, 2026]) {
+    for (const a of anos) await this.fiscalCalendar.garantirAno(a).catch(() => undefined);
+    return this.analise.reconciliarGlobalPorTipo({ anos });
+  }
+
   /**
    * Amostra como os COMPROVANTES estão nomeados (valida a reconciliação): conta e mostra
    * exemplos de documentos cujo nome contém palavras de obrigação (DAS, DCTFWeb, FGTS...).
