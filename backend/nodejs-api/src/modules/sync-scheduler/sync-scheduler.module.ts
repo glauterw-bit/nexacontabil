@@ -149,6 +149,13 @@ class SyncSchedulerController {
   enumerarSites() {
     return this.service.enumerarSitesEDrives();
   }
+
+  /** Reaplica a regra de vencidas (marca vencidas reais + reverte FGTS/eSocial p/ portal). */
+  @Public()
+  @Get('marcar-vencidas')
+  marcarVencidas() {
+    return this.service.marcarVencidas();
+  }
 }
 
 @Module({

@@ -175,6 +175,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.enumerarSitesEDrives();
   }
 
+  /** Reaplica vencidas (marca reais + reverte FGTS/eSocial p/ portal) — correção imediata. */
+  async marcarVencidas() {
+    return this.fiscalCalendar.markOverdue();
+  }
+
   /** Resumo REAL das obrigações por tipo e status (entregue/vencida/pendente) num ano. */
   async resumoObrigacoes(ano = new Date().getFullYear()) {
     const rows = await this.prisma.fiscalCalendarItem.groupBy({
