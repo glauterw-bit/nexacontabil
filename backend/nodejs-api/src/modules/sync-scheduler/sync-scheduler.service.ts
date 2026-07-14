@@ -165,6 +165,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
    * ano, varre TODAS as empresas ativas em lotes até esgotar. É a fonte mais confiável:
    * não perde cliente (usa companyId), casa por nome+pasta do comprovante já capturado.
    */
+  /** Diagnóstico do casamento (por tipo: competência errada × doc ausente × folderPath). */
+  async diagnosticarReconciliacao(ano = new Date().getFullYear() - 1) {
+    return this.fiscalCalendar.diagnosticarReconciliacao(ano);
+  }
+
   async reconciliarDocs(anos = [2025, 2026]) {
     const total = { entregues: 0, vencidas: 0, pendentes: 0, semMudanca: 0, empresas: 0, passes: 0 };
     for (const ano of anos) {

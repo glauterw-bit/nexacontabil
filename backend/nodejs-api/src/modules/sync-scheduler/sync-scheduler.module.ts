@@ -121,6 +121,13 @@ class SyncSchedulerController {
     const lista = anos ? anos.split(',').map((a) => parseInt(a, 10)).filter(Boolean) : undefined;
     return this.service.reconciliarDocs(lista);
   }
+
+  /** Diagnóstico do casamento por tipo (competência errada × doc ausente × cobertura folderPath). */
+  @Public()
+  @Get('diagnosticar-reconciliacao')
+  diagnosticarReconciliacao(@Query('ano') ano?: string) {
+    return this.service.diagnosticarReconciliacao(ano ? parseInt(ano, 10) : undefined);
+  }
 }
 
 @Module({

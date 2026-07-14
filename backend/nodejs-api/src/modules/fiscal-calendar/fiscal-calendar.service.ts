@@ -405,4 +405,54 @@ export class FiscalCalendarService {
     }
     return { ano, empresasProcessadas: empresasProc, marcadasEntregue: entregues, marcadasVencida: vencidas, marcadasPendente: pendentes, semMudanca };
   }
+
+  /**
+   * DIAGNÓSTICO da reconciliação — isola POR QUE uma obrigação não casa. Para cada tipo:
+   *  - casaExato: achou comprovante do tipo NA competência (o que vira "entregue")
+   *  - temDocTipoNoAno: empresa tem ≥1 doc do tipo no ano (competência errada → problema de MÊS)
+   *  - semDocTipo: empresa não tem nenhum doc daquele tipo no ano (problema de DOC AUSENTE)
+   * Também reporta cobertura de folderPath nos comprovantes-PDF (gargalo de captura).
+   */
+  async diagnosticarReconciliacao(ano: number, limitEmpresas = 220) {
+    const empresas = await this.prisma.company.findMany({ where: { active: true }, select: { id: true }, take: limitEmpresas });
+    const porTipo: Record<string, { itens: number; casaExato: number; temDocTipoNoAno: number; semDocTipo: number }> = {};
+    let pdfComprovante = 0, pdfComprovanteSemPasta = 0;
+    for (const emp of empresas) {
+      const itens = await this.prisma.fiscalCalendarItem.findMany({
+        where: { companyId: emp.id, competencia: { startsWith: String(ano) } },
+        select: { tipo: true, competencia: true },
+      });
+      if (!itens.length) continue;
+      const docs = await this.prisma.document.findMany({
+        where: { companyId: emp.id, originalFilename: { not: null } },
+        select: { originalFilename: true, folderPath: true },
+      });
+      const nomes = docs.map((d) => ({
+        n: FiscalCalendarService._norm(`${d.originalFilename ?? ''} ${d.folderPath ?? ''}`),
+        temAno: (`${d.originalFilename ?? ''} ${d.folderPath ?? ''}`).includes(String(ano)),
+      }));
+      // cobertura de folderPath entre comprovantes-PDF (nome com palavra de obrigação)
+      for (const d of docs) {
+        const fn = (d.originalFilename ?? '').toLowerCase();
+        if (fn.endsWith('.pdf') && /pgdas|das|dctf|fgts|reinf|darf|esocial|gia|defis|ecd|ecf|recibo|comprovante/.test(fn)) {
+          pdfComprovante++; if (!d.folderPath) pdfComprovanteSemPasta++;
+        }
+      }
+      for (const it of itens) {
+        const kws = FiscalCalendarService._KW[it.tipo] ?? [FiscalCalendarService._norm(it.tipo)];
+        const temTipo = (extra: (x: { n: string; temAno: boolean }) => boolean) =>
+          nomes.some((x) => kws.some((k) => FiscalCalendarService._temPalavra(x.n, k)) && extra(x));
+        const bucket = (porTipo[it.tipo] ??= { itens: 0, casaExato: 0, temDocTipoNoAno: 0, semDocTipo: 0 });
+        bucket.itens++;
+        if (temTipo((x) => FiscalCalendarService._refCompetencia(x.n, it.competencia))) bucket.casaExato++;
+        else if (temTipo((x) => x.temAno)) bucket.temDocTipoNoAno++;
+        else bucket.semDocTipo++;
+      }
+    }
+    return {
+      ano, empresas: empresas.length,
+      folderPathComprovantes: { pdfComprovante, semPasta: pdfComprovanteSemPasta, pctComPasta: pdfComprovante ? Math.round((1 - pdfComprovanteSemPasta / pdfComprovante) * 100) : 0 },
+      porTipo,
+    };
+  }
 }
