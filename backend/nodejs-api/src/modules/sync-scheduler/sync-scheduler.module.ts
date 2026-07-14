@@ -164,12 +164,19 @@ class SyncSchedulerController {
     return this.service.marcarVencidas();
   }
 
-  /** Reconciliação APP-ONLY (getAllSites → drives → delta) — cobertura 100%, incremental. */
+  /** Reconciliação por SCAN COMPLETO (sites→drives→delta) — dispara em BACKGROUND. */
   @Public()
   @Get('reconciliar-app')
   reconciliarApp(@Query('anos') anos?: string) {
     const lista = anos ? anos.split(',').map((a) => parseInt(a, 10)).filter(Boolean) : undefined;
     return this.service.reconciliarAppOnly(lista);
+  }
+
+  /** Resultado da última reconciliação por scan completo (background). */
+  @Public()
+  @Get('reconciliar-app-status')
+  reconciliarAppStatus() {
+    return this.service.reconciliarAppStatus();
   }
 }
 

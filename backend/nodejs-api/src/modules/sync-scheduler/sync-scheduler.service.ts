@@ -186,11 +186,25 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.fiscalCalendar.markOverdue();
   }
 
-  /** Reconciliação APP-ONLY (getAllSites → drives → delta) — cobertura 100%, incremental. */
-  async reconciliarAppOnly(anos?: number[]) {
+  private appReconResultado: any = null;
+
+  /** Dispara a reconciliação por SCAN COMPLETO (sites→drives→delta) em BACKGROUND (não bloqueia
+   *  o HTTP — o scan é pesado). Guarda o resultado p/ consulta em /reconciliar-app-status. */
+  reconciliarAppOnly(anos?: number[]) {
     const yy = anos ?? [new Date().getFullYear(), new Date().getFullYear() - 1];
-    for (const a of yy) await this.fiscalCalendar.garantirAno(a).catch(() => undefined);
-    return this.analise.reconciliarAppOnly({ anos: yy, timeBudgetMs: 8 * 60_000 });
+    if (this.appReconResultado?.status === 'rodando') return { status: 'rodando', desde: this.appReconResultado.em };
+    this.appReconResultado = { status: 'rodando', em: new Date().toISOString(), anos: yy };
+    (async () => {
+      for (const a of yy) await this.fiscalCalendar.garantirAno(a).catch(() => undefined);
+      const r = await this.analise.reconciliarAppOnly({ anos: yy, timeBudgetMs: 12 * 60_000 });
+      this.appReconResultado = { status: (r as any)?.erro ? 'erro' : 'concluido', em: new Date().toISOString(), ...r };
+    })().catch((e) => { this.appReconResultado = { status: 'erro', msg: e?.message ?? String(e) }; });
+    return { status: 'disparado', anos: yy, dica: 'consulte /sync-drive/reconciliar-app-status' };
+  }
+
+  /** Resultado da última reconciliação por scan completo (background). */
+  reconciliarAppStatus() {
+    return this.appReconResultado ?? { status: 'nunca_rodou' };
   }
 
   /** Resumo REAL das obrigações por tipo e status (entregue/vencida/pendente) num ano. */
