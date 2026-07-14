@@ -70,6 +70,13 @@ class SyncSchedulerController {
   escanearProfundo() {
     return this.service.escanearProfundo();
   }
+
+  /** Refresca os links de pasta (corrige itemId obsoleto → pasta certa). */
+  @Public()
+  @Get('refrescar-pastas')
+  refrescarPastas() {
+    return this.service.refrescarPastas();
+  }
 }
 
 @Module({

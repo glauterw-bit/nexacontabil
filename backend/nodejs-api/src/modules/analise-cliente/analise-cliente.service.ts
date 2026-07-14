@@ -314,6 +314,13 @@ export class AnaliseClienteService {
     return this.onedrive.repararPastasOrfas(conn.id);
   }
 
+  /** Refresca os links de pasta de todos os clientes (corrige itemId obsoleto → pasta certa). */
+  async refrescarPastas() {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    return this.onedrive.refrescarPastasCarteira(conn.id);
+  }
+
   async sincronizarDeltaLote(limit = 6) {
     const lote = await this.prisma.company.findMany({
       where: { active: true, sharepointItemId: { not: null } },

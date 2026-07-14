@@ -125,6 +125,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.escanearProfundoAmostra(6);
   }
 
+  /** Refresca os links de pasta (corrige itemId obsoleto → pasta certa). */
+  async refrescarPastas() {
+    return this.analise.refrescarPastas();
+  }
+
   /**
    * Amostra como os COMPROVANTES estão nomeados (valida a reconciliação): conta e mostra
    * exemplos de documentos cujo nome contém palavras de obrigação (DAS, DCTFWeb, FGTS...).
@@ -282,14 +287,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         await passo('alinharCarteira', () => this.verificacao.desativarForaDaPlanilha());
         this.carteiraAlinhada = true;
       }
-      // 0b. RE-CAPTURA (1x): zera os deltaLinks p/ o Delta reler tudo com o caminho da
-      //     PASTA (folderPath) e recuperar os comprovantes mensais de nome igual que
-      //     antes eram deduplicados. É o que permite reconciliar DAS/DCTF/SPED por competência.
+      // 0b. REFRESCA OS LINKS DE PASTA (1x): re-resolve a pasta atual de cada cliente
+      //     (itemId obsoleto por pasta movida/recriada → apontava pra vazio, scanner lia
+      //     lugar errado). Já zera o deltaLink dos religados p/ re-escanear a pasta certa.
       if (!this.deltaResetFeito) {
-        await passo('resetDeltaParaPastas', async () => {
-          const r = await this.prisma.company.updateMany({ where: { active: true, sharepointDeltaLink: { not: null } }, data: { sharepointDeltaLink: null } });
-          return { deltaLinksZerados: r.count };
-        });
+        await passo('refrescarPastas', () => this.analise.refrescarPastas());
         this.deltaResetFeito = true;
       }
       // DUAS CADEIAS EM PARALELO — a do Drive (Graph) e a do SEFAZ (Receita) usam APIs

@@ -451,6 +451,38 @@ export class OneDriveService {
     return { suspeitos: suspeitos.length, pastaExiste, religadas, inativadas, semPasta, erros };
   }
 
+  /**
+   * REFRESCA os LINKS de pasta de cada cliente: re-lê a carteira do SharePoint (pastas
+   * atuais) e atualiza sharepointItemId/DriveId de cada empresa ativa pelo código/nome.
+   * Corrige links obsoletos (pastas movidas/recriadas → itemId antigo aponta pra vazio).
+   * Zera o deltaLink dos que mudaram p/ re-escanear a pasta certa.
+   */
+  async refrescarPastasCarteira(connectionId: string) {
+    const cart: any = await this.getCarteira(connectionId);
+    if (cart.erro || !cart.clientes?.length) return { erro: cart.erro ?? 'carteira vazia' };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    // índice das pastas atuais por código e por nome (prioriza pasta com mais docs)
+    const porCodigo = new Map<string, any>();
+    const porNome = new Map<string, any>();
+    for (const f of cart.clientes) {
+      if (f.codigo) { const k = String(f.codigo); if (!porCodigo.has(k) || f.docs > (porCodigo.get(k)?.docs ?? 0)) porCodigo.set(k, f); }
+      const n = norm(f.nome); if (n && (!porNome.has(n) || f.docs > (porNome.get(n)?.docs ?? 0))) porNome.set(n, f);
+    }
+    const ativas = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true, clienteCodigo: true, sharepointItemId: true } });
+    let refrescadas = 0, jaCorretas = 0, semMatch = 0;
+    const detalhe: any[] = [];
+    for (const c of ativas) {
+      const m = (c.clienteCodigo && porCodigo.get(String(c.clienteCodigo))) || porNome.get(norm(c.name));
+      if (!m) { semMatch++; continue; }
+      if (m.itemId === c.sharepointItemId) { jaCorretas++; continue; }
+      await this.prisma.company.update({ where: { id: c.id }, data: { sharepointItemId: m.itemId, sharepointDriveId: m.driveId, sharepointDeltaLink: null, sharepointAnalisadoEm: null } }).catch(() => undefined);
+      refrescadas++;
+      if (detalhe.length < 40) detalhe.push({ cliente: c.name, docsNaPastaNova: m.docs });
+    }
+    this.logger.log(`links de pasta refrescados: ${refrescadas} religadas, ${jaCorretas} já corretas, ${semMatch} sem match`);
+    return { ativas: ativas.length, refrescadas, jaCorretas, semMatch, detalhe };
+  }
+
   /** Lista itens compartilhados COM a conta (Compartilhados comigo). */
   async listShared(connectionId: string) {
     const token = await this.getValidToken(connectionId);
