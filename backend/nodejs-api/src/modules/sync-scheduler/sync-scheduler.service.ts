@@ -34,6 +34,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   private demoLimpo = false;
   private deltaResetFeito = false;
   private carteiraAlinhada = false;
+  private reconGlobalFeita = false;
 
   constructor(
     private readonly fluxo: FluxoService,
@@ -101,6 +102,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       empresasComDocumentos: empresasComDoc.length, empresasAtivas,
       certificados,
       ultimoImportCert: this.lastRun?.importarCertificados ?? null,
+      reconciliarGlobal: this.lastRun?.reconciliarGlobal ?? null,
       docsDoSefaz: docsSefaz,
       porTipo,
       amostraSemEmitente: amostraVazios.map((d) => ({ arquivo: (d.originalFilename ?? '').slice(-40), tipo: d.type })),
@@ -307,6 +309,13 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       if (!this.carteiraAlinhada) {
         await passo('alinharCarteira', () => this.verificacao.desativarForaDaPlanilha());
         this.carteiraAlinhada = true;
+      }
+      // 0c. RECONCILIAÇÃO GLOBAL (1x, server-side sem timeout de HTTP): busca cada tipo de
+      //     comprovante no Drive inteiro e casa por tipo+competência (2024/2025/2026) — acha
+      //     as entregas dos meses passados que estão salvas no OneDrive.
+      if (!this.reconGlobalFeita) {
+        await passo('reconciliarGlobal', () => this.reconciliarGlobal([2024, 2025, 2026]));
+        this.reconGlobalFeita = true;
       }
       // 0b. REFRESCA OS LINKS DE PASTA (1x): re-resolve a pasta atual de cada cliente
       //     (itemId obsoleto por pasta movida/recriada → apontava pra vazio, scanner lia
