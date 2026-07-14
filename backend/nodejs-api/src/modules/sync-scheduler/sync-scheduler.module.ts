@@ -135,6 +135,13 @@ class SyncSchedulerController {
   buscaTenant(@Query('q') q?: string) {
     return this.service.buscaTenant(q || 'PGDASD');
   }
+
+  /** Resumo REAL das obrigações por tipo/status/mês num ano (verifica a reconciliação). */
+  @Public()
+  @Get('resumo-obrigacoes')
+  resumoObrigacoes(@Query('ano') ano?: string) {
+    return this.service.resumoObrigacoes(ano ? parseInt(ano, 10) : undefined);
+  }
 }
 
 @Module({

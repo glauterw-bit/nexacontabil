@@ -170,6 +170,32 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.buscaTenant(query || 'PGDASD');
   }
 
+  /** Resumo REAL das obrigações por tipo e status (entregue/vencida/pendente) num ano. */
+  async resumoObrigacoes(ano = new Date().getFullYear()) {
+    const rows = await this.prisma.fiscalCalendarItem.groupBy({
+      by: ['tipo', 'status'],
+      where: { competencia: { startsWith: String(ano) } },
+      _count: { id: true },
+    });
+    const porTipo: Record<string, Record<string, number>> = {};
+    const totalStatus: Record<string, number> = {};
+    let total = 0;
+    for (const r of rows) {
+      (porTipo[r.tipo] ??= {})[r.status] = r._count.id;
+      totalStatus[r.status] = (totalStatus[r.status] ?? 0) + r._count.id;
+      total += r._count.id;
+    }
+    // por competência (mês) — quantas entregues vs total, p/ ver evolução do ano
+    const porComp = await this.prisma.fiscalCalendarItem.groupBy({
+      by: ['competencia', 'status'],
+      where: { competencia: { startsWith: `${ano}-` } },
+      _count: { id: true },
+    });
+    const meses: Record<string, { entregue: number; total: number }> = {};
+    for (const r of porComp) { const m = (meses[r.competencia] ??= { entregue: 0, total: 0 }); m.total += r._count.id; if (r.status === 'entregue' || r.status === 'paga') m.entregue += r._count.id; }
+    return { ano, total, totalStatus, porTipo, meses };
+  }
+
   /** Diagnóstico do casamento (por tipo: competência errada × doc ausente × folderPath). */
   async diagnosticarReconciliacao(ano = new Date().getFullYear() - 1) {
     return this.fiscalCalendar.diagnosticarReconciliacao(ano);
