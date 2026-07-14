@@ -140,7 +140,10 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     out._folderPath = {
       comPasta: await this.prisma.document.count({ where: { folderPath: { not: null } } }),
       total: await this.prisma.document.count(),
+      // comprovantes DAS que referenciam 2026 na pasta (deveria haver muitos)
+      dasCom2026: await this.prisma.document.count({ where: { originalFilename: { contains: 'pgdas', mode: 'insensitive' }, folderPath: { contains: '2026' } } }),
     };
+    out._ultimaReconciliacao = this.lastRun?.reconciliarObrigacoes ?? '(ainda não rodou neste boot)';
     return out;
   }
 
