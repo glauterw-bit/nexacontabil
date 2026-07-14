@@ -179,32 +179,11 @@ export class OneDriveService {
     };
   }
 
-  /**
-   * SCAN COMPLETO APP-ONLY — a forma robusta e 100% da pesquisa Microsoft: enumera TODOS os
-   * sites (getAllSites) → todas as bibliotecas (/drives) → delta de cada drive (só o que mudou
-   * depois da 1ª vez, via @odata.deltaLink guardado). Coleta os arquivos que parecem comprovante
-   * de obrigação (por nome), com o caminho completo (parentReference.path). Não depende de
-   * usuário logado, então nenhum drive fica de fora. Bounded por tempo p/ caber num ciclo.
-   */
-  async scanCompletoAppOnly(opts?: { timeBudgetMs?: number; maxDrives?: number }): Promise<{ sites: number; drivesVarridos: number; arquivosVistos: number; comprovantes: Array<{ name: string; path: string }>; incremental: number; parcial: boolean; erro?: string }> {
-    const token = await this.getAppToken();
-    const inicio = Date.now();
-    const budget = opts?.timeBudgetMs ?? 8 * 60_000;
-    // filtro de nome: só arquivos que parecem comprovante de obrigação (reduz volume do delta)
-    const RE_OBRIG = /pgdas|pgmei|dasn|dctf|reinf|darf|\bgia\b|gare|fgts|grf|esocial|esoc|defis|\becd\b|\becf\b|recibo|comprovante|extrato|declarac/i;
-    // 1. todos os sites
-    const sites: Array<{ id: string; name: string }> = [];
-    let url: string | null = `${GRAPH_BASE}/sites/getAllSites?$select=id,displayName&$top=200`;
-    let guard = 0, r429 = 0;
-    while (url && guard++ < 80) {
-      const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      if ((res.status === 429 || res.status === 503) && r429 < 6) { r429++; await new Promise((r) => setTimeout(r, Math.min(30, 2 ** r429) * 1000)); guard--; continue; }
-      if (!res.ok) return { sites: 0, drivesVarridos: 0, arquivosVistos: 0, comprovantes: [], incremental: 0, parcial: true, erro: `getAllSites ${res.status}: ${(await res.text()).slice(0, 160)}` };
-      const json: any = await res.json();
-      for (const s of (json.value ?? [])) sites.push({ id: s.id, name: s.displayName ?? '' });
-      url = json['@odata.nextLink'] ?? null;
-    }
-    // 2. drives de cada site
+  // filtro de nome: só arquivos que parecem comprovante de obrigação (reduz volume do delta)
+  private readonly RE_OBRIG = /pgdas|pgmei|dasn|dctf|reinf|darf|\bgia\b|gare|fgts|grf|esocial|esoc|defis|\becd\b|\becf\b|recibo|comprovante|extrato|declarac/i;
+
+  /** Coleta os drives de uma lista de sites (bounded por tempo). */
+  private async _drivesDeSites(token: string, sites: Array<{ id: string; name: string }>, inicio: number, budget: number) {
     const drives: Array<{ id: string; site: string; name: string }> = [];
     for (const s of sites) {
       if (Date.now() - inicio > budget) break;
@@ -215,12 +194,17 @@ export class OneDriveService {
         for (const d of (j.value ?? [])) drives.push({ id: d.id, site: s.name, name: d.name ?? '' });
       } catch { /* site sem drive */ }
     }
-    // 3. delta de cada drive (incremental via deltaLink guardado), coletando comprovantes
+    return drives;
+  }
+
+  /** Faz delta de cada drive (incremental via deltaLink), coletando comprovantes por nome. */
+  private async _scanDrives(token: string, drives: Array<{ id: string; site: string; name: string }>, inicio: number, budget: number, maxDrives?: number) {
     const comprovantes: Array<{ name: string; path: string }> = [];
     let drivesVarridos = 0, arquivosVistos = 0, incremental = 0;
-    const maxDrives = opts?.maxDrives ?? drives.length;
-    for (const d of drives.slice(0, maxDrives)) {
-      if (Date.now() - inicio > budget) return { sites: sites.length, drivesVarridos, arquivosVistos, comprovantes, incremental, parcial: true };
+    const vistosDrives = new Set<string>();
+    for (const d of drives.slice(0, maxDrives ?? drives.length)) {
+      if (vistosDrives.has(d.id)) continue; vistosDrives.add(d.id);
+      if (Date.now() - inicio > budget) break;
       const st = await this.prisma.driveDeltaState.findUnique({ where: { driveId: d.id } }).catch(() => null);
       let durl: string | null = st?.deltaLink || `${GRAPH_BASE}/drives/${d.id}/root/delta?$select=name,file,parentReference,lastModifiedDateTime&$top=500`;
       if (st?.deltaLink) incremental++;
@@ -233,17 +217,16 @@ export class OneDriveService {
         if (!res.ok) break;
         const json: any = await res.json();
         for (const it of (json.value ?? [])) {
-          if (!it.file) continue; // só arquivos
+          if (!it.file) continue;
           vistosDrive++; arquivosVistos++;
           const name = it.name ?? '';
-          if (!RE_OBRIG.test(name)) continue;
+          if (!this.RE_OBRIG.test(name)) continue;
           const path = (it.parentReference?.path ?? '').split('root:').pop() || '';
           comprovantes.push({ name, path: decodeURIComponent(path) });
         }
         novoDelta = json['@odata.deltaLink'] ?? novoDelta;
         durl = json['@odata.nextLink'] ?? null;
       }
-      // grava o deltaLink p/ a próxima varredura ser incremental
       if (novoDelta) {
         await this.prisma.driveDeltaState.upsert({
           where: { driveId: d.id },
@@ -253,7 +236,64 @@ export class OneDriveService {
       }
       drivesVarridos++;
     }
-    return { sites: sites.length, drivesVarridos, arquivosVistos, comprovantes, incremental, parcial: Date.now() - inicio > budget };
+    return { comprovantes, drivesVarridos, arquivosVistos, incremental, parcial: Date.now() - inicio > budget };
+  }
+
+  /**
+   * SCAN COMPLETO APP-ONLY (getAllSites → drives → delta) — exige permissão de APLICAÇÃO.
+   */
+  async scanCompletoAppOnly(opts?: { timeBudgetMs?: number; maxDrives?: number }): Promise<{ sites: number; drivesVarridos: number; arquivosVistos: number; comprovantes: Array<{ name: string; path: string }>; incremental: number; parcial: boolean; erro?: string }> {
+    const token = await this.getAppToken();
+    const inicio = Date.now();
+    const budget = opts?.timeBudgetMs ?? 8 * 60_000;
+    const sites: Array<{ id: string; name: string }> = [];
+    let url: string | null = `${GRAPH_BASE}/sites/getAllSites?$select=id,displayName&$top=200`;
+    let guard = 0, r429 = 0;
+    while (url && guard++ < 80) {
+      const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if ((res.status === 429 || res.status === 503) && r429 < 6) { r429++; await new Promise((r) => setTimeout(r, Math.min(30, 2 ** r429) * 1000)); guard--; continue; }
+      if (!res.ok) return { sites: 0, drivesVarridos: 0, arquivosVistos: 0, comprovantes: [], incremental: 0, parcial: true, erro: `getAllSites ${res.status}: ${(await res.text()).slice(0, 160)}` };
+      const json: any = await res.json();
+      for (const s of (json.value ?? [])) sites.push({ id: s.id, name: s.displayName ?? '' });
+      url = json['@odata.nextLink'] ?? null;
+    }
+    const drives = await this._drivesDeSites(token, sites, inicio, budget);
+    const r = await this._scanDrives(token, drives, inicio, budget, opts?.maxDrives);
+    return { sites: sites.length, ...r };
+  }
+
+  /**
+   * SCAN COMPLETO DELEGADO — MESMA cobertura (sites → drives → delta), porém com o token
+   * DELEGADO que já temos (permissão delegada Sites.Read.All). NÃO exige nada no Azure.
+   * Enumera sites via /sites?search=* e SEMPRE inclui os drives já conhecidos dos clientes
+   * (sharepointDriveId) como rede de segurança — assim nenhum drive de cliente fica de fora.
+   */
+  async scanCompletoDelegado(connectionId: string, opts?: { timeBudgetMs?: number; maxDrives?: number }): Promise<{ sites: number; drivesConhecidos: number; drivesVarridos: number; arquivosVistos: number; comprovantes: Array<{ name: string; path: string }>; incremental: number; parcial: boolean; erro?: string }> {
+    const token = await this.getValidToken(connectionId);
+    const inicio = Date.now();
+    const budget = opts?.timeBudgetMs ?? 8 * 60_000;
+    // 1. sites que o usuário conectado enxerga (delegado) — busca ampla
+    const sites: Array<{ id: string; name: string }> = [];
+    for (const q of ['*', 'a', 'e', 'o']) { // várias buscas p/ ampliar cobertura do índice
+      let url: string | null = `${GRAPH_BASE}/sites?search=${q}&$select=id,displayName&$top=100`;
+      let guard = 0, r429 = 0;
+      while (url && guard++ < 30) {
+        if (Date.now() - inicio > budget / 3) break;
+        const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        if ((res.status === 429 || res.status === 503) && r429 < 4) { r429++; await new Promise((r) => setTimeout(r, Math.min(20, 2 ** r429) * 1000)); guard--; continue; }
+        if (!res.ok) break;
+        const json: any = await res.json();
+        for (const s of (json.value ?? [])) if (!sites.some((x) => x.id === s.id)) sites.push({ id: s.id, name: s.displayName ?? '' });
+        url = json['@odata.nextLink'] ?? null;
+      }
+    }
+    // 2. drives desses sites + drives já conhecidos dos clientes (rede de segurança)
+    const drives = await this._drivesDeSites(token, sites, inicio, budget);
+    const conhecidos = [...new Set((await this.prisma.company.findMany({ where: { active: true, sharepointDriveId: { not: null } }, select: { sharepointDriveId: true } })).map((c) => c.sharepointDriveId))].filter(Boolean) as string[];
+    for (const id of conhecidos) if (!drives.some((d) => d.id === id)) drives.push({ id, site: 'carteira', name: '' });
+    // 3. delta de cada drive
+    const r = await this._scanDrives(token, drives, inicio, budget, opts?.maxDrives);
+    return { sites: sites.length, drivesConhecidos: conhecidos.length, ...r };
   }
 
   /** Varre os sites do SharePoint (Acesso rápido) e suas bibliotecas de documentos. */

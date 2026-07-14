@@ -467,10 +467,18 @@ export class AnaliseClienteService {
     const anos = opts?.anos ?? [new Date().getFullYear(), new Date().getFullYear() - 1];
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
     if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
-    let scan;
-    try { scan = await this.onedrive.scanCompletoAppOnly({ timeBudgetMs: opts?.timeBudgetMs ?? 8 * 60_000 }); }
-    catch (e: any) { return { erro: `Scan app-only falhou: ${e?.message ?? e}. Confira permissões de APLICAÇÃO + admin consent no Azure.` }; }
-    if ((scan as any).erro) return scan;
+    // tenta APP-ONLY (100% garantido); se não houver permissão de aplicação, cai no DELEGADO
+    // (mesma varredura sites→drives→delta, com o token que já temos — NÃO exige nada no Azure).
+    const budget = opts?.timeBudgetMs ?? 8 * 60_000;
+    let scan: any = null, via = 'app-only';
+    try { scan = await this.onedrive.scanCompletoAppOnly({ timeBudgetMs: budget }); }
+    catch { scan = { erro: 'app-only indisponível' }; }
+    if (!scan || scan.erro) {
+      via = 'delegado';
+      try { scan = await this.onedrive.scanCompletoDelegado(conn.id, { timeBudgetMs: budget }); }
+      catch (e: any) { return { erro: `Scan falhou (app-only e delegado): ${e?.message ?? e}` }; }
+      if ((scan as any).erro) return scan;
+    }
 
     const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -538,8 +546,8 @@ export class AnaliseClienteService {
       }
     }
     return {
-      anos, fluxo: 'App-only (getAllSites → drives → delta)',
-      sites: (scan as any).sites, drivesVarridos: (scan as any).drivesVarridos, incremental: (scan as any).incremental, parcial: (scan as any).parcial,
+      anos, fluxo: via === 'delegado' ? 'Delegado (sites→drives→delta, sem Azure)' : 'App-only (getAllSites→drives→delta)',
+      sites: (scan as any).sites, drivesConhecidos: (scan as any).drivesConhecidos, drivesVarridos: (scan as any).drivesVarridos, incremental: (scan as any).incremental, parcial: (scan as any).parcial,
       arquivosVistos: (scan as any).arquivosVistos, comprovantesRelevantes: (scan as any).comprovantes.length,
       semTipo, semCliente, semComp, clientesComEntrega: entregas.size, marcadasEntregue: entregue,
     };
