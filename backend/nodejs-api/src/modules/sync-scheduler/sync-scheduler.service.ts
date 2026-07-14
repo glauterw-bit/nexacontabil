@@ -36,6 +36,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   private carteiraAlinhada = false;
   private reconGlobalFeita = false;
   private reconGlobalResultado: any = null;
+  private carteiraRealinhada = false;
 
   constructor(
     private readonly fluxo: FluxoService,
@@ -315,6 +316,12 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       if (!this.carteiraAlinhada) {
         await passo('alinharCarteira', () => this.verificacao.desativarForaDaPlanilha());
         this.carteiraAlinhada = true;
+      }
+      // 0b-2. REALINHA A CARTEIRA (1x) pelas pastas de "Empresas Ativas" — reativa clientes
+      //       reais que a planilha não cobria. Roda ANTES do global p/ eles entrarem nele.
+      if (!this.carteiraRealinhada) {
+        await passo('realinharCarteira', () => this.analise.realinharCarteira());
+        this.carteiraRealinhada = true;
       }
       // 0c. RECONCILIAÇÃO GLOBAL (1x, EM BACKGROUND — não bloqueia o ciclo): busca cada
       //     tipo de comprovante no Drive inteiro e casa por tipo+competência (2024/25/26).
