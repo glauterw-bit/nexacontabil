@@ -77,6 +77,13 @@ class SyncSchedulerController {
   refrescarPastas() {
     return this.service.refrescarPastas();
   }
+
+  /** Teste do scanner de produção (delta) — acha os comprovantes de 2026? */
+  @Public()
+  @Get('escanear-delta')
+  escanearDelta() {
+    return this.service.escanearDelta();
+  }
 }
 
 @Module({

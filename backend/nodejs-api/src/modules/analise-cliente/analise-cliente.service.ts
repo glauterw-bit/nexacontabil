@@ -850,6 +850,39 @@ export class AnaliseClienteService {
     return { clientes: resultado };
   }
 
+  /**
+   * TESTE DO SCANNER DE PRODUÇÃO (delta): roda o deltaScan FULL (sem deltaLink) numa
+   * amostra e mostra quantos arquivos ele acha AGORA, quantos referenciam 2026 e amostra
+   * de pastas — usando exatamente o mecanismo que captura. Definitivo p/ saber se o delta
+   * está achando (ou não) os comprovantes de 2026 que existem no Drive.
+   */
+  async escanearDeltaAmostra(n = 6) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    const empresas = await this.prisma.company.findMany({
+      where: { active: true, sharepointItemId: { not: null } },
+      select: { id: true, name: true, sharepointDriveId: true, sharepointItemId: true },
+      take: n, orderBy: { name: 'asc' },
+    });
+    const out: any[] = [];
+    for (const e of empresas) {
+      try {
+        const { arquivos } = await this.onedrive.deltaScan(conn.id, e.sharepointDriveId!, e.sharepointItemId!, undefined);
+        const com2026 = arquivos.filter((a: any) => (a.path ?? '').includes('2026'));
+        const pgdas2026 = arquivos.filter((a: any) => /pgdas/i.test(a.name) && (a.path ?? '').includes('2026'));
+        out.push({
+          cliente: e.name,
+          arquivosDelta: arquivos.length,
+          com2026: com2026.length,
+          pgdas2026: pgdas2026.length,
+          amostraPastas: [...new Set(arquivos.map((a: any) => (a.path ?? '').slice(-50)))].slice(0, 6),
+          amostra2026: [...new Set(com2026.map((a: any) => (a.path ?? '').slice(-50)))].slice(0, 4),
+        });
+      } catch (er: any) { out.push({ cliente: e.name, erro: (er?.message ?? 'erro').slice(0, 80) }); }
+    }
+    return { clientes: out };
+  }
+
   /** Limpa as análises (documentos) e zera as flags pra re-análise limpa. */
   async resetAnalises() {
     const clientes = await this.prisma.company.findMany({ where: { sharepointItemId: { not: null } }, select: { id: true } });

@@ -130,6 +130,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.refrescarPastas();
   }
 
+  /** Teste do scanner de produção (delta) numa amostra — acha 2026? */
+  async escanearDelta() {
+    return this.analise.escanearDeltaAmostra(6);
+  }
+
   /**
    * Amostra como os COMPROVANTES estão nomeados (valida a reconciliação): conta e mostra
    * exemplos de documentos cujo nome contém palavras de obrigação (DAS, DCTFWeb, FGTS...).
