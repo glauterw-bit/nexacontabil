@@ -472,6 +472,11 @@ export class AnaliseClienteService {
     return this.onedrive.buscaTenant(conn.id, query);
   }
 
+  /** Enumera sites+drives via permissão de APLICAÇÃO (mede cobertura 100%). */
+  async enumerarSitesEDrives() {
+    return this.onedrive.enumerarSitesEDrives();
+  }
+
   /** Realinha clientes ativos pelas pastas de "Empresas Ativas" (reativa os reais removidos). */
   async realinharCarteira() {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });

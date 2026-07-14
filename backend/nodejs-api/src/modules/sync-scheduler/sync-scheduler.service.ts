@@ -170,6 +170,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.buscaTenant(query || 'PGDASD');
   }
 
+  /** Enumera sites+drives via permissão de APLICAÇÃO (diagnóstico de cobertura 100%). */
+  async enumerarSitesEDrives() {
+    return this.analise.enumerarSitesEDrives();
+  }
+
   /** Resumo REAL das obrigações por tipo e status (entregue/vencida/pendente) num ano. */
   async resumoObrigacoes(ano = new Date().getFullYear()) {
     const rows = await this.prisma.fiscalCalendarItem.groupBy({

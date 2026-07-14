@@ -142,6 +142,13 @@ class SyncSchedulerController {
   resumoObrigacoes(@Query('ano') ano?: string) {
     return this.service.resumoObrigacoes(ano ? parseInt(ano, 10) : undefined);
   }
+
+  /** Diagnóstico de cobertura via permissão de APLICAÇÃO (sites+drives que o app enxerga). */
+  @Public()
+  @Get('enumerar-sites')
+  enumerarSites() {
+    return this.service.enumerarSitesEDrives();
+  }
 }
 
 @Module({

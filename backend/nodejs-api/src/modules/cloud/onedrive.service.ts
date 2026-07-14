@@ -114,6 +114,58 @@ export class OneDriveService {
     return t.access_token;
   }
 
+  /**
+   * TOKEN DE APLICAÇÃO (client credentials) — acesso app-only ao tenant inteiro, sem depender
+   * de usuário logado. Exige MICROSOFT_TENANT_ID específico + permissões de APLICAÇÃO
+   * (Sites.Read.All, Files.Read.All) com consentimento de admin no Azure. É o que dá cobertura
+   * 100% (enxerga TODOS os sites/drives, resolvendo o "drives fora do scan" da permissão delegada).
+   */
+  private async getAppToken(): Promise<string> {
+    const tenant = process.env.MICROSOFT_TENANT_ID;
+    if (!tenant || tenant === 'common') throw new BadRequestException('MICROSOFT_TENANT_ID específico é obrigatório para token de aplicação (não use "common").');
+    const res = await this.getMsal().acquireTokenByClientCredential({ scopes: ['https://graph.microsoft.com/.default'] });
+    if (!res?.accessToken) throw new BadRequestException('Falha ao obter token de aplicação — confira permissões de APLICAÇÃO + consentimento admin no Azure.');
+    return res.accessToken;
+  }
+
+  /**
+   * ENUMERA todos os sites do tenant e suas bibliotecas (app-only) — mede a cobertura real.
+   * Responde: "a permissão de aplicação enxerga mais drives que a delegada?". Base do scan 100%.
+   */
+  async enumerarSitesEDrives(opts?: { maxSites?: number }) {
+    const token = await this.getAppToken();
+    const sites: Array<{ id: string; name: string; webUrl: string }> = [];
+    let url: string | null = `${GRAPH_BASE}/sites/getAllSites?$select=id,displayName,webUrl&$top=200`;
+    let guard = 0, r429 = 0;
+    while (url && guard++ < 60) {
+      const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if ((res.status === 429 || res.status === 503) && r429 < 6) { r429++; await new Promise((r) => setTimeout(r, Math.min(30, 2 ** r429) * 1000)); guard--; continue; }
+      if (!res.ok) return { erro: `getAllSites falhou: ${res.status} ${(await res.text()).slice(0, 200)}`, sites: sites.length };
+      const json: any = await res.json();
+      for (const s of (json.value ?? [])) sites.push({ id: s.id, name: s.displayName ?? '', webUrl: s.webUrl ?? '' });
+      url = json['@odata.nextLink'] ?? null;
+    }
+    // amostra de drives dos primeiros sites (p/ ver bibliotecas)
+    const amostraDrives: Array<{ site: string; drive: string; driveId: string }> = [];
+    let drivesTotais = 0;
+    for (const s of sites.slice(0, opts?.maxSites ?? 25)) {
+      try {
+        const r: any = await fetch(`${GRAPH_BASE}/sites/${s.id}/drives?$select=id,name`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!r.ok) continue;
+        const j: any = await r.json();
+        drivesTotais += (j.value ?? []).length;
+        for (const d of (j.value ?? [])) amostraDrives.push({ site: s.name, drive: d.name ?? '', driveId: d.id });
+      } catch { /* ignora site sem drive */ }
+    }
+    return {
+      fluxo: 'App-only (client credentials) — cobertura tenant inteira',
+      totalSites: sites.length,
+      drivesAmostrados: drivesTotais,
+      amostraSites: sites.slice(0, 15).map((s) => s.name),
+      amostraDrives: amostraDrives.slice(0, 20),
+    };
+  }
+
   /** Varre os sites do SharePoint (Acesso rápido) e suas bibliotecas de documentos. */
   async scanSharePoint(connectionId: string) {
     const token = await this.getValidToken(connectionId);
