@@ -416,18 +416,26 @@ export class AnaliseClienteService {
     const termos: Record<string, string[]> = { DAS: ['PGDASD'], 'DASN-SIMEI': ['PGMEI', 'DASN'], DCTFWeb: ['DCTF'], FGTS: ['FGTS', 'GRF'], EFD_REINF: ['REINF'], DARF: ['DARF'], ICMS: ['GIA'], ESOCIAL: ['eSocial'] };
     const entregas = new Map<string, Set<string>>();
     let arquivosVistos = 0, semCliente = 0, semComp = 0;
+    // Search API tem teto de ~3000 por query → particiona por ANO via KQL LastModifiedTime.
+    // Dedup por caminho+nome (janelas podem sobrepor; competência sai sempre do path).
     for (const [tipo, qs] of Object.entries(termos)) {
+      const vistos = new Set<string>();
       for (const q of qs) {
-        let arquivos: Array<{ name: string; path: string }> = [];
-        try { arquivos = (await this.onedrive.coletaTenant(conn.id, q, { maxItens: 8000 })).itens; } catch { continue; }
-        for (const f of arquivos) {
-          arquivosVistos++;
-          const cid = resolveClient(f.path || '');
-          if (!cid) { semCliente++; continue; }
-          const comp = extractComp(norm(`${f.name} ${f.path}`));
-          if (!comp) { semComp++; continue; }
-          if (!entregas.has(cid)) entregas.set(cid, new Set());
-          entregas.get(cid)!.add(`${tipo}|${comp}`);
+        for (const y of anos) {
+          const kql = `${q} LastModifiedTime>=${y}-01-01 AND LastModifiedTime<${y + 1}-01-01`;
+          let arquivos: Array<{ name: string; path: string }> = [];
+          try { arquivos = (await this.onedrive.coletaTenant(conn.id, kql, { maxItens: 5000 })).itens; } catch { continue; }
+          for (const f of arquivos) {
+            const chave = `${f.path}/${f.name}`;
+            if (vistos.has(chave)) continue; vistos.add(chave);
+            arquivosVistos++;
+            const cid = resolveClient(f.path || '');
+            if (!cid) { semCliente++; continue; }
+            const comp = extractComp(norm(`${f.name} ${f.path}`));
+            if (!comp) { semComp++; continue; }
+            if (!entregas.has(cid)) entregas.set(cid, new Set());
+            entregas.get(cid)!.add(`${tipo}|${comp}`);
+          }
         }
       }
     }

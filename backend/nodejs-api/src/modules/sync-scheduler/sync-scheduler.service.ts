@@ -387,15 +387,14 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         await passo('pastasOrfas', () => this.analise.repararPastasOrfas());
         // 2c. reprocessa NFS-e/XMLs sem valor com o parser ABRASF (re-baixa e extrai)
         await passo('reprocessarNfse', () => this.analise.reprocessarSemValor({ timeBudgetMs: 3 * 60_000 }));
-        // 3. RECONCILIAÇÃO POR DOCUMENTOS (banco) — usa o companyId já gravado pelo delta
-        //    (atribuição 100%, sem perder cliente) e casa cada obrigação com o comprovante
-        //    da própria empresa por nome+pasta (ex.: /07.2025/PGDASD-RECIBO.pdf). Rotaciona
-        //    pela carteira a cada ciclo (updatedAt asc). Fonte de verdade das entregas.
-        await passo('reconciliarDocs', async () => {
+        // 3. RECONCILIAÇÃO TENANT-WIDE (Search API) — varre TODOS os drives por tipo de
+        //    obrigação (PGDASD/DCTF/FGTS...), particionando por ano p/ furar o teto de 3000.
+        //    Lê cliente+competência do caminho (webUrl). ADITIVO: só marca ENTREGUE com prova.
+        //    É a fonte de verdade — cobre comprovantes que o delta não alcança (drives fora do
+        //    scan por cliente). Complementa com o casamento por documentos do banco.
+        await passo('reconciliarTenant', async () => {
           const ano = startedAt.getFullYear();
-          const a = await this.fiscalCalendar.reconciliarPorDocumentos({ ano, limitEmpresas: 80, timeBudgetMs: 3 * 60_000 });
-          const b = await this.fiscalCalendar.reconciliarPorDocumentos({ ano: ano - 1, limitEmpresas: 80, timeBudgetMs: 3 * 60_000 });
-          return { anoAtual: a, anoAnterior: b };
+          return this.analise.reconciliarGlobalPorTipo({ anos: [ano, ano - 1] });
         });
         // 4. recibo genérico (fallback) p/ quem não casou por documento específico
         await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 6));
