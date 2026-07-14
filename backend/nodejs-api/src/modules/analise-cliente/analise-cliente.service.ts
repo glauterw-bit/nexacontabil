@@ -448,6 +448,9 @@ export class AnaliseClienteService {
       where: { status: { in: ['pendente', 'vencida'] }, OR: anosStr.map((a) => ({ competencia: { startsWith: a } })) },
       select: { id: true, companyId: true, tipo: true, competencia: true },
     });
+    // índice das obrigações por empresa (todas, p/ debug de casamento)
+    const obrigPorEmp = new Map<string, Set<string>>();
+    for (const it of itens) { if (!obrigPorEmp.has(it.companyId)) obrigPorEmp.set(it.companyId, new Set()); obrigPorEmp.get(it.companyId)!.add(`${it.tipo}|${it.competencia}`); }
     for (const it of itens) {
       const set = entregas.get(it.companyId);
       if (set && set.has(`${it.tipo}|${it.competencia}`)) {
@@ -455,7 +458,20 @@ export class AnaliseClienteService {
         entregue++;
       }
     }
-    return { anos, arquivosVistos, semCliente, semComp, clientesComEntrega: entregas.size, obrigacoesAnalisadas: itens.length, marcadasEntregue: entregue };
+    // DEBUG: amostra de clientes que têm entregas E obrigações pendentes — chaves lado a lado
+    const debug: any[] = [];
+    for (const [cid, eset] of entregas) {
+      const oset = obrigPorEmp.get(cid);
+      if (!oset || !eset.size) continue;
+      const inter = [...eset].filter((k) => oset.has(k));
+      if (debug.length < 6) debug.push({
+        companyId: cid.slice(0, 8),
+        entregasEx: [...eset].slice(0, 5),
+        obrigEx: [...oset].slice(0, 5),
+        intersec: inter.length,
+      });
+    }
+    return { anos, arquivosVistos, semCliente, semComp, clientesComEntrega: entregas.size, obrigacoesAnalisadas: itens.length, marcadasEntregue: entregue, debug };
   }
 
   /** Busca global no Drive (Search API) — varre todas as pastas/subpastas por um termo. */
