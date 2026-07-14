@@ -145,8 +145,8 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   }
 
   /** Busca global no Drive (Search API) por um termo — varre todas as pastas. */
-  async buscarNoDrive(query: string) {
-    return this.analise.buscarNoDrive(query || 'PGDASD');
+  async buscarNoDrive(query: string, pasta?: string) {
+    return this.analise.buscarNoDrive(query || 'PGDASD', pasta);
   }
 
   /** Reconciliação RÁPIDA via Search (comprovantes do ano por cliente). */

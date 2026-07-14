@@ -499,17 +499,17 @@ export class OneDriveService {
    * pelo índice do servidor, sem precisar reler folder por folder. Retorna onde os
    * arquivos que casam com `query` estão (com o caminho), destacando os de 2026.
    */
-  async buscarNoDrive(connectionId: string, query: string, opts?: { maxDrives?: number }) {
+  async buscarNoDrive(connectionId: string, query: string, opts?: { maxDrives?: number; pasta?: string }) {
     const token = await this.getValidToken(connectionId);
     const drives = [...new Set(
       (await this.prisma.company.findMany({ where: { active: true, sharepointDriveId: { not: null } }, select: { sharepointDriveId: true } })).map((c) => c.sharepointDriveId),
     )].filter(Boolean).slice(0, opts?.maxDrives ?? 6) as string[];
-    const achados: Array<{ name: string; path: string }> = [];
+    let achados: Array<{ name: string; path: string }> = [];
     let erros = 0;
     for (const driveId of drives) {
       let url: string | null = `${GRAPH_BASE}/drives/${driveId}/root/search(q='${encodeURIComponent(query)}')?$top=200&$select=name,webUrl,parentReference`;
       let guard = 0, r429 = 0;
-      while (url && guard++ < 25) {
+      while (url && guard++ < 40) {
         const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         if ((res.status === 429 || res.status === 503) && r429 < 5) { r429++; await new Promise((r) => setTimeout(r, Math.min(30, 2 ** r429) * 1000)); guard--; continue; }
         if (!res.ok) { erros++; break; }
@@ -521,14 +521,20 @@ export class OneDriveService {
         url = json['@odata.nextLink'] ?? null;
       }
     }
+    // filtro de PASTA (ex.: "fiscal", "contab") — foca só nos arquivos dessas pastas
+    if (opts?.pasta) { const f = opts.pasta.toLowerCase(); achados = achados.filter((a) => (a.path || '').toLowerCase().includes(f)); }
     const de = (re: RegExp) => achados.filter((a) => re.test(a.path) || re.test(a.name));
     const com2026 = de(/2026/);
+    // distribuição por mês/ano de 2026 (competência nos nomes/pastas)
+    const meses2026: Record<string, number> = {};
+    for (const a of com2026) { const s = `${a.name} ${a.path}`; for (let m = 1; m <= 12; m++) { const mm = String(m).padStart(2, '0'); if (s.includes(`${mm}.2026`) || s.includes(`${mm}-2026`) || s.includes(`${mm}/2026`) || s.includes(`2026/${mm}`)) meses2026[`2026-${mm}`] = (meses2026[`2026-${mm}`] ?? 0) + 1; } }
     return {
-      query, drivesPesquisados: drives.length, erros,
+      query, pasta: opts?.pasta ?? null, drivesPesquisados: drives.length, erros,
       totalAchado: achados.length,
       com2026: com2026.length, com2025: de(/2025/).length, com2024: de(/2024/).length,
-      amostra2026: [...new Set(com2026.map((a) => `${a.path}/${a.name}`))].slice(0, 18),
-      amostraGeral: [...new Set(achados.map((a) => `${a.path}/${a.name}`))].slice(0, 8),
+      meses2026,
+      amostra2026: [...new Set(com2026.map((a) => `${a.path}/${a.name}`))].slice(0, 20),
+      amostraGeral: [...new Set(achados.map((a) => `${a.path}/${a.name}`))].slice(0, 10),
     };
   }
 

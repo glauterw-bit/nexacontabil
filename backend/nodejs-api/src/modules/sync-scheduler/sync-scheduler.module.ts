@@ -95,8 +95,8 @@ class SyncSchedulerController {
   /** Busca global no Drive (Search API) por um termo — varre TODAS as pastas/subpastas. */
   @Public()
   @Get('buscar-drive')
-  buscarDrive(@Query('q') q?: string) {
-    return this.service.buscarNoDrive(q || 'PGDASD');
+  buscarDrive(@Query('q') q?: string, @Query('pasta') pasta?: string) {
+    return this.service.buscarNoDrive(q || 'PGDASD', pasta);
   }
 
   /** Reconciliação RÁPIDA via Search — comprovantes do ano por cliente (marca entregues). */

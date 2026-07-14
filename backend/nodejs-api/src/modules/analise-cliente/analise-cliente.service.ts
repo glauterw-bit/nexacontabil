@@ -451,10 +451,10 @@ export class AnaliseClienteService {
   }
 
   /** Busca global no Drive (Search API) — varre todas as pastas/subpastas por um termo. */
-  async buscarNoDrive(query: string) {
+  async buscarNoDrive(query: string, pasta?: string) {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
     if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
-    return this.onedrive.buscarNoDrive(conn.id, query);
+    return this.onedrive.buscarNoDrive(conn.id, query, { pasta });
   }
 
   /** Realinha clientes ativos pelas pastas de "Empresas Ativas" (reativa os reais removidos). */
