@@ -466,8 +466,9 @@ export class AnaliseClienteService {
       const inter = [...eset].filter((k) => oset.has(k));
       if (debug.length < 6) debug.push({
         companyId: cid.slice(0, 8),
-        entregasEx: [...eset].slice(0, 5),
-        obrigEx: [...oset].slice(0, 5),
+        entregas: [...eset],
+        obrigDAS: [...oset].filter((k) => k.startsWith('DAS|')),
+        totObrig: oset.size,
         intersec: inter.length,
       });
     }
