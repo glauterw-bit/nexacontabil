@@ -391,12 +391,17 @@ export class AnaliseClienteService {
     const companies = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true, clienteCodigo: true } });
     const porCodigo = new Map<string, string>(); const porNome = new Map<string, string>();
     for (const c of companies) { if (c.clienteCodigo) porCodigo.set(String(c.clienteCodigo), c.id); const n = norm(c.name); if (n) porNome.set(n, c.id); }
-    const resolveClient = (seg: string): string | null => {
+    const resolveSeg = (seg: string): string | null => {
       const codeM = seg.match(/^\s*(\d+)\s*[-–]/);
       if (codeM && porCodigo.has(codeM[1])) return porCodigo.get(codeM[1])!;
       const nn = norm(seg.replace(/^\s*\d+\s*[-–]\s*/, '').replace(/\([^)]*\)/g, ''));
-      if (nn.length >= 4 && porNome.has(nn)) return porNome.get(nn)!;
-      if (nn.length >= 6) for (const [n, id] of porNome) if (n.length >= 6 && (nn.includes(n) || n.includes(nn))) return id;
+      if (nn.length >= 5 && porNome.has(nn)) return porNome.get(nn)!;
+      if (nn.length >= 8) for (const [n, id] of porNome) if (n.length >= 8 && (nn.includes(n) || n.includes(nn))) return id;
+      return null;
+    };
+    // a pasta do cliente pode estar em QUALQUER nível ("Empresas Ativas/113 - CLINICA OWEN/...")
+    const resolveClient = (fullPath: string): string | null => {
+      for (const seg of (fullPath || '').split('/')) { const cid = resolveSeg(seg); if (cid) return cid; }
       return null;
     };
     const extractComp = (s: string): string | null => {
@@ -417,8 +422,7 @@ export class AnaliseClienteService {
         try { arquivos = await this.onedrive.buscarNoDriveRaw(conn.id, q); } catch { continue; }
         for (const f of arquivos) {
           arquivosVistos++;
-          const seg = (f.path || '').split('/')[0] || '';
-          const cid = resolveClient(seg);
+          const cid = resolveClient(f.path || '');
           if (!cid) { semCliente++; continue; }
           const comp = extractComp(norm(`${f.name} ${f.path}`));
           if (!comp) { semComp++; continue; }
@@ -428,24 +432,22 @@ export class AnaliseClienteService {
       }
     }
 
-    // aplica às obrigações (todos os anos considerados)
-    const now = new Date();
-    let entregue = 0, vencida = 0, pendente = 0;
+    // aplica às obrigações — ADITIVO: só marca ENTREGUE onde há prova (não cria vencida
+    // falsa quando o casamento não acha; a ausência de match não prova não-entrega).
+    let entregue = 0;
     const anosStr = anos.map(String);
     const itens = await this.prisma.fiscalCalendarItem.findMany({
-      where: { status: { in: ['pendente', 'vencida', 'entregue'] }, OR: anosStr.map((a) => ({ competencia: { startsWith: a } })) },
-      select: { id: true, companyId: true, tipo: true, competencia: true, dataVencimento: true, status: true },
+      where: { status: { in: ['pendente', 'vencida'] }, OR: anosStr.map((a) => ({ competencia: { startsWith: a } })) },
+      select: { id: true, companyId: true, tipo: true, competencia: true },
     });
     for (const it of itens) {
       const set = entregas.get(it.companyId);
-      const achou = !!set && set.has(`${it.tipo}|${it.competencia}`);
-      const novo = achou ? 'entregue' : (new Date(it.dataVencimento) < now ? 'vencida' : 'pendente');
-      if (novo !== it.status) {
-        await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: novo } }).catch(() => undefined);
-        if (novo === 'entregue') entregue++; else if (novo === 'vencida') vencida++; else pendente++;
+      if (set && set.has(`${it.tipo}|${it.competencia}`)) {
+        await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined);
+        entregue++;
       }
     }
-    return { anos, arquivosVistos, semCliente, semComp, clientesComEntrega: entregas.size, obrigacoes: itens.length, marcadasEntregue: entregue, marcadasVencida: vencida, marcadasPendente: pendente };
+    return { anos, arquivosVistos, semCliente, semComp, clientesComEntrega: entregas.size, obrigacoesAnalisadas: itens.length, marcadasEntregue: entregue };
   }
 
   /** Busca global no Drive (Search API) — varre todas as pastas/subpastas por um termo. */
