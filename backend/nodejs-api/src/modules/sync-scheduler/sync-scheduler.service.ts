@@ -140,6 +140,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.buscarNoDrive(query || 'PGDASD');
   }
 
+  /** Reconciliação RÁPIDA via Search (comprovantes do ano por cliente). */
+  async reconciliarViaSearch(ano?: number) {
+    return this.analise.reconciliarViaSearch({ ano, timeBudgetMs: 8 * 60_000 });
+  }
+
   /**
    * Amostra como os COMPROVANTES estão nomeados (valida a reconciliação): conta e mostra
    * exemplos de documentos cujo nome contém palavras de obrigação (DAS, DCTFWeb, FGTS...).
@@ -317,10 +322,10 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         await passo('pastasOrfas', () => this.analise.repararPastasOrfas());
         // 2c. reprocessa NFS-e/XMLs sem valor com o parser ABRASF (re-baixa e extrai)
         await passo('reprocessarNfse', () => this.analise.reprocessarSemValor({ timeBudgetMs: 3 * 60_000 }));
-        // 3. RECONCILIAÇÃO POR EVIDÊNCIA — lê os comprovantes já capturados nas pastas
-        //    e decide o status REAL de cada obrigação (entregue/vencida/pendente) por
-        //    tipo+competência. É a fonte de verdade das entregas (substitui o recibo genérico).
-        await passo('reconciliarObrigacoes', () => this.fiscalCalendar.reconciliarPorDocumentos({ timeBudgetMs: 2 * 60_000 }));
+        // 3. RECONCILIAÇÃO RÁPIDA VIA SEARCH — 1 busca no índice do Graph por cliente acha
+        //    os comprovantes do ano (ex.: "05.2026 - Rec.pdf") sem re-capturar 137k arquivos.
+        //    Marca entregue/vencida/pendente por competência. É a fonte de verdade das entregas.
+        await passo('reconciliarViaSearch', () => this.analise.reconciliarViaSearch({ timeBudgetMs: 4 * 60_000 }));
         // 4. recibo genérico (fallback) p/ quem não casou por documento específico
         await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 6));
         // 5. marca vencidas o que sobrou pendente e já passou do prazo

@@ -533,6 +533,30 @@ export class OneDriveService {
     };
   }
 
+  /**
+   * BUSCA DENTRO da pasta de um cliente (Search API escopada) — varre todas as subpastas
+   * do cliente pelo índice do servidor. Rápido: 1 chamada acha os comprovantes do período.
+   */
+  async searchInFolder(connectionId: string, driveId: string, folderId: string, query: string, max = 500): Promise<Array<{ name: string; path: string }>> {
+    const token = await this.getValidToken(connectionId);
+    let url: string | null = `${GRAPH_BASE}/drives/${driveId}/items/${folderId}/search(q='${encodeURIComponent(query)}')?$top=200&$select=name,parentReference`;
+    const out: Array<{ name: string; path: string }> = [];
+    let guard = 0, r429 = 0;
+    while (url && guard++ < 15 && out.length < max) {
+      const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if ((res.status === 429 || res.status === 503) && r429 < 4) { r429++; await new Promise((r) => setTimeout(r, Math.min(20, 2 ** r429) * 1000)); guard--; continue; }
+      if (!res.ok) break;
+      const json: any = await res.json();
+      for (const it of (json.value ?? [])) {
+        if (it.folder) continue;
+        const raw = it.parentReference?.path ?? '';
+        out.push({ name: it.name ?? '', path: raw.includes('root:') ? raw.split('root:')[1] : raw });
+      }
+      url = json['@odata.nextLink'] ?? null;
+    }
+    return out;
+  }
+
   /** Lista itens compartilhados COM a conta (Compartilhados comigo). */
   async listShared(connectionId: string) {
     const token = await this.getValidToken(connectionId);

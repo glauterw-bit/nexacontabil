@@ -314,6 +314,66 @@ export class AnaliseClienteService {
     return this.onedrive.repararPastasOrfas(conn.id);
   }
 
+  /**
+   * RECONCILIAÇÃO RÁPIDA VIA SEARCH — para cada cliente, 1 busca no índice do servidor
+   * pelos comprovantes do ANO (ex.: arquivos "05.2026 - Rec.pdf"). Extrai as competências
+   * que TÊM comprovante e marca as obrigações do cliente. Muito mais rápido que re-capturar.
+   */
+  async reconciliarViaSearch(opts?: { ano?: number; limitEmpresas?: number; timeBudgetMs?: number }) {
+    const ano = opts?.ano ?? new Date().getFullYear();
+    const timeBudgetMs = opts?.timeBudgetMs ?? 4 * 60_000;
+    const inicio = Date.now();
+    const now = new Date();
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const ehComprovante = (n: string) => /rec|recibo|comprovante|declarac|\bdas\b|pgdas|dctf|darf|fgts|gps|guia|sped|gia|gare|esocial|reinf/i.test(n);
+
+    const empresas = await this.prisma.company.findMany({
+      where: { active: true, sharepointItemId: { not: null } },
+      select: { id: true, name: true, sharepointDriveId: true, sharepointItemId: true },
+      take: opts?.limitEmpresas ?? 200, orderBy: { updatedAt: 'asc' },
+    });
+    let proc = 0, achadosTot = 0, entregue = 0, vencida = 0, pendente = 0, comProva = 0, semAcesso = 0;
+    const detalhe: any[] = [];
+    for (const e of empresas) {
+      if (Date.now() - inicio > timeBudgetMs) break;
+      let arquivos: Array<{ name: string; path: string }> = [];
+      try { arquivos = await this.onedrive.searchInFolder(conn.id, e.sharepointDriveId!, e.sharepointItemId!, String(ano)); }
+      catch { semAcesso++; continue; }
+      achadosTot += arquivos.length;
+      // competências (YYYY-MM) que têm comprovante do ano
+      const comps = new Set<string>();
+      for (const f of arquivos) {
+        if (!ehComprovante(f.name)) continue;
+        const s = norm(`${f.name} ${f.path}`);
+        for (let m = 1; m <= 12; m++) {
+          const mm = String(m).padStart(2, '0');
+          if (s.includes(`${mm} ${ano}`) || s.includes(`${ano} ${mm}`) || s.includes(`${mm}${ano}`) || (s.includes(MESES[m - 1]) && s.includes(String(ano)))) {
+            comps.add(`${ano}-${mm}`);
+          }
+        }
+      }
+      if (comps.size) comProva++;
+      const itens = await this.prisma.fiscalCalendarItem.findMany({
+        where: { companyId: e.id, competencia: { startsWith: String(ano) }, status: { in: ['pendente', 'vencida', 'entregue'] } },
+        select: { id: true, competencia: true, dataVencimento: true, status: true },
+      });
+      for (const it of itens) {
+        const novo = comps.has(it.competencia) ? 'entregue' : (new Date(it.dataVencimento) < now ? 'vencida' : 'pendente');
+        if (novo !== it.status) {
+          await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: novo } }).catch(() => undefined);
+          if (novo === 'entregue') entregue++; else if (novo === 'vencida') vencida++; else pendente++;
+        }
+      }
+      await this.prisma.company.update({ where: { id: e.id }, data: { updatedAt: new Date() } }).catch(() => undefined);
+      if (detalhe.length < 30 && comps.size) detalhe.push({ cliente: e.name, competenciasComProva: [...comps].sort() });
+      proc++;
+    }
+    return { ano, empresasProcessadas: proc, comprovantesAchados: achadosTot, clientesComProva: comProva, marcadasEntregue: entregue, marcadasVencida: vencida, marcadasPendente: pendente, semAcesso, detalhe };
+  }
+
   /** Busca global no Drive (Search API) — varre todas as pastas/subpastas por um termo. */
   async buscarNoDrive(query: string) {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });

@@ -91,6 +91,13 @@ class SyncSchedulerController {
   buscarDrive(@Query('q') q?: string) {
     return this.service.buscarNoDrive(q || 'PGDASD');
   }
+
+  /** Reconciliação RÁPIDA via Search — comprovantes do ano por cliente (marca entregues). */
+  @Public()
+  @Get('reconciliar-search')
+  reconciliarSearch(@Query('ano') ano?: string) {
+    return this.service.reconciliarViaSearch(ano ? parseInt(ano, 10) : undefined);
+  }
 }
 
 @Module({
