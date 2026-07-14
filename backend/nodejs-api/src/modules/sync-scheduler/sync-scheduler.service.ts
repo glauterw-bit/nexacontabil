@@ -120,6 +120,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.mapearPastasOneDrive({ limitClientes: 120, timeBudgetMs: 4 * 60_000 });
   }
 
+  /** Varredura PROFUNDA ao vivo de uma amostra — compara Drive real × capturado. */
+  async escanearProfundo() {
+    return this.analise.escanearProfundoAmostra(6);
+  }
+
   /**
    * Amostra como os COMPROVANTES estão nomeados (valida a reconciliação): conta e mostra
    * exemplos de documentos cujo nome contém palavras de obrigação (DAS, DCTFWeb, FGTS...).

@@ -63,6 +63,13 @@ class SyncSchedulerController {
   amostraComprovantes() {
     return this.service.amostraComprovantes();
   }
+
+  /** Varredura PROFUNDA ao vivo (Drive real × capturado) — revela falha do scanner. */
+  @Public()
+  @Get('escanear-profundo')
+  escanearProfundo() {
+    return this.service.escanearProfundo();
+  }
 }
 
 @Module({

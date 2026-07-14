@@ -798,6 +798,51 @@ export class AnaliseClienteService {
     return resultado;
   }
 
+  /**
+   * VARREDURA PROFUNDA AO VIVO de uma amostra de clientes — lista recursivamente TODAS as
+   * pastas/arquivos e compara com o que o sistema capturou. Revela se o scanner está
+   * perdendo comprovantes (ex.: de 2026) que existem no OneDrive.
+   */
+  async escanearProfundoAmostra(n = 6) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    const empresas = await this.prisma.company.findMany({
+      where: { active: true, sharepointItemId: { not: null } },
+      select: { id: true, name: true, sharepointDriveId: true, sharepointItemId: true },
+      take: n, orderBy: { name: 'asc' },
+    });
+    const resultado: any[] = [];
+    for (const e of empresas) {
+      const arquivos: Array<{ name: string; path: string }> = [];
+      let chamadas = 0, erro: string | null = null;
+      const walk = async (driveId: string, folderId: string, path: string, depth: number): Promise<void> => {
+        if (depth > 7 || arquivos.length > 4000 || chamadas > 300) return;
+        chamadas++;
+        let filhos: any[] = [];
+        try { filhos = await this.onedrive.listAllChildren(conn.id, driveId, folderId); }
+        catch (er: any) { erro = (er?.message ?? 'erro').slice(0, 60); return; }
+        for (const f of filhos) {
+          if (f.isFolder) await walk(driveId, f.id, `${path}/${f.name}`, depth + 1);
+          else arquivos.push({ name: f.name, path });
+        }
+      };
+      try { await walk(e.sharepointDriveId!, e.sharepointItemId!, '', 0); } catch { /* segue */ }
+      const tem2026 = arquivos.filter((a) => a.path.includes('2026'));
+      const pgdas = arquivos.filter((a) => /pgdas/i.test(a.name));
+      const pgdas2026 = pgdas.filter((a) => a.path.includes('2026'));
+      const dbTotal = await this.prisma.document.count({ where: { companyId: e.id } });
+      const dbCom2026 = await this.prisma.document.count({ where: { companyId: e.id, folderPath: { contains: '2026' } } });
+      resultado.push({
+        cliente: e.name, chamadasGraph: chamadas, erro,
+        arquivosNoDrive: arquivos.length, com2026NoDrive: tem2026.length, pgdasTotal: pgdas.length, pgdas2026NoDrive: pgdas2026.length,
+        noBanco: dbTotal, noBancoCom2026: dbCom2026,
+        amostraPastas2026: [...new Set(tem2026.map((a) => a.path.slice(-55)))].slice(0, 5),
+        amostraPgdas2026: pgdas2026.slice(0, 3).map((a) => `${a.path.slice(-40)} / ${a.name.slice(0, 30)}`),
+      });
+    }
+    return { clientes: resultado };
+  }
+
   /** Limpa as análises (documentos) e zera as flags pra re-análise limpa. */
   async resetAnalises() {
     const clientes = await this.prisma.company.findMany({ where: { sharepointItemId: { not: null } }, select: { id: true } });
