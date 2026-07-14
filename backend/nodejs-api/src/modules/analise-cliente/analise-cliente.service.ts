@@ -412,14 +412,14 @@ export class AnaliseClienteService {
       return null;
     };
 
-    // busca cada tipo globalmente; mapeia entregas por cliente|tipo|competência
+    // busca cada tipo TENANT-WIDE (todos os drives, Search API); mapeia entregas por cliente|tipo|competência
     const termos: Record<string, string[]> = { DAS: ['PGDASD'], 'DASN-SIMEI': ['PGMEI', 'DASN'], DCTFWeb: ['DCTF'], FGTS: ['FGTS', 'GRF'], EFD_REINF: ['REINF'], DARF: ['DARF'], ICMS: ['GIA'], ESOCIAL: ['eSocial'] };
     const entregas = new Map<string, Set<string>>();
     let arquivosVistos = 0, semCliente = 0, semComp = 0;
     for (const [tipo, qs] of Object.entries(termos)) {
       for (const q of qs) {
         let arquivos: Array<{ name: string; path: string }> = [];
-        try { arquivos = await this.onedrive.buscarNoDriveRaw(conn.id, q); } catch { continue; }
+        try { arquivos = (await this.onedrive.coletaTenant(conn.id, q, { maxItens: 8000 })).itens; } catch { continue; }
         for (const f of arquivos) {
           arquivosVistos++;
           const cid = resolveClient(f.path || '');

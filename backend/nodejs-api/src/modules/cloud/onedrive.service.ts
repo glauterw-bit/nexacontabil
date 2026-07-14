@@ -545,12 +545,13 @@ export class OneDriveService {
    * qualquer arquivo que contenha o termo, com webUrl completo (hierarquia de pastas).
    * Pagina por `from`/`size` até esgotar (moreResultsAvailable=false).
    */
-  async buscaTenant(connectionId: string, query: string, opts?: { maxItens?: number }) {
+  /** Coleta CRUA tenant-wide (paginada até esgotar) — base p/ agregados e reconciliação. */
+  async coletaTenant(connectionId: string, query: string, opts?: { maxItens?: number }): Promise<{ itens: Array<{ name: string; path: string; webUrl: string }>; total: number; erros: number }> {
     const token = await this.getValidToken(connectionId);
     const achados: Array<{ name: string; path: string; webUrl: string }> = [];
-    const maxItens = opts?.maxItens ?? 3000;
+    const maxItens = opts?.maxItens ?? 6000;
     let from = 0, more = true, guard = 0, r429 = 0, total = 0, erros = 0;
-    while (more && guard++ < 60 && achados.length < maxItens) {
+    while (more && guard++ < 200 && achados.length < maxItens) {
       const res: any = await fetch(`${GRAPH_BASE}/search/query`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -558,7 +559,8 @@ export class OneDriveService {
           entityTypes: ['driveItem'],
           query: { queryString: query },
           from, size: 200,
-          fields: ['name', 'webUrl', 'parentReference'],
+          fields: ['name', 'webUrl', 'parentReference', 'lastModifiedDateTime'],
+          sortProperties: [{ name: 'lastModifiedDateTime', isDescending: true }],
         }] }),
       });
       if ((res.status === 429 || res.status === 503) && r429 < 6) { r429++; await new Promise((r) => setTimeout(r, Math.min(30, 2 ** r429) * 1000)); guard--; continue; }
@@ -575,6 +577,11 @@ export class OneDriveService {
       more = !!container.moreResultsAvailable;
       from += 200;
     }
+    return { itens: achados, total, erros };
+  }
+
+  async buscaTenant(connectionId: string, query: string, opts?: { maxItens?: number }) {
+    const { itens: achados, total, erros } = await this.coletaTenant(connectionId, query, opts);
     const de = (re: RegExp) => achados.filter((a) => re.test(a.path) || re.test(a.name));
     const anos: Record<string, number> = {};
     for (const a of achados) { const m = `${a.name} ${a.path}`.match(/20(1[5-9]|2[0-9])/g) || []; for (const y of m) anos[y] = (anos[y] ?? 0) + 1; }
