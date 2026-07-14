@@ -314,6 +314,13 @@ export class AnaliseClienteService {
     return this.onedrive.repararPastasOrfas(conn.id);
   }
 
+  /** Busca global no Drive (Search API) — varre todas as pastas/subpastas por um termo. */
+  async buscarNoDrive(query: string) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    return this.onedrive.buscarNoDrive(conn.id, query);
+  }
+
   /** Refresca os links de pasta de todos os clientes (corrige itemId obsoleto → pasta certa). */
   async refrescarPastas() {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });

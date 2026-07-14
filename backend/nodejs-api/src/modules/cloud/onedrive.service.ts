@@ -494,6 +494,45 @@ export class OneDriveService {
     return { ativas: ativas.length, refrescadas, jaCorretas, semMatch, detalhe };
   }
 
+  /**
+   * BUSCA GLOBAL no Drive (Graph Search API) — varre TODAS as pastas/subpastas/arquivos
+   * pelo índice do servidor, sem precisar reler folder por folder. Retorna onde os
+   * arquivos que casam com `query` estão (com o caminho), destacando os de 2026.
+   */
+  async buscarNoDrive(connectionId: string, query: string, opts?: { maxDrives?: number }) {
+    const token = await this.getValidToken(connectionId);
+    const drives = [...new Set(
+      (await this.prisma.company.findMany({ where: { active: true, sharepointDriveId: { not: null } }, select: { sharepointDriveId: true } })).map((c) => c.sharepointDriveId),
+    )].filter(Boolean).slice(0, opts?.maxDrives ?? 6) as string[];
+    const achados: Array<{ name: string; path: string }> = [];
+    let erros = 0;
+    for (const driveId of drives) {
+      let url: string | null = `${GRAPH_BASE}/drives/${driveId}/root/search(q='${encodeURIComponent(query)}')?$top=200&$select=name,parentReference`;
+      let guard = 0, r429 = 0;
+      while (url && guard++ < 25) {
+        const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        if ((res.status === 429 || res.status === 503) && r429 < 5) { r429++; await new Promise((r) => setTimeout(r, Math.min(30, 2 ** r429) * 1000)); guard--; continue; }
+        if (!res.ok) { erros++; break; }
+        const json: any = await res.json();
+        for (const it of (json.value ?? [])) {
+          if (it.folder) continue;
+          const raw = it.parentReference?.path ?? '';
+          achados.push({ name: it.name ?? '', path: raw.includes('root:') ? raw.split('root:')[1] : raw });
+        }
+        url = json['@odata.nextLink'] ?? null;
+      }
+    }
+    const de = (re: RegExp) => achados.filter((a) => re.test(a.path) || re.test(a.name));
+    const com2026 = de(/2026/);
+    return {
+      query, drivesPesquisados: drives.length, erros,
+      totalAchado: achados.length,
+      com2026: com2026.length, com2025: de(/2025/).length, com2024: de(/2024/).length,
+      amostra2026: [...new Set(com2026.map((a) => `${a.path.slice(-45)}/${a.name.slice(0, 30)}`))].slice(0, 15),
+      amostraGeral: [...new Set(achados.map((a) => `${a.path.slice(-40)}/${a.name.slice(0, 25)}`))].slice(0, 8),
+    };
+  }
+
   /** Lista itens compartilhados COM a conta (Compartilhados comigo). */
   async listShared(connectionId: string) {
     const token = await this.getValidToken(connectionId);

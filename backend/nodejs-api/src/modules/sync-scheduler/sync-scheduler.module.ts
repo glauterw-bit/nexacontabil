@@ -1,4 +1,4 @@
-import { Module, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Module, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../../common/public.decorator';
 import { PrismaService } from '../../database/prisma.service';
@@ -83,6 +83,13 @@ class SyncSchedulerController {
   @Get('escanear-delta')
   escanearDelta() {
     return this.service.escanearDelta();
+  }
+
+  /** Busca global no Drive (Search API) por um termo — varre TODAS as pastas/subpastas. */
+  @Public()
+  @Get('buscar-drive')
+  buscarDrive(@Query('q') q?: string) {
+    return this.service.buscarNoDrive(q || 'PGDASD');
   }
 }
 
