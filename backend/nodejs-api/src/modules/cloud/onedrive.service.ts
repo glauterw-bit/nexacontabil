@@ -528,8 +528,8 @@ export class OneDriveService {
       query, drivesPesquisados: drives.length, erros,
       totalAchado: achados.length,
       com2026: com2026.length, com2025: de(/2025/).length, com2024: de(/2024/).length,
-      amostra2026: [...new Set(com2026.map((a) => `${a.path.slice(-45)}/${a.name.slice(0, 30)}`))].slice(0, 15),
-      amostraGeral: [...new Set(achados.map((a) => `${a.path.slice(-40)}/${a.name.slice(0, 25)}`))].slice(0, 8),
+      amostra2026: [...new Set(com2026.map((a) => `${a.path}/${a.name}`))].slice(0, 18),
+      amostraGeral: [...new Set(achados.map((a) => `${a.path}/${a.name}`))].slice(0, 8),
     };
   }
 
