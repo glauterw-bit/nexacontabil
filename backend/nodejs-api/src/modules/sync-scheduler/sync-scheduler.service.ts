@@ -377,10 +377,16 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         await passo('pastasOrfas', () => this.analise.repararPastasOrfas());
         // 2c. reprocessa NFS-e/XMLs sem valor com o parser ABRASF (re-baixa e extrai)
         await passo('reprocessarNfse', () => this.analise.reprocessarSemValor({ timeBudgetMs: 3 * 60_000 }));
-        // 3. RECONCILIAÇÃO RÁPIDA VIA SEARCH — 1 busca no índice do Graph por cliente acha
-        //    os comprovantes do ano (ex.: "05.2026 - Rec.pdf") sem re-capturar 137k arquivos.
-        //    Marca entregue/vencida/pendente por competência. É a fonte de verdade das entregas.
-        await passo('reconciliarViaSearch', () => this.analise.reconciliarViaSearch({ timeBudgetMs: 4 * 60_000 }));
+        // 3. RECONCILIAÇÃO POR DOCUMENTOS (banco) — usa o companyId já gravado pelo delta
+        //    (atribuição 100%, sem perder cliente) e casa cada obrigação com o comprovante
+        //    da própria empresa por nome+pasta (ex.: /07.2025/PGDASD-RECIBO.pdf). Rotaciona
+        //    pela carteira a cada ciclo (updatedAt asc). Fonte de verdade das entregas.
+        await passo('reconciliarDocs', async () => {
+          const ano = startedAt.getFullYear();
+          const a = await this.fiscalCalendar.reconciliarPorDocumentos({ ano, limitEmpresas: 80, timeBudgetMs: 3 * 60_000 });
+          const b = await this.fiscalCalendar.reconciliarPorDocumentos({ ano: ano - 1, limitEmpresas: 80, timeBudgetMs: 3 * 60_000 });
+          return { anoAtual: a, anoAnterior: b };
+        });
         // 4. recibo genérico (fallback) p/ quem não casou por documento específico
         await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 6));
         // 5. marca vencidas o que sobrou pendente e já passou do prazo
