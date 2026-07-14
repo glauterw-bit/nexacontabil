@@ -35,6 +35,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   private deltaResetFeito = false;
   private carteiraAlinhada = false;
   private reconGlobalFeita = false;
+  private reconGlobalResultado: any = null;
 
   constructor(
     private readonly fluxo: FluxoService,
@@ -102,7 +103,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       empresasComDocumentos: empresasComDoc.length, empresasAtivas,
       certificados,
       ultimoImportCert: this.lastRun?.importarCertificados ?? null,
-      reconciliarGlobal: this.lastRun?.reconciliarGlobal ?? null,
+      reconciliarGlobal: this.reconGlobalResultado ?? null,
       docsDoSefaz: docsSefaz,
       porTipo,
       amostraSemEmitente: amostraVazios.map((d) => ({ arquivo: (d.originalFilename ?? '').slice(-40), tipo: d.type })),
@@ -310,12 +311,15 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         await passo('alinharCarteira', () => this.verificacao.desativarForaDaPlanilha());
         this.carteiraAlinhada = true;
       }
-      // 0c. RECONCILIAÇÃO GLOBAL (1x, server-side sem timeout de HTTP): busca cada tipo de
-      //     comprovante no Drive inteiro e casa por tipo+competência (2024/2025/2026) — acha
-      //     as entregas dos meses passados que estão salvas no OneDrive.
+      // 0c. RECONCILIAÇÃO GLOBAL (1x, EM BACKGROUND — não bloqueia o ciclo): busca cada
+      //     tipo de comprovante no Drive inteiro e casa por tipo+competência (2024/25/26).
+      //     É pesada (muitas buscas); roda destacada e grava o resultado quando termina.
       if (!this.reconGlobalFeita) {
-        await passo('reconciliarGlobal', () => this.reconciliarGlobal([2024, 2025, 2026]));
         this.reconGlobalFeita = true;
+        this.reconGlobalResultado = { status: 'rodando', em: startedAt.toISOString() };
+        this.reconciliarGlobal([2024, 2025, 2026])
+          .then((r) => { this.reconGlobalResultado = { status: 'concluido', ...r }; this.logger.log(`reconciliarGlobal: ${r?.marcadasEntregue} entregues, ${r?.clientesComEntrega} clientes`); })
+          .catch((e) => { this.reconGlobalResultado = { status: 'erro', msg: e?.message }; });
       }
       // 0b. REFRESCA OS LINKS DE PASTA (1x): re-resolve a pasta atual de cada cliente
       //     (itemId obsoleto por pasta movida/recriada → apontava pra vazio, scanner lia
