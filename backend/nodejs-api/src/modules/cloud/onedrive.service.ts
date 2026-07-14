@@ -507,7 +507,7 @@ export class OneDriveService {
     const achados: Array<{ name: string; path: string }> = [];
     let erros = 0;
     for (const driveId of drives) {
-      let url: string | null = `${GRAPH_BASE}/drives/${driveId}/root/search(q='${encodeURIComponent(query)}')?$top=200&$select=name,parentReference`;
+      let url: string | null = `${GRAPH_BASE}/drives/${driveId}/root/search(q='${encodeURIComponent(query)}')?$top=200&$select=name,webUrl,parentReference`;
       let guard = 0, r429 = 0;
       while (url && guard++ < 25) {
         const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -516,8 +516,7 @@ export class OneDriveService {
         const json: any = await res.json();
         for (const it of (json.value ?? [])) {
           if (it.folder) continue;
-          const raw = it.parentReference?.path ?? '';
-          achados.push({ name: it.name ?? '', path: raw.includes('root:') ? raw.split('root:')[1] : raw });
+          achados.push({ name: it.name ?? '', path: this._pastaDoWebUrl(it.webUrl) || (it.parentReference?.path ?? '') });
         }
         url = json['@odata.nextLink'] ?? null;
       }
@@ -539,7 +538,8 @@ export class OneDriveService {
    */
   async searchInFolder(connectionId: string, driveId: string, folderId: string, query: string, max = 500): Promise<Array<{ name: string; path: string }>> {
     const token = await this.getValidToken(connectionId);
-    let url: string | null = `${GRAPH_BASE}/drives/${driveId}/items/${folderId}/search(q='${encodeURIComponent(query)}')?$top=200&$select=name,parentReference`;
+    // webUrl traz o CAMINHO COMPLETO de pastas (parentReference.path vem vazio na busca).
+    let url: string | null = `${GRAPH_BASE}/drives/${driveId}/items/${folderId}/search(q='${encodeURIComponent(query)}')?$top=200&$select=name,webUrl,parentReference`;
     const out: Array<{ name: string; path: string }> = [];
     let guard = 0, r429 = 0;
     while (url && guard++ < 15 && out.length < max) {
@@ -549,12 +549,26 @@ export class OneDriveService {
       const json: any = await res.json();
       for (const it of (json.value ?? [])) {
         if (it.folder) continue;
-        const raw = it.parentReference?.path ?? '';
-        out.push({ name: it.name ?? '', path: raw.includes('root:') ? raw.split('root:')[1] : raw });
+        out.push({ name: it.name ?? '', path: this._pastaDoWebUrl(it.webUrl) || (it.parentReference?.path ?? '') });
       }
       url = json['@odata.nextLink'] ?? null;
     }
     return out;
+  }
+
+  /** Extrai o caminho de PASTAS (sem host/biblioteca/arquivo) de um webUrl do SharePoint. */
+  private _pastaDoWebUrl(webUrl?: string): string {
+    if (!webUrl) return '';
+    try {
+      const u = new URL(webUrl);
+      let p = decodeURIComponent(u.pathname); // /sites/Site/Documentos Compartilhados/CLIENTE/DP Fiscal/2026/05.2026/arquivo.pdf
+      // remove /sites/{site}/ e a 1ª pasta (biblioteca), e o nome do arquivo no fim
+      p = p.replace(/^\/sites\/[^/]+\//i, '').replace(/^\/personal\/[^/]+\//i, '');
+      const segs = p.split('/').filter(Boolean);
+      segs.shift();  // biblioteca (ex.: "Documentos Compartilhados")
+      segs.pop();    // nome do arquivo
+      return segs.join('/');
+    } catch { return ''; }
   }
 
   /** Lista itens compartilhados COM a conta (Compartilhados comigo). */
