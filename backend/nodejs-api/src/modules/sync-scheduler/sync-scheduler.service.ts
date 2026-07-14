@@ -165,6 +165,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
    * ano, varre TODAS as empresas ativas em lotes até esgotar. É a fonte mais confiável:
    * não perde cliente (usa companyId), casa por nome+pasta do comprovante já capturado.
    */
+  /** Busca TENANT-WIDE (Microsoft Search API) — o fluxo mais rápido/completo p/ ler todo o OneDrive. */
+  async buscaTenant(query: string) {
+    return this.analise.buscaTenant(query || 'PGDASD');
+  }
+
   /** Diagnóstico do casamento (por tipo: competência errada × doc ausente × folderPath). */
   async diagnosticarReconciliacao(ano = new Date().getFullYear() - 1) {
     return this.fiscalCalendar.diagnosticarReconciliacao(ano);

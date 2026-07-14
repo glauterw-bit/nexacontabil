@@ -457,6 +457,13 @@ export class AnaliseClienteService {
     return this.onedrive.buscarNoDrive(conn.id, query, { pasta });
   }
 
+  /** Busca TENANT-WIDE (Microsoft Search API) — lê tudo do OneDrive numa varredura indexada. */
+  async buscaTenant(query: string) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    return this.onedrive.buscaTenant(conn.id, query);
+  }
+
   /** Realinha clientes ativos pelas pastas de "Empresas Ativas" (reativa os reais removidos). */
   async realinharCarteira() {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });

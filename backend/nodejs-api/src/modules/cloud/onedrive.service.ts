@@ -539,6 +539,58 @@ export class OneDriveService {
   }
 
   /**
+   * BUSCA TENANT-WIDE via Microsoft Search API (POST /search/query) — varre TODOS os sites
+   * e bibliotecas do tenant numa única chamada indexada, em vez de percorrer drive a drive.
+   * É o fluxo mais rápido e completo p/ "ler tudo do OneDrive": o índice do servidor devolve
+   * qualquer arquivo que contenha o termo, com webUrl completo (hierarquia de pastas).
+   * Pagina por `from`/`size` até esgotar (moreResultsAvailable=false).
+   */
+  async buscaTenant(connectionId: string, query: string, opts?: { maxItens?: number }) {
+    const token = await this.getValidToken(connectionId);
+    const achados: Array<{ name: string; path: string; webUrl: string }> = [];
+    const maxItens = opts?.maxItens ?? 3000;
+    let from = 0, more = true, guard = 0, r429 = 0, total = 0, erros = 0;
+    while (more && guard++ < 60 && achados.length < maxItens) {
+      const res: any = await fetch(`${GRAPH_BASE}/search/query`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requests: [{
+          entityTypes: ['driveItem'],
+          query: { queryString: query },
+          from, size: 200,
+          fields: ['name', 'webUrl', 'parentReference'],
+        }] }),
+      });
+      if ((res.status === 429 || res.status === 503) && r429 < 6) { r429++; await new Promise((r) => setTimeout(r, Math.min(30, 2 ** r429) * 1000)); guard--; continue; }
+      if (!res.ok) { erros++; break; }
+      const json: any = await res.json();
+      const container = json?.value?.[0]?.hitsContainers?.[0] ?? {};
+      total = container.total ?? total;
+      for (const hit of (container.hits ?? [])) {
+        const it = hit.resource ?? {};
+        if (it.folder) continue;
+        const webUrl = it.webUrl ?? '';
+        achados.push({ name: it.name ?? '', path: this._pastaDoWebUrl(webUrl) || (it.parentReference?.path ?? ''), webUrl });
+      }
+      more = !!container.moreResultsAvailable;
+      from += 200;
+    }
+    const de = (re: RegExp) => achados.filter((a) => re.test(a.path) || re.test(a.name));
+    const anos: Record<string, number> = {};
+    for (const a of achados) { const m = `${a.name} ${a.path}`.match(/20(1[5-9]|2[0-9])/g) || []; for (const y of m) anos[y] = (anos[y] ?? 0) + 1; }
+    const com2026 = de(/2026/);
+    const meses2026: Record<string, number> = {};
+    for (const a of com2026) { const s = `${a.name} ${a.path}`; for (let mo = 1; mo <= 12; mo++) { const mm = String(mo).padStart(2, '0'); if (s.includes(`${mm}.2026`) || s.includes(`${mm}-2026`) || s.includes(`${mm}/2026`) || s.includes(`${mm} 2026`) || s.includes(`2026/${mm}`)) meses2026[`2026-${mm}`] = (meses2026[`2026-${mm}`] ?? 0) + 1; } }
+    return {
+      query, fluxo: 'Microsoft Search API (tenant-wide)', totalIndexado: total, coletado: achados.length, erros,
+      porAno: anos, com2026: com2026.length,
+      meses2026,
+      amostra2026: [...new Set(com2026.map((a) => `${a.path}/${a.name}`))].slice(0, 25),
+      amostraGeral: [...new Set(achados.map((a) => `${a.path}/${a.name}`))].slice(0, 10),
+    };
+  }
+
+  /**
    * BUSCA DENTRO da pasta de um cliente (Search API escopada) — varre todas as subpastas
    * do cliente pelo índice do servidor. Rápido: 1 chamada acha os comprovantes do período.
    */

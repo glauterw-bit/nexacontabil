@@ -128,6 +128,13 @@ class SyncSchedulerController {
   diagnosticarReconciliacao(@Query('ano') ano?: string) {
     return this.service.diagnosticarReconciliacao(ano ? parseInt(ano, 10) : undefined);
   }
+
+  /** Busca TENANT-WIDE (Microsoft Search API) — lê TODO o OneDrive numa varredura indexada. */
+  @Public()
+  @Get('busca-tenant')
+  buscaTenant(@Query('q') q?: string) {
+    return this.service.buscaTenant(q || 'PGDASD');
+  }
 }
 
 @Module({
