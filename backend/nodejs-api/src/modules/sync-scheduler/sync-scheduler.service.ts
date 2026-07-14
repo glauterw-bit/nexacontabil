@@ -180,6 +180,13 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.fiscalCalendar.markOverdue();
   }
 
+  /** Reconciliação APP-ONLY (getAllSites → drives → delta) — cobertura 100%, incremental. */
+  async reconciliarAppOnly(anos?: number[]) {
+    const yy = anos ?? [new Date().getFullYear(), new Date().getFullYear() - 1];
+    for (const a of yy) await this.fiscalCalendar.garantirAno(a).catch(() => undefined);
+    return this.analise.reconciliarAppOnly({ anos: yy, timeBudgetMs: 8 * 60_000 });
+  }
+
   /** Resumo REAL das obrigações por tipo e status (entregue/vencida/pendente) num ano. */
   async resumoObrigacoes(ano = new Date().getFullYear()) {
     const rows = await this.prisma.fiscalCalendarItem.groupBy({

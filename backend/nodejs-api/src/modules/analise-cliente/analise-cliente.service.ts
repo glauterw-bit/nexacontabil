@@ -458,6 +458,93 @@ export class AnaliseClienteService {
     return { anos, arquivosVistos, semCliente, semComp, clientesComEntrega: entregas.size, obrigacoesAnalisadas: itens.length, marcadasEntregue: entregue };
   }
 
+  /**
+   * RECONCILIAÇÃO APP-ONLY (cobertura 100%) — usa o scan completo (getAllSites → drives → delta,
+   * permissão de aplicação) e casa os comprovantes por cliente+competência lidos do caminho.
+   * É a fonte definitiva: nenhum drive fica de fora. ADITIVO (só marca ENTREGUE com prova).
+   */
+  async reconciliarAppOnly(opts?: { anos?: number[]; timeBudgetMs?: number }) {
+    const anos = opts?.anos ?? [new Date().getFullYear(), new Date().getFullYear() - 1];
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    let scan;
+    try { scan = await this.onedrive.scanCompletoAppOnly({ timeBudgetMs: opts?.timeBudgetMs ?? 8 * 60_000 }); }
+    catch (e: any) { return { erro: `Scan app-only falhou: ${e?.message ?? e}. Confira permissões de APLICAÇÃO + admin consent no Azure.` }; }
+    if ((scan as any).erro) return scan;
+
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const companies = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true, clienteCodigo: true } });
+    const porCodigo = new Map<string, string>(); const porNome = new Map<string, string>();
+    for (const c of companies) { if (c.clienteCodigo) porCodigo.set(String(c.clienteCodigo), c.id); const n = norm(c.name); if (n) porNome.set(n, c.id); }
+    const resolveSeg = (seg: string): string | null => {
+      const codeM = seg.match(/^\s*(\d+)\s*[-–]/);
+      if (codeM && porCodigo.has(codeM[1])) return porCodigo.get(codeM[1])!;
+      const nn = norm(seg.replace(/^\s*\d+\s*[-–]\s*/, '').replace(/\([^)]*\)/g, ''));
+      if (nn.length >= 5 && porNome.has(nn)) return porNome.get(nn)!;
+      if (nn.length >= 8) for (const [n, id] of porNome) if (n.length >= 8 && (nn.includes(n) || n.includes(nn))) return id;
+      return null;
+    };
+    const resolveClient = (fullPath: string): string | null => { for (const seg of (fullPath || '').split('/')) { const cid = resolveSeg(seg); if (cid) return cid; } return null; };
+    const extractComp = (s: string): string | null => {
+      for (const y of anos) for (let m = 1; m <= 12; m++) {
+        const mm = String(m).padStart(2, '0');
+        if (s.includes(`${mm} ${y}`) || s.includes(`${y} ${mm}`) || s.includes(`${mm}${y}`) || (s.includes(MESES[m - 1]) && s.includes(String(y)))) return `${y}-${mm}`;
+      }
+      return null;
+    };
+    // detecta o TIPO de obrigação pelo nome do comprovante
+    const detectTipo = (n: string): string | null => {
+      if (/dasnsimei|\bdasn\b/.test(n)) return 'DASN-SIMEI';
+      if (/pgdasd|pgdas|pgmei/.test(n)) return 'DAS';
+      if (/dctf/.test(n)) return 'DCTFWeb';
+      if (/reinf/.test(n)) return 'EFD_REINF';
+      if (/\bgia\b|gare/.test(n)) return 'ICMS';
+      if (/\bdarf\b/.test(n)) return 'DARF';
+      if (/fgts|\bgrf\b/.test(n)) return 'FGTS';
+      if (/esocial|esoc/.test(n)) return 'ESOCIAL';
+      if (/defis/.test(n)) return 'DEFIS';
+      if (/\becd\b/.test(n)) return 'ECD';
+      if (/\becf\b/.test(n)) return 'ECF';
+      return null;
+    };
+
+    const entregas = new Map<string, Set<string>>();
+    let semCliente = 0, semComp = 0, semTipo = 0;
+    for (const f of (scan as any).comprovantes as Array<{ name: string; path: string }>) {
+      const ntxt = norm(`${f.name} ${f.path}`);
+      const tipo = detectTipo(ntxt);
+      if (!tipo) { semTipo++; continue; }
+      const cid = resolveClient(f.path || '');
+      if (!cid) { semCliente++; continue; }
+      const comp = tipo === 'DEFIS' || tipo === 'ECD' || tipo === 'ECF' || tipo === 'DASN-SIMEI'
+        ? (anos.map(String).find((y) => ntxt.includes(y)) ?? null) // anuais: basta o ano
+        : extractComp(ntxt);
+      if (!comp) { semComp++; continue; }
+      if (!entregas.has(cid)) entregas.set(cid, new Set());
+      entregas.get(cid)!.add(`${tipo}|${comp}`);
+    }
+    const anosStr = anos.map(String);
+    const itens = await this.prisma.fiscalCalendarItem.findMany({
+      where: { status: { in: ['pendente', 'vencida'] }, OR: anosStr.map((a) => ({ competencia: { startsWith: a } })) },
+      select: { id: true, companyId: true, tipo: true, competencia: true },
+    });
+    let entregue = 0;
+    for (const it of itens) {
+      const set = entregas.get(it.companyId);
+      if (set && set.has(`${it.tipo}|${it.competencia}`)) {
+        await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined);
+        entregue++;
+      }
+    }
+    return {
+      anos, fluxo: 'App-only (getAllSites → drives → delta)',
+      sites: (scan as any).sites, drivesVarridos: (scan as any).drivesVarridos, incremental: (scan as any).incremental, parcial: (scan as any).parcial,
+      arquivosVistos: (scan as any).arquivosVistos, comprovantesRelevantes: (scan as any).comprovantes.length,
+      semTipo, semCliente, semComp, clientesComEntrega: entregas.size, marcadasEntregue: entregue,
+    };
+  }
+
   /** Busca global no Drive (Search API) — varre todas as pastas/subpastas por um termo. */
   async buscarNoDrive(query: string, pasta?: string) {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });

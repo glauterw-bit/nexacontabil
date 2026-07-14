@@ -1400,6 +1400,21 @@ model CloudConnection {
   @@map("cloud_connections")
 }
 
+// ─── Estado do scan por DRIVE (delta incremental app-only) ────
+// Guarda o @odata.deltaLink de cada drive p/ que a próxima varredura pegue só as mudanças.
+model DriveDeltaState {
+  id         String   @id @default(uuid())
+  driveId    String   @unique
+  siteName   String?
+  driveName  String?
+  deltaLink  String?  @db.Text // link opaco do Graph p/ sincronização incremental
+  arquivos   Int      @default(0) // arquivos vistos na última varredura
+  lastSyncAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("drive_delta_state")
+}
+
 // ─── Document Query History (buscas em linguagem natural) ────
 model DocumentQuery {
   id              String   @id @default(uuid())
