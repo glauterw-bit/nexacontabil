@@ -133,6 +133,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.refrescarPastas();
   }
 
+  /** Realinha a carteira pelas pastas de "Empresas Ativas" (reativa clientes reais). */
+  async realinharCarteira() {
+    return this.analise.realinharCarteira();
+  }
+
   /** Teste do scanner de produção (delta) numa amostra — acha 2026? */
   async escanearDelta() {
     return this.analise.escanearDeltaAmostra(6);

@@ -78,6 +78,13 @@ class SyncSchedulerController {
     return this.service.refrescarPastas();
   }
 
+  /** Realinha a carteira pelas pastas de "Empresas Ativas" (reativa clientes reais). */
+  @Public()
+  @Get('realinhar-carteira')
+  realinharCarteira() {
+    return this.service.realinharCarteira();
+  }
+
   /** Teste do scanner de produção (delta) — acha os comprovantes de 2026? */
   @Public()
   @Get('escanear-delta')

@@ -457,6 +457,13 @@ export class AnaliseClienteService {
     return this.onedrive.buscarNoDrive(conn.id, query);
   }
 
+  /** Realinha clientes ativos pelas pastas de "Empresas Ativas" (reativa os reais removidos). */
+  async realinharCarteira() {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    return this.onedrive.realinharPelaCarteira(conn.id);
+  }
+
   /** Refresca os links de pasta de todos os clientes (corrige itemId obsoleto → pasta certa). */
   async refrescarPastas() {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });

@@ -593,6 +593,38 @@ export class OneDriveService {
     return out;
   }
 
+  /**
+   * REALINHA os clientes ativos pelas pastas de "Empresas Ativas" do SharePoint (a verdade
+   * operacional). Reativa os clientes REAIS (pasta com código "NNN - NOME") que ficaram
+   * inativos por não estarem na planilha; mantém fora as pastas-lixo (sem código) e as de
+   * "Empresas Inativas". Também vincula/atualiza o itemId da pasta.
+   */
+  async realinharPelaCarteira(connectionId: string) {
+    const cart: any = await this.getCarteira(connectionId);
+    if (cart.erro || !cart.clientes?.length) return { erro: cart.erro ?? 'carteira vazia' };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    // pastas de clientes REAIS = ativas E com código "NNN -" (exclui GERÊNCIA/Anexos etc.)
+    const reais = cart.clientes.filter((c: any) => c.ativo && c.codigo);
+    const porCodigo = new Map<string, any>(); const porNome = new Map<string, any>();
+    for (const f of reais) { porCodigo.set(String(f.codigo), f); const n = norm(f.nome); if (n) porNome.set(n, f); }
+
+    const empresas = await this.prisma.company.findMany({ select: { id: true, name: true, clienteCodigo: true, active: true } });
+    let reativadas = 0, jaAtivas = 0, semMatch = 0;
+    for (const c of empresas) {
+      const f = (c.clienteCodigo && porCodigo.get(String(c.clienteCodigo))) || porNome.get(norm(c.name));
+      if (!f) { semMatch++; continue; }
+      if (c.active) { jaAtivas++; continue; }
+      await this.prisma.company.update({
+        where: { id: c.id },
+        data: { active: true, sharepointItemId: f.itemId, sharepointDriveId: f.driveId, sharepointDeltaLink: null, ...(c.clienteCodigo ? {} : { clienteCodigo: String(f.codigo) }) },
+      }).catch(() => undefined);
+      reativadas++;
+    }
+    const totalAtivas = await this.prisma.company.count({ where: { active: true } });
+    this.logger.log(`realinhar carteira: ${reativadas} reativadas, ${jaAtivas} já ativas — total ativas agora ${totalAtivas}`);
+    return { pastasReais: reais.length, reativadas, jaAtivas, semMatch, totalAtivasAgora: totalAtivas };
+  }
+
   /** Lista itens compartilhados COM a conta (Compartilhados comigo). */
   async listShared(connectionId: string) {
     const token = await this.getValidToken(connectionId);
