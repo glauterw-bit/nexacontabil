@@ -113,6 +113,14 @@ class SyncSchedulerController {
     const lista = anos ? anos.split(',').map((a) => parseInt(a, 10)).filter(Boolean) : undefined;
     return this.service.reconciliarGlobal(lista);
   }
+
+  /** Reconciliação por DOCUMENTOS do banco (companyId 100%) — fonte confiável, varre todas as empresas. */
+  @Public()
+  @Get('reconciliar-docs')
+  reconciliarDocs(@Query('anos') anos?: string) {
+    const lista = anos ? anos.split(',').map((a) => parseInt(a, 10)).filter(Boolean) : undefined;
+    return this.service.reconciliarDocs(lista);
+  }
 }
 
 @Module({

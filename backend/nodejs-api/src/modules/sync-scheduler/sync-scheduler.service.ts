@@ -161,6 +161,30 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   }
 
   /**
+   * Reconciliação por DOCUMENTOS do banco (companyId 100% atribuído pelo delta) — para cada
+   * ano, varre TODAS as empresas ativas em lotes até esgotar. É a fonte mais confiável:
+   * não perde cliente (usa companyId), casa por nome+pasta do comprovante já capturado.
+   */
+  async reconciliarDocs(anos = [2025, 2026]) {
+    const total = { entregues: 0, vencidas: 0, pendentes: 0, semMudanca: 0, empresas: 0, passes: 0 };
+    for (const ano of anos) {
+      await this.fiscalCalendar.garantirAno(ano).catch(() => undefined);
+      // pagina por lotes: cada chamada processa até 60 empresas menos-recentes; roda várias voltas
+      for (let p = 0; p < 6; p++) {
+        const r: any = await this.fiscalCalendar.reconciliarPorDocumentos({ ano, limitEmpresas: 60, timeBudgetMs: 90_000 });
+        total.entregues += r.marcadasEntregue ?? 0;
+        total.vencidas += r.marcadasVencida ?? 0;
+        total.pendentes += r.marcadasPendente ?? 0;
+        total.semMudanca += r.semMudanca ?? 0;
+        total.empresas += r.empresasProcessadas ?? 0;
+        total.passes++;
+        if ((r.empresasProcessadas ?? 0) < 60) break; // esgotou as empresas do ano
+      }
+    }
+    return { anos, ...total };
+  }
+
+  /**
    * Amostra como os COMPROVANTES estão nomeados (valida a reconciliação): conta e mostra
    * exemplos de documentos cujo nome contém palavras de obrigação (DAS, DCTFWeb, FGTS...).
    */
