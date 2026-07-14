@@ -150,6 +150,13 @@ class SyncSchedulerController {
     return this.service.enumerarSitesEDrives();
   }
 
+  /** Link de CONSENTIMENTO de admin (Azure) — abrir 1x libera as permissões de aplicação. */
+  @Public()
+  @Get('admin-consent-url')
+  adminConsentUrl() {
+    return this.service.adminConsentUrl();
+  }
+
   /** Reaplica a regra de vencidas (marca vencidas reais + reverte FGTS/eSocial p/ portal). */
   @Public()
   @Get('marcar-vencidas')

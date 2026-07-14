@@ -128,6 +128,19 @@ export class OneDriveService {
     return res.accessToken;
   }
 
+  /** Monta o link de CONSENTIMENTO DE ADMIN — abrir 1x autoriza as permissões de aplicação. */
+  adminConsentUrl() {
+    const id = process.env.MICROSOFT_CLIENT_ID;
+    const tenant = process.env.MICROSOFT_TENANT_ID;
+    if (!id) return { erro: 'MICROSOFT_CLIENT_ID não configurado.' };
+    const t = tenant && tenant !== 'common' ? tenant : 'common';
+    return {
+      clientId: id, tenant: t,
+      urlConsentimento: `https://login.microsoftonline.com/${t}/adminconsent?client_id=${id}`,
+      instrucao: 'Adicione Sites.Read.All + Files.Read.All como permissões de APLICAÇÃO no App registration; depois abra este link logado como ADMIN e clique Aceitar.',
+    };
+  }
+
   /**
    * ENUMERA todos os sites do tenant e suas bibliotecas (app-only) — mede a cobertura real.
    * Responde: "a permissão de aplicação enxerga mais drives que a delegada?". Base do scan 100%.

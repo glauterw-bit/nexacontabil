@@ -564,6 +564,11 @@ export class AnaliseClienteService {
     return this.onedrive.enumerarSitesEDrives();
   }
 
+  /** Link de consentimento de admin p/ liberar as permissões de aplicação. */
+  adminConsentUrl() {
+    return this.onedrive.adminConsentUrl();
+  }
+
   /** Realinha clientes ativos pelas pastas de "Empresas Ativas" (reativa os reais removidos). */
   async realinharCarteira() {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });

@@ -176,6 +176,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.enumerarSitesEDrives();
   }
 
+  /** Link de consentimento de admin (Azure) — 1 clique libera as permissões de aplicação. */
+  adminConsentUrl() {
+    return this.analise.adminConsentUrl();
+  }
+
   /** Reaplica vencidas (marca reais + reverte FGTS/eSocial p/ portal) — correção imediata. */
   async marcarVencidas() {
     return this.fiscalCalendar.markOverdue();
