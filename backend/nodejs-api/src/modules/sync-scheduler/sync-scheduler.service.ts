@@ -133,9 +133,14 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     for (const [g, kws] of Object.entries(grupos)) {
       const where = { originalFilename: { endsWith: '.pdf' as const }, OR: kws.map((k) => ({ originalFilename: { contains: k, mode: 'insensitive' as const } })) };
       const total = await this.prisma.document.count({ where });
-      const amostra = await this.prisma.document.findMany({ where, select: { originalFilename: true }, take: 5, orderBy: { createdAt: 'desc' } });
-      out[g] = { total, exemplos: amostra.map((d) => (d.originalFilename ?? '').slice(0, 60)) };
+      const amostra = await this.prisma.document.findMany({ where, select: { originalFilename: true, folderPath: true }, take: 5, orderBy: { createdAt: 'desc' } });
+      out[g] = { total, exemplos: amostra.map((d) => ({ nome: (d.originalFilename ?? '').slice(0, 40), pasta: (d.folderPath ?? '(sem pasta)').slice(-60) })) };
     }
+    // quantos docs já têm folderPath preenchido (re-captura funcionando?)
+    out._folderPath = {
+      comPasta: await this.prisma.document.count({ where: { folderPath: { not: null } } }),
+      total: await this.prisma.document.count(),
+    };
     return out;
   }
 
