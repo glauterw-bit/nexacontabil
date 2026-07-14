@@ -253,17 +253,22 @@ export class PaineisService {
       // pelos comprovantes das pastas). Antes usava o mês atual e ignorava a competência.
       this.prisma.fiscalCalendarItem.findMany({
         where: { companyId: { in: ids }, competencia: { startsWith: comp } },
-        select: { companyId: true, status: true, dataVencimento: true },
+        select: { companyId: true, status: true, dataVencimento: true, tipo: true },
       }),
     ]);
     const reciboBy = new Map(fluxos.map((f) => [f.companyId, f.reciboEncontrado]));
     const mesProcessado = fluxos.length > 0; // só pune declaração se o mês já foi verificado
 
-    // OBRIGAÇÕES por cliente da competência (do calendário reconciliado) — fonte da entrega
+    // OBRIGAÇÕES por cliente da competência (do calendário reconciliado) — fonte da entrega.
+    // FGTS/eSocial são cumpridos no portal do governo (Pix/transmissão), sem PDF arquivado
+    // nas pastas — não dá p/ verificar por comprovante, então NÃO entram no semáforo como
+    // "vencida" (seria falha fantasma). Ficam num acompanhamento à parte (controle no portal).
     const ENTREGUE_OB = new Set(['paga', 'isenta', 'entregue']);
+    const PORTAL_OB = new Set(['FGTS', 'ESOCIAL']);
     const nowD2 = new Date();
     const obBy = new Map<string, { entregues: number; vencidas: number; pendentes: number; total: number }>();
     for (const o of obrigMes) {
+      if (PORTAL_OB.has(o.tipo)) continue; // controlada no portal — fora do semáforo
       const m = obBy.get(o.companyId) ?? { entregues: 0, vencidas: 0, pendentes: 0, total: 0 };
       m.total++;
       if (ENTREGUE_OB.has(o.status)) m.entregues++;
@@ -347,6 +352,7 @@ export class PaineisService {
     let obTotal = 0, obVencidas = 0, obProximas = 0, obEntregues = 0;
     const em7 = new Date(nowD.getTime() + 7 * 86400000);
     for (const o of obrigMes) {
+      if (PORTAL_OB.has(o.tipo)) continue; // FGTS/eSocial controlados no portal — fora do agregado
       obTotal++;
       const venc = new Date(o.dataVencimento);
       if (ENTREGUE_OB.has(o.status)) { obEntregues++; continue; }
@@ -674,12 +680,14 @@ export class PaineisService {
       this.prisma.document.findMany({ where: { companyId, extractedData: { not: null } }, select: { totalValue: true, issueDate: true, extractedData: true, fiscalValidation: true } }),
     ]);
 
-    // ── OBRIGAÇÕES: entregues / pendentes / vencidas ──
+    // ── OBRIGAÇÕES: entregues / pendentes / vencidas / (portal = FGTS/eSocial) ──
     const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
-    const entregues: any[] = [], pendentes: any[] = [], vencidas: any[] = [];
+    const PORTAL_OB = new Set(['FGTS', 'ESOCIAL']);
+    const entregues: any[] = [], pendentes: any[] = [], vencidas: any[] = [], portal: any[] = [];
     for (const o of obrig) {
       const item = { tipo: o.tipo, descricao: o.descricao, competencia: o.competencia, vencimento: o.dataVencimento, status: o.status };
       if (ENTREGUE.has(o.status)) entregues.push(item);
+      else if (PORTAL_OB.has(o.tipo)) portal.push(item); // controlada no portal — não é falha
       else if (o.status === 'vencida' || new Date(o.dataVencimento) < now) vencidas.push(item);
       else pendentes.push(item);
     }
@@ -709,7 +717,7 @@ export class PaineisService {
     return {
       empresa: { nome: co.name, cnpj: co.cnpj, regime: co.taxRegime, responsavel: co.responsavel, uf: co.uf, segmento: co.segmentoFiscal },
       status,
-      obrigacoes: { entregues, pendentes, vencidas, totalAno: obrig.length, pctEntrega: obrig.length ? Math.round((entregues.length / obrig.length) * 100) : 0 },
+      obrigacoes: { entregues, pendentes, vencidas, portal, totalAno: obrig.length, pctEntrega: obrig.length ? Math.round((entregues.length / obrig.length) * 100) : 0 },
       documentos: { total: docs.length, entradas, saidas, mesesComMovimento: [...mesesComDoc].sort() },
       analiseFiscal: {
         faturamento: r2(faturamento),

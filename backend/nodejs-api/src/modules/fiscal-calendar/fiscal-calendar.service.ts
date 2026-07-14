@@ -299,14 +299,21 @@ export class FiscalCalendarService {
     return { empresas, gerados, apagadosEmAberto: apagados, ano };
   }
 
-  /** Diariamente: marca obrigações vencidas. Pode ser chamado por cron externo. */
+  /** Diariamente: marca obrigações vencidas. Pode ser chamado por cron externo.
+   *  FGTS/eSocial são cumpridos no portal do governo (sem PDF na pasta) → não viram
+   *  "vencida" por falta de comprovante (seria falha fantasma); ficam fora dessa marcação. */
   async markOverdue() {
     const now = new Date();
     const result = await this.prisma.fiscalCalendarItem.updateMany({
-      where: { dataVencimento: { lt: now }, status: { in: ['pendente', 'em_apuracao', 'apurada'] } },
+      where: { dataVencimento: { lt: now }, status: { in: ['pendente', 'em_apuracao', 'apurada'] }, tipo: { notIn: ['FGTS', 'ESOCIAL'] } },
       data: { status: 'vencida' },
     });
-    return { updated: result.count };
+    // reverte FGTS/eSocial que já estavam marcados vencida → pendente (controle no portal)
+    const rev = await this.prisma.fiscalCalendarItem.updateMany({
+      where: { tipo: { in: ['FGTS', 'ESOCIAL'] }, status: 'vencida' },
+      data: { status: 'pendente' },
+    });
+    return { updated: result.count, revertidosPortal: rev.count };
   }
 
   // ── RECONCILIAÇÃO POR EVIDÊNCIA ────────────────────────────────────────────
