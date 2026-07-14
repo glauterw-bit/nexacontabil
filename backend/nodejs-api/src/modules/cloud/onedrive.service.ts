@@ -183,8 +183,18 @@ export class OneDriveService {
     const arquivos: Array<{ id: string; name: string; driveId: string; modified: string | null; path?: string }> = [];
     let novoDeltaLink: string | null = deltaLink ?? null;
     let guard = 0, primeira = true;
+    let tentativas429 = 0;
     while (url && guard++ < 400) {
       const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      // 429/503 = limite do Graph: respeita o Retry-After e tenta de novo (até 5x)
+      if ((res.status === 429 || res.status === 503) && tentativas429 < 5) {
+        tentativas429++;
+        const ra = parseInt(res.headers?.get?.('retry-after') ?? '', 10);
+        const espera = Math.min(60, isNaN(ra) ? Math.pow(2, tentativas429) * 2 : ra) * 1000;
+        await new Promise((r) => setTimeout(r, espera));
+        guard--; // esta iteração não conta
+        continue;
+      }
       if (!res.ok) {
         // deltaLink expirado (410 Gone) → recomeça leitura completa da pasta uma vez
         if (primeira && deltaLink) { primeira = false; url = `${base}/items/${folderId}/delta?$top=500`; continue; }
@@ -193,6 +203,7 @@ export class OneDriveService {
         const corpo = await res.text().catch(() => '');
         throw new Error(`Graph delta HTTP ${res.status}: ${corpo.slice(0, 160)}`);
       }
+      tentativas429 = 0;
       primeira = false;
       const json: any = await res.json();
       for (const item of (json.value ?? [])) {
