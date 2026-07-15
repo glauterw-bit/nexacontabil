@@ -643,7 +643,6 @@ export class AnaliseClienteService {
     });
     const entregas = new Map<string, Set<string>>();
     let clientesVarridos = 0, arquivos = 0, semComp = 0, zipsLidos = 0, parcial = false;
-    const compHist: Record<string, number> = {}; const amostra2026: string[] = [];
     for (const c of companies) {
       if (Date.now() - inicio > budget) { parcial = true; break; }
       // LÊ A PASTA DO CLIENTE (delta) — todos os arquivos com caminho, mesmo os de nome genérico
@@ -657,13 +656,7 @@ export class AnaliseClienteService {
         arquivos++;
         const compArq = extractComp(norm(`${f.name} ${f.path ?? ''}`));
         const tipo = detectTipo(norm(f.name));
-        if (tipo) {
-          // DEBUG: qual ano aparece no caminho deste arquivo-de-obrigação?
-          const ys = `${f.name} ${f.path ?? ''}`.match(/20(2[0-7])/g) || [];
-          for (const y of ys) compHist[y] = (compHist[y] ?? 0) + 1;
-          if (/2026/.test(`${f.name} ${f.path ?? ''}`) && amostra2026.length < 15) amostra2026.push(`${tipo}|${compArq ?? 'SEMCOMP'}|${(f.name || '').slice(0, 30)}|${(f.path || '').slice(-45)}`);
-          if (compArq) add(tipo, compArq); else semComp++;
-        }
+        if (tipo) { if (compArq) add(tipo, compArq); else semComp++; }
         // ZIP numa pasta de competência 2026: abre e classifica os nomes internos (recibos compactados)
         if (/\.zip$/i.test(f.name) && compArq && zipsAbertos.size < 40 && Date.now() - inicio < budget) {
           zipsAbertos.add(f.id);
@@ -689,7 +682,7 @@ export class AnaliseClienteService {
         entregue++;
       }
     }
-    return { anos, fluxo: 'Por pasta do cliente (delta) + zip + classificação local', clientesVarridos, arquivos, zipsLidos, semComp, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue, compHist, amostra2026 };
+    return { anos, fluxo: 'Por pasta do cliente (delta) + zip + classificação local', clientesVarridos, arquivos, zipsLidos, semComp, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
   }
 
   /**
