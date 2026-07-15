@@ -305,12 +305,12 @@ export class FiscalCalendarService {
   async markOverdue() {
     const now = new Date();
     const result = await this.prisma.fiscalCalendarItem.updateMany({
-      where: { dataVencimento: { lt: now }, status: { in: ['pendente', 'em_apuracao', 'apurada'] }, tipo: { notIn: ['FGTS', 'ESOCIAL'] } },
+      where: { dataVencimento: { lt: now }, status: { in: ['pendente', 'em_apuracao', 'apurada'] }, tipo: { notIn: ['FGTS', 'ESOCIAL', 'DARF'] } },
       data: { status: 'vencida' },
     });
     // reverte FGTS/eSocial que já estavam marcados vencida → pendente (controle no portal)
     const rev = await this.prisma.fiscalCalendarItem.updateMany({
-      where: { tipo: { in: ['FGTS', 'ESOCIAL'] }, status: 'vencida' },
+      where: { tipo: { in: ['FGTS', 'ESOCIAL', 'DARF'] }, status: 'vencida' },
       data: { status: 'pendente' },
     });
     return { updated: result.count, revertidosPortal: rev.count };

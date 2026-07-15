@@ -264,7 +264,7 @@ export class PaineisService {
     // nas pastas — não dá p/ verificar por comprovante, então NÃO entram no semáforo como
     // "vencida" (seria falha fantasma). Ficam num acompanhamento à parte (controle no portal).
     const ENTREGUE_OB = new Set(['paga', 'isenta', 'entregue']);
-    const PORTAL_OB = new Set(['FGTS', 'ESOCIAL']);
+    const PORTAL_OB = new Set(['FGTS', 'ESOCIAL', 'DARF']);
     const nowD2 = new Date();
     const obBy = new Map<string, { entregues: number; vencidas: number; pendentes: number; total: number }>();
     for (const o of obrigMes) {
@@ -682,7 +682,7 @@ export class PaineisService {
 
     // ── OBRIGAÇÕES: entregues / pendentes / vencidas / (portal = FGTS/eSocial) ──
     const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
-    const PORTAL_OB = new Set(['FGTS', 'ESOCIAL']);
+    const PORTAL_OB = new Set(['FGTS', 'ESOCIAL', 'DARF']);
     const entregues: any[] = [], pendentes: any[] = [], vencidas: any[] = [], portal: any[] = [];
     for (const o of obrig) {
       const item = { tipo: o.tipo, descricao: o.descricao, competencia: o.competencia, vencimento: o.dataVencimento, status: o.status };
