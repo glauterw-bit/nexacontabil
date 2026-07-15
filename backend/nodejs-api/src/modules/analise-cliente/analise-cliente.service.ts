@@ -686,6 +686,105 @@ export class AnaliseClienteService {
   }
 
   /**
+   * LISTADOR DAS PASTAS DE COMPETÊNCIA 2026 — a caça definitiva. A busca acha ALGUM arquivo em
+   * cada pasta de competência (um XML, um PGDASD) e isso revela o ID da PASTA. Então LISTA a
+   * pasta inteira (delta) e classifica TODO arquivo — pegando os recibos de nome genérico que a
+   * busca por palavra não acha (o gap real). Também abre zips. Fonte na localização CERTA de 2026.
+   */
+  async reconciliarListandoPastas(opts?: { anos?: number[]; timeBudgetMs?: number }) {
+    const anos = opts?.anos ?? [new Date().getFullYear()];
+    const budget = opts?.timeBudgetMs ?? 12 * 60_000;
+    const inicio = Date.now();
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const detectTipo = (n: string): string | null => {
+      if (/dasnsimei|\bdasn\b/.test(n)) return 'DASN-SIMEI';
+      if (/pgdasd|pgdas|pgmei|\bdas\b|simples nacional|(?:rec\w*|dec\w*|declara\w*|extrato)[\s-]+sn\b|recibo de pagamento|extrato mensal|(?:dec|declara\w*)[\s\d]*\bsm\b|se?m\s*moviment/.test(n)) return 'DAS';
+      if (/dctf/.test(n)) return 'DCTFWeb';
+      if (/reinf/.test(n)) return 'EFD_REINF';
+      if (/\bgia\b|gare|icms/.test(n)) return 'ICMS';
+      if (/defis/.test(n)) return 'DEFIS';
+      return null;
+    };
+    const extractComp = (s: string): string | null => {
+      for (const y of anos) for (let m = 1; m <= 12; m++) {
+        const mm = String(m).padStart(2, '0');
+        if (s.includes(`${mm} ${y}`) || s.includes(`${y} ${mm}`) || s.includes(`${mm}${y}`) || s.includes(`${y}${mm}`) || (s.includes(MESES[m - 1]) && s.includes(String(y)))) return `${y}-${mm}`;
+      }
+      return null;
+    };
+    // resolução de cliente pelo caminho
+    const companies = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true, clienteCodigo: true } });
+    const porCodigo = new Map<string, string>(); const porNome = new Map<string, string>();
+    for (const c of companies) { if (c.clienteCodigo) porCodigo.set(String(c.clienteCodigo), c.id); const n = norm(c.name); if (n) porNome.set(n, c.id); }
+    const resolveClient = (fullPath: string): string | null => {
+      for (const seg of (fullPath || '').split('/')) {
+        const codeM = seg.match(/^\s*(\d+)\s*[-–]/); if (codeM && porCodigo.has(codeM[1])) return porCodigo.get(codeM[1])!;
+        const nn = norm(seg.replace(/^\s*\d+\s*[-–]\s*/, '').replace(/\([^)]*\)/g, ''));
+        if (nn.length >= 5 && porNome.has(nn)) return porNome.get(nn)!;
+        if (nn.length >= 8) for (const [n, id] of porNome) if (n.length >= 8 && (nn.includes(n) || n.includes(nn))) return id;
+      }
+      return null;
+    };
+    // 1. DESCOBRE as pastas de competência 2026 (via qualquer arquivo achável nelas)
+    const pastas = new Map<string, { driveId: string; parentId: string; path: string }>();
+    const proxMes = (y: number, m: number) => (m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`);
+    const descoberta = ['PGDASD', 'DAS', 'Simples Nacional', 'DCTF', 'GIA', 'REINF', 'PGMEI', 'recibo', 'extrato', 'declaracao'];
+    for (const q of descoberta) {
+      if (Date.now() - inicio > budget * 0.5) break; // metade do tempo p/ descobrir, metade p/ listar
+      for (const y of anos) for (let m = 1; m <= 12; m++) {
+        const mm = String(m).padStart(2, '0');
+        const kql = `${q} LastModifiedTime>=${y}-${mm}-01 AND LastModifiedTime<${proxMes(y, m)}`;
+        let itens: any[] = [];
+        try { itens = (await this.onedrive.coletaTenant(conn.id, kql, { maxItens: 2000 })).itens; } catch { continue; }
+        for (const f of itens) {
+          if (!f.driveId || !f.parentId) continue;
+          if (!/2026/.test(f.path || '')) continue; // só pastas de 2026
+          pastas.set(`${f.driveId}|${f.parentId}`, { driveId: f.driveId, parentId: f.parentId, path: f.path });
+        }
+      }
+    }
+    // 2. LISTA cada pasta descoberta e classifica TODO arquivo (pega os de nome genérico)
+    const entregas = new Map<string, Set<string>>();
+    let pastasListadas = 0, arquivos = 0, zipsLidos = 0, parcial = false;
+    for (const { driveId, parentId, path } of pastas.values()) {
+      if (Date.now() - inicio > budget) { parcial = true; break; }
+      const cid = resolveClient(path);
+      if (!cid) continue;
+      let children: Array<{ id: string; name: string; driveId: string; path?: string }> = [];
+      try { children = (await this.onedrive.deltaScan(conn.id, driveId, parentId)).arquivos; } catch { continue; }
+      pastasListadas++;
+      const add = (tipo: string, comp: string) => { if (!entregas.has(cid)) entregas.set(cid, new Set()); entregas.get(cid)!.add(`${tipo}|${comp}`); };
+      for (const ch of children) {
+        arquivos++;
+        const compArq = extractComp(norm(`${ch.name} ${ch.path ?? path}`)) || extractComp(norm(path));
+        const tipo = detectTipo(norm(ch.name));
+        if (tipo && compArq) add(tipo, compArq);
+        if (/\.zip$/i.test(ch.name) && compArq && zipsLidos < 60 && Date.now() - inicio < budget) {
+          zipsLidos++;
+          let internos: string[] = [];
+          try { internos = await this.onedrive.lerNomesZip(conn.id, ch.driveId, ch.id); } catch { /* ignora */ }
+          for (const nm of internos) { const t2 = detectTipo(norm(nm)); if (t2) add(t2, extractComp(norm(nm)) || compArq); }
+        }
+      }
+    }
+    // 3. aplica (aditivo)
+    const anosStr = anos.map(String);
+    const obr = await this.prisma.fiscalCalendarItem.findMany({
+      where: { status: { in: ['pendente', 'vencida'] }, OR: anosStr.map((a) => ({ competencia: { startsWith: a } })) },
+      select: { id: true, companyId: true, tipo: true, competencia: true },
+    });
+    let entregue = 0;
+    for (const it of obr) {
+      const set = entregas.get(it.companyId);
+      if (set && set.has(`${it.tipo}|${it.competencia}`)) { await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined); entregue++; }
+    }
+    return { anos, fluxo: 'Listador de pastas 2026 (descobre pasta + lista tudo + zip)', pastasDescobertas: pastas.size, pastasListadas, arquivos, zipsLidos, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
+  }
+
+  /**
    * DIAGNÓSTICO do gap de DAS — pega clientes do Simples/MEI com DAS VENCIDO num mês passado e
    * LISTA o conteúdo REAL da pasta deles naquele mês (via Search API), pra revelar por que o
    * recibo não casou: nome diferente? dentro de zip? subpasta? ou realmente ausente?

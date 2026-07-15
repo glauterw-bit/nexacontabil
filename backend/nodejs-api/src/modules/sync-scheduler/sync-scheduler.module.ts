@@ -134,6 +134,19 @@ class SyncSchedulerController {
     return this.service.reconciliarPorClienteStatus();
   }
 
+  /** Listador de pastas 2026 (descobre pasta + lista tudo + zip) — background. */
+  @Public()
+  @Get('reconciliar-pastas2026')
+  reconciliarPastas2026(@Query('anos') anos?: string) {
+    const lista = anos ? anos.split(',').map((a) => parseInt(a, 10)).filter(Boolean) : undefined;
+    return this.service.reconciliarListandoPastas(lista);
+  }
+  @Public()
+  @Get('reconciliar-pastas2026-status')
+  reconciliarPastas2026Status() {
+    return this.service.reconciliarListandoPastasStatus();
+  }
+
   /** Reconciliação por DOCUMENTOS do banco (companyId 100%) — fonte confiável, varre todas as empresas. */
   @Public()
   @Get('reconciliar-docs')

@@ -188,6 +188,20 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   }
   reconciliarPorClienteStatus() { return this.reconClienteManual ?? { status: 'nunca_rodou' }; }
 
+  private reconPastasManual: any = null;
+  /** Listador de pastas 2026 (descobre pasta + lista tudo + zip) — background. */
+  reconciliarListandoPastas(anos = [new Date().getFullYear()]) {
+    if (this.reconPastasManual?.status === 'rodando') return { status: 'rodando', desde: this.reconPastasManual.em };
+    this.reconPastasManual = { status: 'rodando', em: new Date().toISOString(), anos };
+    (async () => {
+      for (const a of anos) await this.fiscalCalendar.garantirAno(a).catch(() => undefined);
+      const r = await this.analise.reconciliarListandoPastas({ anos, timeBudgetMs: 13 * 60_000 });
+      this.reconPastasManual = { status: (r as any)?.erro ? 'erro' : 'concluido', em: new Date().toISOString(), ...r };
+    })().catch((e) => { this.reconPastasManual = { status: 'erro', msg: e?.message ?? String(e) }; });
+    return { status: 'disparado', anos, dica: 'consulte /sync-drive/reconciliar-pastas2026-status' };
+  }
+  reconciliarListandoPastasStatus() { return this.reconPastasManual ?? { status: 'nunca_rodou' }; }
+
   /**
    * Reconciliação por DOCUMENTOS do banco (companyId 100% atribuído pelo delta) — para cada
    * ano, varre TODAS as empresas ativas em lotes até esgotar. É a fonte mais confiável:

@@ -748,9 +748,9 @@ export class OneDriveService {
    * Pagina por `from`/`size` até esgotar (moreResultsAvailable=false).
    */
   /** Coleta CRUA tenant-wide (paginada até esgotar) — base p/ agregados e reconciliação. */
-  async coletaTenant(connectionId: string, query: string, opts?: { maxItens?: number }): Promise<{ itens: Array<{ name: string; path: string; webUrl: string }>; total: number; erros: number }> {
+  async coletaTenant(connectionId: string, query: string, opts?: { maxItens?: number }): Promise<{ itens: Array<{ name: string; path: string; webUrl: string; driveId?: string; parentId?: string }>; total: number; erros: number }> {
     const token = await this.getValidToken(connectionId);
-    const achados: Array<{ name: string; path: string; webUrl: string }> = [];
+    const achados: Array<{ name: string; path: string; webUrl: string; driveId?: string; parentId?: string }> = [];
     const maxItens = opts?.maxItens ?? 6000;
     let from = 0, more = true, guard = 0, r429 = 0, total = 0, erros = 0;
     while (more && guard++ < 200 && achados.length < maxItens) {
@@ -774,7 +774,7 @@ export class OneDriveService {
         const it = hit.resource ?? {};
         if (it.folder) continue;
         const webUrl = it.webUrl ?? '';
-        achados.push({ name: it.name ?? '', path: this._pastaDoWebUrl(webUrl) || (it.parentReference?.path ?? ''), webUrl });
+        achados.push({ name: it.name ?? '', path: this._pastaDoWebUrl(webUrl) || (it.parentReference?.path ?? ''), webUrl, driveId: it.parentReference?.driveId, parentId: it.parentReference?.id });
       }
       more = !!container.moreResultsAvailable;
       from += 200;
