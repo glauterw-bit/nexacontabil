@@ -380,8 +380,16 @@ export class AnaliseClienteService {
    * arquivo. Casa POR TIPO E COMPETÊNCIA em qualquer ano (acha entregas de meses passados).
    * Poucas buscas globais (não uma por cliente) → rápido e completo.
    */
-  async reconciliarGlobalPorTipo(opts?: { anos?: number[] }) {
+  async reconciliarGlobalPorTipo(opts?: { anos?: number[]; ultimosMeses?: number }) {
     const anos = opts?.anos ?? [2024, 2025, 2026];
+    // janelas (y,m) a varrer: por padrão todos os 12 meses de cada ano; se ultimosMeses, só os
+    // N meses mais recentes (uso no ciclo — captura recibos novos sem varrer o ano inteiro).
+    let janelas: Array<{ y: number; m: number }> = [];
+    for (const y of anos) for (let m = 1; m <= 12; m++) janelas.push({ y, m });
+    if (opts?.ultimosMeses) {
+      const now = new Date(); const curY = now.getFullYear(), curM = now.getMonth() + 1;
+      janelas = janelas.filter((j) => { const diff = (curY - j.y) * 12 + (curM - j.m); return diff >= 0 && diff < opts.ultimosMeses!; });
+    }
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
     if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
     const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -428,15 +436,18 @@ export class AnaliseClienteService {
     };
     const entregas = new Map<string, Set<string>>();
     let arquivosVistos = 0, semCliente = 0, semComp = 0, nomeNaoConfere = 0;
-    // Search API tem teto de ~3000 por query → particiona por ANO via KQL LastModifiedTime.
-    // Dedup por caminho+nome (janelas podem sobrepor; competência sai sempre do path).
+    // Search API tem teto de ~3000 por query → particiona por MÊS via KQL LastModifiedTime
+    // (janela mensal cabe sempre abaixo do teto, mesmo em tipos volumosos como DAS). Dedup por
+    // caminho+nome. Competência sai sempre do PATH (arquivo modificado no mês seguinte ao da comp).
+    const proxMes = (y: number, m: number) => (m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`);
     for (const [tipo, cfg] of Object.entries(termos)) {
       const vistos = new Set<string>();
       for (const q of cfg.qs) {
-        for (const y of anos) {
-          const kql = `${q} LastModifiedTime>=${y}-01-01 AND LastModifiedTime<${y + 1}-01-01`;
+        for (const { y, m } of janelas) {
+          const mm = String(m).padStart(2, '0');
+          const kql = `${q} LastModifiedTime>=${y}-${mm}-01 AND LastModifiedTime<${proxMes(y, m)}`;
           let arquivos: Array<{ name: string; path: string }> = [];
-          try { arquivos = (await this.onedrive.coletaTenant(conn.id, kql, { maxItens: 5000 })).itens; } catch { continue; }
+          try { arquivos = (await this.onedrive.coletaTenant(conn.id, kql, { maxItens: 3000 })).itens; } catch { continue; }
           for (const f of arquivos) {
             const chave = `${f.path}/${f.name}`;
             if (vistos.has(chave)) continue; vistos.add(chave);

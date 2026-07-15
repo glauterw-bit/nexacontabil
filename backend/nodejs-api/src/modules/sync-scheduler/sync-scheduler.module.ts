@@ -114,6 +114,13 @@ class SyncSchedulerController {
     return this.service.reconciliarGlobal(lista);
   }
 
+  /** Resultado da última reconciliação global (background). */
+  @Public()
+  @Get('reconciliar-global-status')
+  reconciliarGlobalStatus() {
+    return this.service.reconciliarGlobalStatus();
+  }
+
   /** Reconciliação por DOCUMENTOS do banco (companyId 100%) — fonte confiável, varre todas as empresas. */
   @Public()
   @Get('reconciliar-docs')

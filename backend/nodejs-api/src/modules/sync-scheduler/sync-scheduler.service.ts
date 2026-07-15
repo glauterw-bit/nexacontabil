@@ -155,10 +155,23 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.reconciliarViaSearch({ ano, timeBudgetMs: 8 * 60_000 });
   }
 
-  /** Reconciliação GLOBAL por tipo (acha entregas de qualquer ano) — gera calendários antes. */
-  async reconciliarGlobal(anos = [2024, 2025, 2026]) {
-    for (const a of anos) await this.fiscalCalendar.garantirAno(a).catch(() => undefined);
-    return this.analise.reconciliarGlobalPorTipo({ anos });
+  private reconGlobalManual: any = null;
+
+  /** Reconciliação GLOBAL por tipo — dispara em BACKGROUND (partição mensal é pesada, ~centenas
+   *  de buscas). Consulte /reconciliar-global-status. Gera os calendários antes. */
+  reconciliarGlobal(anos = [2024, 2025, 2026]) {
+    if (this.reconGlobalManual?.status === 'rodando') return { status: 'rodando', desde: this.reconGlobalManual.em };
+    this.reconGlobalManual = { status: 'rodando', em: new Date().toISOString(), anos };
+    (async () => {
+      for (const a of anos) await this.fiscalCalendar.garantirAno(a).catch(() => undefined);
+      const r = await this.analise.reconciliarGlobalPorTipo({ anos });
+      this.reconGlobalManual = { status: (r as any)?.erro ? 'erro' : 'concluido', em: new Date().toISOString(), ...r };
+    })().catch((e) => { this.reconGlobalManual = { status: 'erro', msg: e?.message ?? String(e) }; });
+    return { status: 'disparado', anos, dica: 'consulte /sync-drive/reconciliar-global-status' };
+  }
+
+  reconciliarGlobalStatus() {
+    return this.reconGlobalManual ?? { status: 'nunca_rodou' };
   }
 
   /**
@@ -426,8 +439,8 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       if (!this.reconGlobalFeita) {
         this.reconGlobalFeita = true;
         this.reconGlobalResultado = { status: 'rodando', em: startedAt.toISOString() };
-        this.reconciliarGlobal([2024, 2025, 2026])
-          .then((r) => { this.reconGlobalResultado = { status: 'concluido', ...r }; this.logger.log(`reconciliarGlobal: ${r?.marcadasEntregue} entregues, ${r?.clientesComEntrega} clientes`); })
+        (async () => { for (const a of [2024, 2025, 2026]) await this.fiscalCalendar.garantirAno(a).catch(() => undefined); return this.analise.reconciliarGlobalPorTipo({ anos: [2024, 2025, 2026] }); })()
+          .then((r: any) => { this.reconGlobalResultado = { status: 'concluido', ...r }; this.logger.log(`reconciliarGlobal: ${r?.marcadasEntregue} entregues, ${r?.clientesComEntrega} clientes`); })
           .catch((e) => { this.reconGlobalResultado = { status: 'erro', msg: e?.message }; });
       }
       // 0b. REFRESCA OS LINKS DE PASTA (1x): re-resolve a pasta atual de cada cliente
@@ -457,7 +470,9 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         //    scan por cliente). Complementa com o casamento por documentos do banco.
         await passo('reconciliarTenant', async () => {
           const ano = startedAt.getFullYear();
-          return this.analise.reconciliarGlobalPorTipo({ anos: [ano, ano - 1] });
+          // no ciclo: só os últimos 4 meses (leve) — capta recibos novos. O backfill completo
+          // do ano roda 1x no boot (reconGlobalFeita) e sob demanda em /reconciliar-global.
+          return this.analise.reconciliarGlobalPorTipo({ anos: [ano, ano - 1], ultimosMeses: 4 });
         });
         // 3b. (opcional/manual) SCAN COMPLETO sites→drives→delta fica no endpoint /reconciliar-app.
         //     Fora do ciclo: é pesado (varre ~460k arquivos) e a busca tenant-wide do passo 3 já
