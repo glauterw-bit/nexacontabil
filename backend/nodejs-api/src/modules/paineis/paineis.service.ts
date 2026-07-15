@@ -1522,20 +1522,23 @@ export class PaineisService {
       const venc = new Date(it.dataVencimento);
       if (!entregue) { if (venc < now) cell.overdueFalta++; if (!cell.proxVenc || venc < cell.proxVenc) cell.proxVenc = venc; }
     }
-    const statusCell = (c: Cell, m: number): 'ok' | 'warn' | 'late' | 'na' => {
-      if (c.tot === 0) return 'na';
-      if (c.ent === c.tot) return 'ok';
-      const futuro = ano > anoAtual || (ano === anoAtual && m > mesAtual);
-      if (futuro && c.overdueFalta === 0) return c.ent > 0 ? 'warn' : 'na';
-      if (c.overdueFalta > 0 && c.ent === 0) return 'late';
-      return 'warn';
+    // status da célula: SÓ é pendência o que REALMENTE venceu. O que ainda está no prazo (mês
+    // atual/futuro, sem vencimento passado) fica NEUTRO ('na' = a vencer) — não polui com âmbar.
+    const statusCell = (c: Cell): 'ok' | 'warn' | 'late' | 'na' => {
+      if (c.tot === 0) return 'na';                          // sem obrigação naquele mês
+      if (c.ent === c.tot) return 'ok';                      // tudo entregue → verde
+      if (c.overdueFalta === 0) return 'na';                 // nada venceu ainda → a vencer (neutro)
+      if (c.ent === 0) return 'late';                        // tudo venceu e nada entregue → vermelho
+      return 'warn';                                         // parcial com algo vencido → âmbar
     };
     let emDia = 0, parciais = 0, atrasados = 0, proxDias: number | null = null, proxTipo = '';
     const clientes = companies.map((c) => {
       const cells = mapa.get(c.id)!;
-      const meses = cells.map((cell, m) => ({ mes: m + 1, status: statusCell(cell, m + 1), ent: cell.ent, tot: cell.tot }));
-      const cur = meses[mesAtual - 1];
-      if (cur) { if (cur.status === 'ok') emDia++; else if (cur.status === 'late') atrasados++; else if (cur.status === 'warn') parciais++; }
+      const meses = cells.map((cell, m) => ({ mes: m + 1, status: statusCell(cell), ent: cell.ent, tot: cell.tot }));
+      // saúde do cliente: atrasado = tem mês vencido; parcial = tem mês parcial; senão em dia
+      const temLate = meses.some((x) => x.status === 'late');
+      const temWarn = meses.some((x) => x.status === 'warn');
+      if (temLate) atrasados++; else if (temWarn) parciais++; else emDia++;
       const pendencia = meses.filter((x) => x.status === 'late').length * 2 + meses.filter((x) => x.status === 'warn').length;
       // próximo prazo (menor dias) entre obrigações não entregues do mês atual em diante
       for (let m = mesAtual - 1; m < 12; m++) { const pv = cells[m].proxVenc; if (pv && pv >= now) { const d = Math.ceil((pv.getTime() - now.getTime()) / 86400000); if (proxDias === null || d < proxDias) { proxDias = d; } } }
