@@ -412,15 +412,27 @@ export class AnaliseClienteService {
       return null;
     };
 
-    // busca cada tipo TENANT-WIDE (todos os drives, Search API); mapeia entregas por cliente|tipo|competência
-    const termos: Record<string, string[]> = { DAS: ['PGDASD'], 'DASN-SIMEI': ['PGMEI', 'DASN'], DCTFWeb: ['DCTF'], FGTS: ['FGTS', 'GRF'], EFD_REINF: ['REINF'], DARF: ['DARF'], ICMS: ['GIA'], ESOCIAL: ['eSocial'] };
+    // busca cada tipo TENANT-WIDE (Search API). Termos AMPLOS (o escritório nomeia de vários
+    // jeitos: "PGDASD-RECIBO", "REC DAS", "Simples Nacional.pdf") + VALIDAÇÃO por regex no NOME
+    // do arquivo, p/ não pegar falso positivo (ex.: "vendas" contém "das"). A competência sai
+    // sempre da PASTA (ex.: /2026/06.2026/). Só marca entrega com nome que confirma o tipo.
+    const termos: Record<string, { qs: string[]; re: RegExp }> = {
+      DAS: { qs: ['PGDASD', 'DAS', 'Simples Nacional', 'PGMEI'], re: /pgdas|pgmei|(^|[^a-z])das([^a-z]|$)|simples\s*nacional/i },
+      'DASN-SIMEI': { qs: ['DASN', 'DASN-SIMEI'], re: /dasn/i },
+      DCTFWeb: { qs: ['DCTF', 'DCTFWeb'], re: /dctf/i },
+      FGTS: { qs: ['FGTS', 'GRF'], re: /fgts|(^|[^a-z])grf/i },
+      EFD_REINF: { qs: ['REINF'], re: /reinf/i },
+      DARF: { qs: ['DARF'], re: /darf/i },
+      ICMS: { qs: ['GIA', 'GARE', 'ICMS'], re: /(^|[^a-z])gia|gare|icms/i },
+      ESOCIAL: { qs: ['eSocial'], re: /esocial|esoc/i },
+    };
     const entregas = new Map<string, Set<string>>();
-    let arquivosVistos = 0, semCliente = 0, semComp = 0;
+    let arquivosVistos = 0, semCliente = 0, semComp = 0, nomeNaoConfere = 0;
     // Search API tem teto de ~3000 por query → particiona por ANO via KQL LastModifiedTime.
     // Dedup por caminho+nome (janelas podem sobrepor; competência sai sempre do path).
-    for (const [tipo, qs] of Object.entries(termos)) {
+    for (const [tipo, cfg] of Object.entries(termos)) {
       const vistos = new Set<string>();
-      for (const q of qs) {
+      for (const q of cfg.qs) {
         for (const y of anos) {
           const kql = `${q} LastModifiedTime>=${y}-01-01 AND LastModifiedTime<${y + 1}-01-01`;
           let arquivos: Array<{ name: string; path: string }> = [];
@@ -429,6 +441,8 @@ export class AnaliseClienteService {
             const chave = `${f.path}/${f.name}`;
             if (vistos.has(chave)) continue; vistos.add(chave);
             arquivosVistos++;
+            // valida que o NOME do arquivo confirma o tipo (evita falso positivo da busca ampla)
+            if (!cfg.re.test(f.name || '')) { nomeNaoConfere++; continue; }
             const cid = resolveClient(f.path || '');
             if (!cid) { semCliente++; continue; }
             const comp = extractComp(norm(`${f.name} ${f.path}`));
@@ -455,7 +469,7 @@ export class AnaliseClienteService {
         entregue++;
       }
     }
-    return { anos, arquivosVistos, semCliente, semComp, clientesComEntrega: entregas.size, obrigacoesAnalisadas: itens.length, marcadasEntregue: entregue };
+    return { anos, arquivosVistos, nomeNaoConfere, semCliente, semComp, clientesComEntrega: entregas.size, obrigacoesAnalisadas: itens.length, marcadasEntregue: entregue };
   }
 
   /**
@@ -504,10 +518,10 @@ export class AnaliseClienteService {
     // detecta o TIPO de obrigação pelo nome do comprovante
     const detectTipo = (n: string): string | null => {
       if (/dasnsimei|\bdasn\b/.test(n)) return 'DASN-SIMEI';
-      if (/pgdasd|pgdas|pgmei/.test(n)) return 'DAS';
+      if (/pgdasd|pgdas|pgmei|\bdas\b|simples nacional/.test(n)) return 'DAS';
       if (/dctf/.test(n)) return 'DCTFWeb';
       if (/reinf/.test(n)) return 'EFD_REINF';
-      if (/\bgia\b|gare/.test(n)) return 'ICMS';
+      if (/\bgia\b|gare|icms/.test(n)) return 'ICMS';
       if (/\bdarf\b/.test(n)) return 'DARF';
       if (/fgts|\bgrf\b/.test(n)) return 'FGTS';
       if (/esocial|esoc/.test(n)) return 'ESOCIAL';
