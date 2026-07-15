@@ -52,6 +52,16 @@ export class PaineisController {
     return this.service.recibosFaltantes(ano ? parseInt(ano, 10) : undefined, tipo);
   }
 
+  @Get('calendario-entregas')
+  calendarioEntregas(@Query('ano') ano?: string) {
+    return this.service.calendarioEntregas(ano ? parseInt(ano, 10) : undefined);
+  }
+
+  @Get('calendario-cliente')
+  calendarioCliente(@Query('companyId') companyId: string, @Query('ano') ano?: string) {
+    return this.service.calendarioClienteDetalhe(companyId, ano ? parseInt(ano, 10) : undefined);
+  }
+
   @Get('farois')
   farois() {
     return this.service.farois();

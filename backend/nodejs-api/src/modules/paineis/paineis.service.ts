@@ -1471,6 +1471,99 @@ export class PaineisService {
   }
 
   /**
+   * CALENDÁRIO DE ENTREGAS — cliente × mês, status agregado das obrigações verificáveis por
+   * comprovante (exclui FGTS/eSocial/DARF, que são controle no portal/banco). Cada célula:
+   * ok (tudo entregue) · warn (parcial) · late (venceu e falta) · na (a vencer/sem obrigação).
+   * Alimenta o painel Central de Entregas (grade estilo calendário).
+   */
+  async calendarioEntregas(ano = new Date().getFullYear()) {
+    const now = new Date();
+    const anoAtual = now.getFullYear();
+    const mesAtual = ano < anoAtual ? 12 : (ano > anoAtual ? 0 : now.getMonth() + 1);
+    const PORTAL = new Set(['FGTS', 'ESOCIAL', 'DARF']);
+    const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    const companies = await this.prisma.company.findMany({
+      where: { active: true },
+      select: { id: true, name: true, clienteCodigo: true, taxRegime: true, responsavel: true },
+    });
+    const ids = companies.map((c) => c.id);
+    const itens = await this.prisma.fiscalCalendarItem.findMany({
+      where: { companyId: { in: ids }, competencia: { startsWith: `${ano}-` } },
+      select: { companyId: true, tipo: true, competencia: true, status: true, dataVencimento: true },
+    });
+    // agrega por empresa × mês
+    type Cell = { tot: number; ent: number; overdueFalta: number; proxVenc: Date | null };
+    const mapa = new Map<string, Cell[]>(); // companyId -> [12] (índice 0..11)
+    for (const c of companies) mapa.set(c.id, Array.from({ length: 12 }, () => ({ tot: 0, ent: 0, overdueFalta: 0, proxVenc: null })));
+    for (const it of itens) {
+      if (PORTAL.has(it.tipo)) continue;
+      const mm = parseInt(it.competencia.split('-')[1] ?? '0', 10);
+      if (!mm) continue;
+      const cell = mapa.get(it.companyId)?.[mm - 1]; if (!cell) continue;
+      cell.tot++;
+      const entregue = ENTREGUE.has(it.status);
+      if (entregue) cell.ent++;
+      const venc = new Date(it.dataVencimento);
+      if (!entregue) { if (venc < now) cell.overdueFalta++; if (!cell.proxVenc || venc < cell.proxVenc) cell.proxVenc = venc; }
+    }
+    const statusCell = (c: Cell, m: number): 'ok' | 'warn' | 'late' | 'na' => {
+      if (c.tot === 0) return 'na';
+      if (c.ent === c.tot) return 'ok';
+      const futuro = ano > anoAtual || (ano === anoAtual && m > mesAtual);
+      if (futuro && c.overdueFalta === 0) return c.ent > 0 ? 'warn' : 'na';
+      if (c.overdueFalta > 0 && c.ent === 0) return 'late';
+      return 'warn';
+    };
+    let emDia = 0, parciais = 0, atrasados = 0, proxDias: number | null = null, proxTipo = '';
+    const clientes = companies.map((c) => {
+      const cells = mapa.get(c.id)!;
+      const meses = cells.map((cell, m) => ({ mes: m + 1, status: statusCell(cell, m + 1), ent: cell.ent, tot: cell.tot }));
+      const cur = meses[mesAtual - 1];
+      if (cur) { if (cur.status === 'ok') emDia++; else if (cur.status === 'late') atrasados++; else if (cur.status === 'warn') parciais++; }
+      const pendencia = meses.filter((x) => x.status === 'late').length * 2 + meses.filter((x) => x.status === 'warn').length;
+      // próximo prazo (menor dias) entre obrigações não entregues do mês atual em diante
+      for (let m = mesAtual - 1; m < 12; m++) { const pv = cells[m].proxVenc; if (pv && pv >= now) { const d = Math.ceil((pv.getTime() - now.getTime()) / 86400000); if (proxDias === null || d < proxDias) { proxDias = d; } } }
+      return {
+        companyId: c.id, nome: c.name, codigo: c.clienteCodigo, regime: c.taxRegime, responsavel: c.responsavel,
+        meses, pendencia,
+      };
+    }).sort((a, b) => b.pendencia - a.pendencia || String(a.nome).localeCompare(String(b.nome)));
+    const totalClientes = clientes.length;
+    return {
+      ano, mesAtual,
+      resumo: {
+        totalClientes, emDia, parciais, atrasados,
+        pct: totalClientes ? Math.round((emDia / totalClientes) * 100) : 0,
+        proximoPrazoDias: proxDias, proximoPrazoTipo: proxTipo,
+      },
+      responsaveis: [...new Set(companies.map((c) => c.responsavel).filter(Boolean))],
+      clientes,
+    };
+  }
+
+  /** Detalhe de 1 cliente p/ o drawer: obrigações por mês (todas, com marcação portal). */
+  async calendarioClienteDetalhe(companyId: string, ano = new Date().getFullYear()) {
+    const now = new Date();
+    const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    const PORTAL = new Set(['FGTS', 'ESOCIAL', 'DARF']);
+    const c = await this.prisma.company.findUnique({ where: { id: companyId }, select: { name: true, clienteCodigo: true, taxRegime: true, responsavel: true } });
+    const itens = await this.prisma.fiscalCalendarItem.findMany({
+      where: { companyId, competencia: { startsWith: `${ano}-` } },
+      select: { tipo: true, descricao: true, competencia: true, status: true, dataVencimento: true },
+      orderBy: { dataVencimento: 'asc' },
+    });
+    const meses: Record<number, any[]> = {};
+    for (const it of itens) {
+      const mm = parseInt(it.competencia.split('-')[1] ?? '0', 10); if (!mm) continue;
+      const entregue = ENTREGUE.has(it.status);
+      const venc = new Date(it.dataVencimento);
+      const st = PORTAL.has(it.tipo) ? 'portal' : (entregue ? 'ok' : (venc < now ? 'late' : 'pendente'));
+      (meses[mm] ??= []).push({ tipo: it.tipo, descricao: it.descricao, status: st, vencimento: it.dataVencimento });
+    }
+    return { empresa: c, ano, meses };
+  }
+
+  /**
    * MAPA DE RECIBOS FALTANTES — por cliente × mês, o status da obrigação PRINCIPAL (DAS pro
    * Simples/MEI, DCTFWeb pro Lucro). Objetivo: a equipe ver de relance quem não subiu o recibo
    * de cada competência, pra cobrar. FGTS/eSocial ficam de fora (controle no portal).

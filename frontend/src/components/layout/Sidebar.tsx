@@ -34,6 +34,7 @@ interface NavGroup { label: string; items: NavItem[] }
    clientes, e módulos avançados recolhidos. ── */
 
 const VISAO: NavItem[] = [
+  { href: '/central-entregas', icon: CalendarClock, label: 'Central de Entregas' },
   { href: '/painel',    icon: LayoutDashboard, label: 'Painel do Escritório' },
   { href: '/consultor', icon: Sparkles,        label: 'Consultor de IA' },
   { href: '/meu-dia',   icon: Sun,             label: 'Meu Dia' },
