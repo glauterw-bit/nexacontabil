@@ -643,7 +643,6 @@ export class AnaliseClienteService {
     });
     const entregas = new Map<string, Set<string>>();
     let clientesVarridos = 0, arquivos = 0, semComp = 0, parcial = false;
-    const dbg: any[] = [];
     for (const c of companies) {
       if (Date.now() - inicio > budget) { parcial = true; break; }
       // LÊ A PASTA DO CLIENTE (delta) — todos os arquivos com caminho, mesmo os de nome genérico
@@ -656,7 +655,6 @@ export class AnaliseClienteService {
         const tipo = detectTipo(norm(f.name));
         if (!tipo) continue;
         const comp = extractComp(norm(`${f.name} ${f.path ?? ''}`));
-        if (dbg.length < 25) dbg.push({ name: (f.name || '').slice(0, 40), path: (f.path || '').slice(-50), tipo, comp });
         if (!comp) { semComp++; continue; }
         if (!entregas.has(c.id)) entregas.set(c.id, new Set());
         entregas.get(c.id)!.add(`${tipo}|${comp}`);
@@ -677,7 +675,7 @@ export class AnaliseClienteService {
         entregue++;
       }
     }
-    return { anos, fluxo: 'Por pasta do cliente (delta) + classificação local', clientesVarridos, arquivos, semComp, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue, dbg };
+    return { anos, fluxo: 'Por pasta do cliente (delta) + classificação local', clientesVarridos, arquivos, semComp, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
   }
 
   /**
