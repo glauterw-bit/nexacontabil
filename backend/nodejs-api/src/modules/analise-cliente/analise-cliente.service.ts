@@ -798,10 +798,24 @@ export class AnaliseClienteService {
       if (/dasn simei|declaracao anual do simples/.test(n)) return 'DASN-SIMEI';
       return null;
     };
+    // COMPETÊNCIA a partir do TEXTO do PDF ("Período de Apuração 01/2026", "PA 01/2026", "01/2026")
+    const compDoTexto = (t: string): string | null => {
+      const n = norm(t);
+      // "periodo de apuracao 01 2026" (após norm o "/" vira espaço)
+      let mth = n.match(/periodo de apuracao\D{0,6}(0[1-9]|1[0-2])\s*(20\d\d)/);
+      if (mth) return `${mth[2]}-${mth[1]}`;
+      mth = n.match(/\bpa\b\D{0,4}(0[1-9]|1[0-2])\s*(20\d\d)/);
+      if (mth) return `${mth[2]}-${mth[1]}`;
+      // qualquer "MM 2026" no texto, preferindo os anos-alvo
+      for (const y of anos) { const m2 = n.match(new RegExp(`(0[1-9]|1[0-2])\\s*${y}`)); if (m2) return `${y}-${m2[1]}`; }
+      return null;
+    };
     const entregas = new Map<string, Set<string>>();
     let pastasListadas = 0, arquivos = 0, zipsLidos = 0, pdfsLidos = 0, escaneados = 0, porConteudo = 0, parcial = false;
     const capDownloads = 4000;
-    for (const { driveId, parentId, path } of pastas.values()) {
+    // embaralha as pastas (cada rodada cobre um subconjunto diferente → converge em poucas voltas)
+    const listaPastas = [...pastas.values()].sort(() => Math.random() - 0.5);
+    for (const { driveId, parentId, path } of listaPastas) {
       if (Date.now() - inicio > budget) { parcial = true; break; }
       const cid = resolveClient(path);
       if (!cid) continue;
@@ -815,13 +829,18 @@ export class AnaliseClienteService {
         const tipoNome = detectTipo(norm(ch.name));
         if (tipoNome && compArq) add(tipoNome, compArq);
         // LÊ O CONTEÚDO do PDF quando o NOME não classificou (nome genérico) — baixa e parseia
-        else if (/\.pdf$/i.test(ch.name) && compArq && pdfsLidos < capDownloads && Date.now() - inicio < budget) {
+        else if (/\.pdf$/i.test(ch.name) && (compArq || /2026/.test(path)) && pdfsLidos < capDownloads && Date.now() - inicio < budget) {
           pdfsLidos++;
           let r = { texto: '', bytes: 0, escaneado: false };
           try { r = await this.onedrive.lerTextoPdf(conn.id, ch.driveId, ch.id); } catch { /* */ }
           if (r.escaneado) escaneados++;
           const tipoCont = detectTipoConteudo(r.texto);
-          if (tipoCont) { add(tipoCont, compArq); porConteudo++; }
+          if (tipoCont) {
+            // COMPETÊNCIA do TEXTO (Período de Apuração MM/AAAA) — a real, corrige o mês salvo na
+            // pasta de geração (ex.: DAS de 01/2026 salvo em 02.2026). Cai p/ a pasta se não achar.
+            const compFinal = compDoTexto(r.texto) || compArq;
+            if (compFinal) { add(tipoCont, compFinal); porConteudo++; }
+          }
         }
         if (/\.zip$/i.test(ch.name) && compArq && zipsLidos < 60 && Date.now() - inicio < budget) {
           zipsLidos++;
