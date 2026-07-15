@@ -434,7 +434,7 @@ export class OneDriveService {
     const budget = opts?.timeBudgetMs ?? 60_000;
     const pularXml = opts?.pularXml ?? true; // XMLs de nota afogam a árvore; foco na estrutura + recibos
     const inicio = Date.now();
-    const itens: Array<{ nome: string; caminho: string; isFolder: boolean; webUrl: string; size: number; modified: string | null }> = [];
+    const itens: Array<{ id: string; nome: string; caminho: string; isFolder: boolean; webUrl: string; size: number; modified: string | null }> = [];
     const fila: Array<{ id: string; caminho: string; prof: number }> = [{ id: folderId, caminho: raizNome, prof: 0 }];
     let truncado = false, xmlsOcultos = 0;
     while (fila.length && itens.length < maxItens) {
@@ -446,7 +446,7 @@ export class OneDriveService {
         const cam = `${caminho}/${ch.name}`;
         if (ch.isFolder && prof < maxProf) fila.push({ id: ch.id, caminho: cam, prof: prof + 1 });
         if (!ch.isFolder && pularXml && /\.xml$/i.test(ch.name)) { xmlsOcultos++; continue; } // não lista XMLs
-        itens.push({ nome: ch.name, caminho: cam, isFolder: ch.isFolder, webUrl: ch.webUrl, size: ch.size, modified: ch.modified });
+        itens.push({ id: ch.id, nome: ch.name, caminho: cam, isFolder: ch.isFolder, webUrl: ch.webUrl, size: ch.size, modified: ch.modified });
       }
     }
     return { itens, total: itens.length, truncado, xmlsOcultos };

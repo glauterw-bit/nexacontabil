@@ -202,6 +202,20 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   }
   reconciliarListandoPastasStatus() { return this.reconPastasManual ?? { status: 'nunca_rodou' }; }
 
+  private reconArvoreManual: any = null;
+  /** Verificacao "tudo foi lido" via arvore completa (paginacao corrigida) — background. */
+  reconciliarViaArvore(anos = [new Date().getFullYear()], limite?: number) {
+    if (this.reconArvoreManual?.status === 'rodando') return { status: 'rodando', desde: this.reconArvoreManual.em };
+    this.reconArvoreManual = { status: 'rodando', em: new Date().toISOString(), anos };
+    (async () => {
+      for (const a of anos) await this.fiscalCalendar.garantirAno(a).catch(() => undefined);
+      const r = await this.analise.reconciliarViaArvore({ anos, limite, timeBudgetMs: 13 * 60_000 });
+      this.reconArvoreManual = { status: (r as any)?.erro ? 'erro' : 'concluido', em: new Date().toISOString(), ...r };
+    })().catch((e) => { this.reconArvoreManual = { status: 'erro', msg: e?.message ?? String(e) }; });
+    return { status: 'disparado', anos, dica: 'consulte /sync-drive/reconciliar-arvore-status' };
+  }
+  reconciliarViaArvoreStatus() { return this.reconArvoreManual ?? { status: 'nunca_rodou' }; }
+
   /**
    * Reconciliação por DOCUMENTOS do banco (companyId 100% atribuído pelo delta) — para cada
    * ano, varre TODAS as empresas ativas em lotes até esgotar. É a fonte mais confiável:

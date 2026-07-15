@@ -910,6 +910,101 @@ export class AnaliseClienteService {
   }
 
   /**
+   * VERIFICAÇÃO "tudo foi lido" — para cada cliente, resolve a pasta-raiz ATUAL e VARRE a árvore
+   * INTEIRA (leitura corrigida, paginação completa), classificando cada arquivo por NOME e por
+   * CONTEÚDO (baixa PDF genérico). É a leitura mais completa possível. Rotaciona pela carteira.
+   */
+  async reconciliarViaArvore(opts?: { anos?: number[]; limite?: number; timeBudgetMs?: number }) {
+    const anos = opts?.anos ?? [new Date().getFullYear()];
+    const budget = opts?.timeBudgetMs ?? 12 * 60_000;
+    const inicio = Date.now();
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const detectTipo = (n: string): string | null => {
+      if (/dasnsimei|\bdasn\b/.test(n)) return 'DASN-SIMEI';
+      if (/pgdasd|pgdas|pgmei|\bdas\b|simples nacional|(?:rec\w*|dec\w*|declara\w*|extrato)[\s-]+sn\b|recibo de pagamento|extrato mensal|(?:dec|declara\w*)[\s\d]*\bsm\b|se?m\s*moviment/.test(n)) return 'DAS';
+      if (/dctf/.test(n)) return 'DCTFWeb';
+      if (/reinf/.test(n)) return 'EFD_REINF';
+      if (/\bgia\b|gare|icms/.test(n)) return 'ICMS';
+      if (/defis/.test(n)) return 'DEFIS';
+      return null;
+    };
+    const detectConteudo = (t: string): string | null => {
+      const n = norm(t);
+      if (/documento de arrecadacao do simples nacional|pgdas|extrato do simples nacional/.test(n)) return 'DAS';
+      if (/recibo de entrega da dctfweb|dctfweb/.test(n)) return 'DCTFWeb';
+      if (/efd reinf|reinf/.test(n)) return 'EFD_REINF';
+      if (/apuracao do icms|\bgia\b/.test(n)) return 'ICMS';
+      return null;
+    };
+    const extractComp = (s: string): string | null => {
+      for (const y of anos) for (let m = 1; m <= 12; m++) {
+        const mm = String(m).padStart(2, '0');
+        if (s.includes(`${mm} ${y}`) || s.includes(`${y} ${mm}`) || s.includes(`${mm}${y}`) || s.includes(`${y}${mm}`) || (s.includes(MESES[m - 1]) && s.includes(String(y)))) return `${y}-${mm}`;
+      }
+      return null;
+    };
+    const compTexto = (t: string): string | null => {
+      const n = norm(t);
+      let mth = n.match(/periodo de apuracao\D{0,6}(0[1-9]|1[0-2])\s*(20\d\d)/) || n.match(/\bpa\b\D{0,4}(0[1-9]|1[0-2])\s*(20\d\d)/);
+      if (mth) return `${mth[2]}-${mth[1]}`;
+      for (const y of anos) { const m2 = n.match(new RegExp(`(0[1-9]|1[0-2])\\s*${y}`)); if (m2) return `${y}-${m2[1]}`; }
+      return null;
+    };
+    const companies = await this.prisma.company.findMany({
+      where: { active: true, clienteCodigo: { not: null } },
+      select: { id: true, clienteCodigo: true }, orderBy: { updatedAt: 'asc' }, take: opts?.limite ?? 500,
+    });
+    const entregas = new Map<string, Set<string>>();
+    let clientesVarridos = 0, semPasta = 0, arquivos = 0, pdfsLidos = 0, porConteudo = 0, parcial = false;
+    for (const c of companies) {
+      if (Date.now() - inicio > budget) { parcial = true; break; }
+      const cod = String(c.clienteCodigo);
+      const reCodSeg = new RegExp(`^\\s*${cod}\\s*[-–]`);
+      let arqs: any[] = [];
+      try { arqs = (await this.onedrive.coletaTenant(conn.id, `${cod}`, { maxItens: 200 })).itens; } catch { /* */ }
+      const ref = arqs.find((f) => new RegExp(`(^|/)\\s*${cod}\\s*[-–]`).test(f.path || '') && f.driveId);
+      if (!ref) { semPasta++; continue; }
+      const segs = (ref.path || '').split('/').filter(Boolean);
+      const idx = segs.findIndex((s: string) => reCodSeg.test(s));
+      const raizCaminho = idx >= 0 ? segs.slice(0, idx + 1).join('/') : segs[0];
+      const raiz = await this.onedrive.resolverPastaPorCaminho(conn.id, ref.driveId, raizCaminho);
+      if (!raiz) { semPasta++; continue; }
+      const arv = await this.onedrive.arvoreCompleta(conn.id, ref.driveId, raiz.id, raiz.name, { maxItens: 3000, timeBudgetMs: Math.max(20_000, budget - (Date.now() - inicio)), pularXml: true });
+      clientesVarridos++;
+      const add = (tipo: string, comp: string) => { if (!entregas.has(c.id)) entregas.set(c.id, new Set()); entregas.get(c.id)!.add(`${tipo}|${comp}`); };
+      for (const it of arv.itens) {
+        if (it.isFolder) continue;
+        // só interessam competências dos anos-alvo (o caminho tem /2026/MM.2026/)
+        const comp = extractComp(norm(it.caminho));
+        if (!comp) continue;
+        arquivos++;
+        const tNome = detectTipo(norm(it.nome));
+        if (tNome) { add(tNome, comp); continue; }
+        if (/\.pdf$/i.test(it.nome) && pdfsLidos < 3000 && Date.now() - inicio < budget) {
+          pdfsLidos++;
+          let r = { texto: '', bytes: 0, escaneado: false };
+          try { r = await this.onedrive.lerTextoPdf(conn.id, ref.driveId, (it as any).id ?? ''); } catch { /* */ }
+          const tCont = detectConteudo(r.texto);
+          if (tCont) { add(tCont, compTexto(r.texto) || comp); porConteudo++; }
+        }
+      }
+      await this.prisma.company.update({ where: { id: c.id }, data: { updatedAt: new Date() } }).catch(() => undefined);
+    }
+    // aplica (aditivo)
+    const anosStr = anos.map(String);
+    const obr = await this.prisma.fiscalCalendarItem.findMany({
+      where: { status: { in: ['pendente', 'vencida'] }, OR: anosStr.map((a) => ({ competencia: { startsWith: a } })) },
+      select: { id: true, companyId: true, tipo: true, competencia: true },
+    });
+    let entregue = 0;
+    for (const it of obr) { const set = entregas.get(it.companyId); if (set && set.has(`${it.tipo}|${it.competencia}`)) { await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined); entregue++; } }
+    return { anos, fluxo: 'Verificação via ÁRVORE COMPLETA (paginação corrigida) + nome + conteúdo', clientesVarridos, semPasta, arquivos, pdfsLidos, porConteudo, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
+  }
+
+  /**
    * DIAGNÓSTICO do gap de DAS — pega clientes do Simples/MEI com DAS VENCIDO num mês passado e
    * LISTA o conteúdo REAL da pasta deles naquele mês (via Search API), pra revelar por que o
    * recibo não casou: nome diferente? dentro de zip? subpasta? ou realmente ausente?

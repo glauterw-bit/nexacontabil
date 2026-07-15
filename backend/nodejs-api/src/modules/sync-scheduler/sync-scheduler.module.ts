@@ -204,6 +204,19 @@ class SyncSchedulerController {
     return this.service.explorar(codigo);
   }
 
+  /** Verificacao "tudo foi lido" via arvore completa — background. */
+  @Public()
+  @Get('reconciliar-arvore')
+  reconciliarArvore(@Query('anos') anos?: string, @Query('limite') limite?: string) {
+    const lista = anos ? anos.split(',').map((a) => parseInt(a, 10)).filter(Boolean) : undefined;
+    return this.service.reconciliarViaArvore(lista, limite ? parseInt(limite, 10) : undefined);
+  }
+  @Public()
+  @Get('reconciliar-arvore-status')
+  reconciliarArvoreStatus() {
+    return this.service.reconciliarViaArvoreStatus();
+  }
+
   /** Link de CONSENTIMENTO de admin (Azure) — abrir 1x libera as permissões de aplicação. */
   @Public()
   @Get('admin-consent-url')
