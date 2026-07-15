@@ -626,6 +626,28 @@ export class AnaliseClienteService {
   }
 
   /**
+   * DIAGNÓSTICO Camada 3: pega um cliente e BAIXA os PDFs de 2026 da pasta dele, lendo o texto
+   * (pdf-parse). Mostra se cada PDF é NATIVO (tem texto → busca por conteúdo acha) ou ESCANEADO
+   * (texto vazio → precisa OCR). Responde: os recibos que faltam são escaneados ou não existem?
+   */
+  async diagnosticarPdfCliente(codigo: string) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    // acha os arquivos 2026 do cliente pelo código
+    let itens: any[] = [];
+    try { itens = (await this.onedrive.coletaTenant(conn.id, `${codigo} LastModifiedTime>=2026-01-01`, { maxItens: 400 })).itens; } catch { /* */ }
+    const reCod = new RegExp(`(^|/)\\s*${codigo}\\s*[-–]`);
+    const pdfs = itens.filter((f) => reCod.test(f.path || '') && /2026/.test(f.path || '') && /\.pdf$/i.test(f.name) && f.driveId && f.id);
+    const amostra: any[] = [];
+    for (const f of pdfs.slice(0, 15)) {
+      let r = { texto: '', bytes: 0, escaneado: false };
+      try { r = await this.onedrive.lerTextoPdf(conn.id, f.driveId, f.id); } catch { /* */ }
+      amostra.push({ nome: (f.name || '').slice(0, 45), pasta: (f.path || '').slice(-40), bytes: r.bytes, escaneado: r.escaneado, temDAS: /pgdas|simples nacional|arrecadacao|apuracao/i.test(r.texto), trecho: r.texto.slice(0, 90) });
+    }
+    return { codigo, pdfsAchados: pdfs.length, amostra };
+  }
+
+  /**
    * RECONCILIAÇÃO POR CLIENTE (escopada pelo código) — a mais robusta p/ nomes variados: em vez
    * de buscar por palavra da obrigação (a Search API não indexa bem abreviações curtas como "SM"),
    * busca os ARQUIVOS DE CADA CLIENTE pelo código e CLASSIFICA localmente cada nome (regex ampla).

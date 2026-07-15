@@ -190,6 +190,13 @@ class SyncSchedulerController {
     return this.service.diagnosticarDasFaltante(ano ? parseInt(ano, 10) : undefined);
   }
 
+  /** Diagnostico Camada 3: PDFs de um cliente sao nativos (texto) ou escaneados (imagem)? */
+  @Public()
+  @Get('diag-pdf-cliente')
+  diagPdfCliente(@Query('codigo') codigo: string) {
+    return this.service.diagnosticarPdfCliente(codigo);
+  }
+
   /** Link de CONSENTIMENTO de admin (Azure) — abrir 1x libera as permissões de aplicação. */
   @Public()
   @Get('admin-consent-url')

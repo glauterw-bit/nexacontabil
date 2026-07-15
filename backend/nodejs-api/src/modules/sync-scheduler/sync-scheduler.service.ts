@@ -217,6 +217,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.enumerarSitesEDrives();
   }
 
+  /** Diagnostico Camada 3: baixa PDFs 2026 de um cliente e ve se sao nativos ou escaneados. */
+  async diagnosticarPdfCliente(codigo: string) {
+    return this.analise.diagnosticarPdfCliente(codigo);
+  }
+
   /** Diagnóstico do gap de DAS — lista a pasta real de clientes com DAS vencido. */
   async diagnosticarDasFaltante(ano?: number) {
     return this.analise.diagnosticarDasFaltante(ano);

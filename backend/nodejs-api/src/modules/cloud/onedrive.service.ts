@@ -378,6 +378,25 @@ export class OneDriveService {
     } catch { return []; }
   }
 
+  /**
+   * Baixa um PDF e extrai o TEXTO (pdf-parse). Retorna o texto (nativo). Se vier vazio/curto, o
+   * PDF é escaneado (imagem) e precisaria de OCR. Base da "Camada 3" (ler o conteúdo do arquivo).
+   */
+  async lerTextoPdf(connectionId: string, driveId: string, itemId: string, maxMB = 20): Promise<{ texto: string; bytes: number; escaneado: boolean }> {
+    const token = await this.getValidToken(connectionId);
+    const res: any = await fetch(`${GRAPH_BASE}/drives/${driveId}/items/${itemId}/content`, { headers: { Authorization: `Bearer ${token}` }, redirect: 'follow' });
+    if (!res.ok) return { texto: '', bytes: 0, escaneado: false };
+    const len = parseInt(res.headers?.get?.('content-length') ?? '0', 10);
+    if (len && len > maxMB * 1024 * 1024) return { texto: '', bytes: len, escaneado: false };
+    const buf = Buffer.from(await res.arrayBuffer());
+    try {
+      const pdf = require('pdf-parse');
+      const data = await pdf(buf);
+      const texto = (data.text || '').replace(/\s+/g, ' ').trim();
+      return { texto: texto.slice(0, 4000), bytes: buf.length, escaneado: texto.length < 30 };
+    } catch { return { texto: '', bytes: buf.length, escaneado: true }; }
+  }
+
   async deltaScan(connectionId: string, driveId: string, folderId: string, deltaLink?: string) {
     const token = await this.getValidToken(connectionId);
     const base = `${GRAPH_BASE}/drives/${driveId}`;
@@ -748,9 +767,9 @@ export class OneDriveService {
    * Pagina por `from`/`size` até esgotar (moreResultsAvailable=false).
    */
   /** Coleta CRUA tenant-wide (paginada até esgotar) — base p/ agregados e reconciliação. */
-  async coletaTenant(connectionId: string, query: string, opts?: { maxItens?: number }): Promise<{ itens: Array<{ name: string; path: string; webUrl: string; driveId?: string; parentId?: string }>; total: number; erros: number }> {
+  async coletaTenant(connectionId: string, query: string, opts?: { maxItens?: number }): Promise<{ itens: Array<{ id?: string; name: string; path: string; webUrl: string; driveId?: string; parentId?: string }>; total: number; erros: number }> {
     const token = await this.getValidToken(connectionId);
-    const achados: Array<{ name: string; path: string; webUrl: string; driveId?: string; parentId?: string }> = [];
+    const achados: Array<{ id?: string; name: string; path: string; webUrl: string; driveId?: string; parentId?: string }> = [];
     const maxItens = opts?.maxItens ?? 6000;
     let from = 0, more = true, guard = 0, r429 = 0, total = 0, erros = 0;
     while (more && guard++ < 200 && achados.length < maxItens) {
@@ -774,7 +793,7 @@ export class OneDriveService {
         const it = hit.resource ?? {};
         if (it.folder) continue;
         const webUrl = it.webUrl ?? '';
-        achados.push({ name: it.name ?? '', path: this._pastaDoWebUrl(webUrl) || (it.parentReference?.path ?? ''), webUrl, driveId: it.parentReference?.driveId, parentId: it.parentReference?.id });
+        achados.push({ id: it.id, name: it.name ?? '', path: this._pastaDoWebUrl(webUrl) || (it.parentReference?.path ?? ''), webUrl, driveId: it.parentReference?.driveId, parentId: it.parentReference?.id });
       }
       more = !!container.moreResultsAvailable;
       from += 200;
