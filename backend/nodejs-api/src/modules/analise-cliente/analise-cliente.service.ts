@@ -633,30 +633,41 @@ export class AnaliseClienteService {
   async explorarCliente(codigo: string, ano = 2026) {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
     if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
-    const company = await this.prisma.company.findFirst({ where: { clienteCodigo: String(codigo) }, select: { name: true, taxRegime: true } });
-    let itens: any[] = [];
-    try { itens = (await this.onedrive.coletaTenant(conn.id, `${codigo} LastModifiedTime>=${ano}-01-01`, { maxItens: 600 })).itens; } catch { /* */ }
+    const company = await this.prisma.company.findFirst({ where: { clienteCodigo: String(codigo) }, select: { name: true, taxRegime: true, sharepointDriveId: true } });
+    // 1. DESCOBRE o driveId + o caminho da PASTA-RAIZ do cliente (via busca por código)
+    const reCodSeg = new RegExp(`^\\s*${codigo}\\s*[-–]`);
     const reCod = new RegExp(`(^|/)\\s*${codigo}\\s*[-–]`);
-    const doCliente = itens.filter((f) => reCod.test(f.path || '') && new RegExp(`/${ano}`).test(`/${f.path || ''}`) && f.driveId && f.parentId);
-    // agrupa por pasta-pai (driveId|parentId)
-    const grupos = new Map<string, { driveId: string; parentId: string; path: string; url: string }>();
-    for (const f of doCliente) {
-      const k = `${f.driveId}|${f.parentId}`;
-      if (!grupos.has(k)) grupos.set(k, { driveId: f.driveId, parentId: f.parentId, path: f.path || '', url: f.webUrl || '' });
-    }
-    const derivaPastaUrl = (fileUrl: string) => { try { const u = new URL(fileUrl); u.search = ''; u.pathname = u.pathname.split('/').slice(0, -1).join('/'); return u.toString(); } catch { return ''; } };
-    const pastas: any[] = [];
-    for (const g of [...grupos.values()].slice(0, 30)) {
-      let children: any[] = [];
-      try { children = await this.onedrive.listarChildrenComUrl(conn.id, g.driveId, g.parentId); } catch { /* */ }
-      pastas.push({
-        pasta: g.path,
-        abrirPasta: derivaPastaUrl(g.url),
-        arquivos: children.map((c) => ({ nome: c.name, tipo: c.isFolder ? 'pasta' : 'arquivo', abrir: c.webUrl, tamanhoKB: Math.round((c.size || 0) / 1024), modificado: c.modified })),
-      });
-    }
-    pastas.sort((a, b) => String(a.pasta).localeCompare(String(b.pasta)));
-    return { codigo, cliente: company?.name ?? null, regime: company?.taxRegime ?? null, ano, totalPastas: pastas.length, pastas };
+    let arquivos: any[] = [];
+    try { arquivos = (await this.onedrive.coletaTenant(conn.id, `${codigo}`, { maxItens: 400 })).itens; } catch { /* */ }
+    const ref = arquivos.find((f) => reCod.test(f.path || '') && f.driveId);
+    if (!ref) return { codigo, cliente: company?.name ?? null, regime: company?.taxRegime ?? null, ano, erro: 'nao_localizado', total: 0, itens: [], msg: 'Não localizei a pasta deste cliente no OneDrive conectado (nenhum arquivo com o código foi encontrado).' };
+    const driveId = ref.driveId as string;
+    // caminho da raiz = segmentos até (inclusive) o que começa com o código
+    const segs = (ref.path || '').split('/').filter(Boolean);
+    const idx = segs.findIndex((s: string) => reCodSeg.test(s));
+    const raizCaminho = idx >= 0 ? segs.slice(0, idx + 1).join('/') : segs[0];
+    // 2. RESOLVE a pasta-raiz e 3. VARRE a árvore REAL (recursivo, paginação completa)
+    const raiz = await this.onedrive.resolverPastaPorCaminho(conn.id, driveId, raizCaminho);
+    if (!raiz) return { codigo, cliente: company?.name ?? null, regime: company?.taxRegime ?? null, ano, erro: 'raiz_nao_resolvida', raizCaminho, total: 0, itens: [] };
+    const arv = await this.onedrive.arvoreCompleta(conn.id, driveId, raiz.id, raiz.name, { maxItens: 7000, maxProfundidade: 7, timeBudgetMs: 55_000 });
+    // itens da árvore: nome, caminho relativo (a partir da raiz), tipo, link, tamanho
+    const itens = arv.itens.map((it) => ({
+      nome: it.nome,
+      caminho: it.caminho,
+      nivel: it.caminho.split('/').length - 1, // 0 = filhos diretos da raiz
+      tipo: it.isFolder ? 'pasta' : 'arquivo',
+      abrir: it.webUrl,
+      tamanhoKB: Math.round((it.size || 0) / 1024),
+      modificado: it.modified,
+    }));
+    return {
+      codigo, cliente: company?.name ?? null, regime: company?.taxRegime ?? null, ano,
+      raiz: raiz.name, abrirRaiz: raiz.webUrl, driveId,
+      total: arv.total, truncado: arv.truncado,
+      pastas: itens.filter((i) => i.tipo === 'pasta').length,
+      arquivos: itens.filter((i) => i.tipo === 'arquivo').length,
+      itens,
+    };
   }
 
   /**

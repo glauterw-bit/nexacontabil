@@ -397,21 +397,59 @@ export class OneDriveService {
     } catch { return { texto: '', bytes: buf.length, escaneado: true }; }
   }
 
-  /** Lista os filhos DIRETOS de uma pasta com webUrl (link p/ abrir no OneDrive) — p/ o explorador. */
-  async listarChildrenComUrl(connectionId: string, driveId: string, folderId: string): Promise<Array<{ id: string; name: string; isFolder: boolean; webUrl: string; size: number; modified: string | null }>> {
+  /** Lista os filhos DIRETOS de uma pasta com webUrl — paginação COMPLETA (segue nextLink cru até
+   *  o fim; nextLink já traz $top/$select, não re-aplicar). Sem cap artificial de páginas. */
+  async listarChildrenComUrl(connectionId: string, driveId: string, folderId: string): Promise<Array<{ id: string; name: string; isFolder: boolean; webUrl: string; size: number; modified: string | null; childCount: number }>> {
     const token = await this.getValidToken(connectionId);
-    const out: Array<{ id: string; name: string; isFolder: boolean; webUrl: string; size: number; modified: string | null }> = [];
-    let url: string | null = `${GRAPH_BASE}/drives/${driveId}/items/${folderId}/children?$select=id,name,webUrl,folder,file,size,lastModifiedDateTime&$top=200`;
+    const out: Array<{ id: string; name: string; isFolder: boolean; webUrl: string; size: number; modified: string | null; childCount: number }> = [];
+    let url: string | null = `${GRAPH_BASE}/drives/${driveId}/items/${folderId}/children?$select=id,name,webUrl,folder,file,size,lastModifiedDateTime&$top=999`;
     let guard = 0, r429 = 0;
-    while (url && guard++ < 20) {
+    while (url && guard++ < 500) {
       const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      if ((res.status === 429 || res.status === 503) && r429 < 5) { r429++; await new Promise((r) => setTimeout(r, Math.min(30, 2 ** r429) * 1000)); guard--; continue; }
+      if ((res.status === 429 || res.status === 503) && r429 < 6) { r429++; await new Promise((r) => setTimeout(r, Math.min(30, 2 ** r429) * 1000)); guard--; continue; }
       if (!res.ok) break;
       const json: any = await res.json();
-      for (const it of (json.value ?? [])) out.push({ id: it.id, name: it.name ?? '', isFolder: !!it.folder, webUrl: it.webUrl ?? '', size: it.size ?? 0, modified: it.lastModifiedDateTime ?? null });
-      url = json['@odata.nextLink'] ?? null;
+      for (const it of (json.value ?? [])) out.push({ id: it.id, name: it.name ?? '', isFolder: !!it.folder, webUrl: it.webUrl ?? '', size: it.size ?? 0, modified: it.lastModifiedDateTime ?? null, childCount: it.folder?.childCount ?? 0 });
+      url = json['@odata.nextLink'] ?? null; // segue CRU — já contém skiptoken
     }
     return out;
+  }
+
+  /** Resolve uma pasta pelo CAMINHO (server-relative na drive) → item {id, webUrl, name}. */
+  async resolverPastaPorCaminho(connectionId: string, driveId: string, caminho: string): Promise<{ id: string; webUrl: string; name: string } | null> {
+    const token = await this.getValidToken(connectionId);
+    const enc = caminho.split('/').filter(Boolean).map((s) => encodeURIComponent(s)).join('/');
+    const res: any = await fetch(`${GRAPH_BASE}/drives/${driveId}/root:/${enc}?$select=id,webUrl,name,folder`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return null;
+    const it: any = await res.json();
+    if (!it.folder) return null;
+    return { id: it.id, webUrl: it.webUrl ?? '', name: it.name ?? '' };
+  }
+
+  /** Varre a SUBÁRVORE completa de uma pasta (BFS, paginação completa) — pastas + arquivos com
+   *  webUrl e caminho relativo. Bounded por total/tempo p/ não estourar. É a estrutura REAL. */
+  async arvoreCompleta(connectionId: string, driveId: string, folderId: string, raizNome: string, opts?: { maxItens?: number; maxProfundidade?: number; timeBudgetMs?: number; pularXml?: boolean }) {
+    const maxItens = opts?.maxItens ?? 8000;
+    const maxProf = opts?.maxProfundidade ?? 6;
+    const budget = opts?.timeBudgetMs ?? 60_000;
+    const pularXml = opts?.pularXml ?? true; // XMLs de nota afogam a árvore; foco na estrutura + recibos
+    const inicio = Date.now();
+    const itens: Array<{ nome: string; caminho: string; isFolder: boolean; webUrl: string; size: number; modified: string | null }> = [];
+    const fila: Array<{ id: string; caminho: string; prof: number }> = [{ id: folderId, caminho: raizNome, prof: 0 }];
+    let truncado = false, xmlsOcultos = 0;
+    while (fila.length && itens.length < maxItens) {
+      if (Date.now() - inicio > budget) { truncado = true; break; }
+      const { id, caminho, prof } = fila.shift()!;
+      let children: any[] = [];
+      try { children = await this.listarChildrenComUrl(connectionId, driveId, id); } catch { continue; }
+      for (const ch of children) {
+        const cam = `${caminho}/${ch.name}`;
+        if (ch.isFolder && prof < maxProf) fila.push({ id: ch.id, caminho: cam, prof: prof + 1 });
+        if (!ch.isFolder && pularXml && /\.xml$/i.test(ch.name)) { xmlsOcultos++; continue; } // não lista XMLs
+        itens.push({ nome: ch.name, caminho: cam, isFolder: ch.isFolder, webUrl: ch.webUrl, size: ch.size, modified: ch.modified });
+      }
+    }
+    return { itens, total: itens.length, truncado, xmlsOcultos };
   }
 
   async deltaScan(connectionId: string, driveId: string, folderId: string, deltaLink?: string) {
