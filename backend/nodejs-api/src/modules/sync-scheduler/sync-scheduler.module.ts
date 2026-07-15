@@ -157,6 +157,13 @@ class SyncSchedulerController {
     return this.service.enumerarSitesEDrives();
   }
 
+  /** Diagnóstico do gap de DAS — lista a pasta real de clientes com DAS vencido. */
+  @Public()
+  @Get('diag-das-faltante')
+  diagDasFaltante(@Query('ano') ano?: string) {
+    return this.service.diagnosticarDasFaltante(ano ? parseInt(ano, 10) : undefined);
+  }
+
   /** Link de CONSENTIMENTO de admin (Azure) — abrir 1x libera as permissões de aplicação. */
   @Public()
   @Get('admin-consent-url')

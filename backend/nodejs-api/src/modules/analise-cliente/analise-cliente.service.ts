@@ -597,6 +597,60 @@ export class AnaliseClienteService {
     return this.onedrive.enumerarSitesEDrives();
   }
 
+  /**
+   * DIAGNÓSTICO do gap de DAS — pega clientes do Simples/MEI com DAS VENCIDO num mês passado e
+   * LISTA o conteúdo REAL da pasta deles naquele mês (via Search API), pra revelar por que o
+   * recibo não casou: nome diferente? dentro de zip? subpasta? ou realmente ausente?
+   */
+  async diagnosticarDasFaltante(ano = new Date().getFullYear(), amostra = 6) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    // clientes Simples/MEI com DAS vencido
+    const simples = await this.prisma.company.findMany({
+      where: { active: true, OR: [{ taxRegime: { contains: 'SIMPLES' } }, { taxRegime: { contains: 'MEI' } }] },
+      select: { id: true, name: true, clienteCodigo: true, taxRegime: true },
+    });
+    const byId = new Map(simples.map((c) => [c.id, c]));
+    const vencidos = await this.prisma.fiscalCalendarItem.findMany({
+      where: { companyId: { in: simples.map((c) => c.id) }, tipo: 'DAS', status: 'vencida', competencia: { startsWith: `${ano}-` } },
+      select: { companyId: true, competencia: true },
+    });
+    // agrupa meses vencidos por cliente
+    const porCliente = new Map<string, string[]>();
+    for (const v of vencidos) { if (!porCliente.has(v.companyId)) porCliente.set(v.companyId, []); porCliente.get(v.companyId)!.push(v.competencia); }
+    const alvos = [...porCliente.entries()].slice(0, amostra);
+    const resultado: any[] = [];
+    for (const [cid, meses] of alvos) {
+      const c = byId.get(cid)!;
+      const cod = c.clienteCodigo ? String(c.clienteCodigo) : null;
+      // busca ampla pelo código do cliente (aparece no caminho "NNN - NOME")
+      const termo = cod || (c.name.split(/\s+/).find((w) => w.length >= 5) ?? c.name);
+      let itens: Array<{ name: string; path: string }> = [];
+      try { itens = (await this.onedrive.coletaTenant(conn.id, `${termo} LastModifiedTime>=${ano}-01-01`, { maxItens: 400 })).itens; } catch { /* segue */ }
+      // filtra os arquivos que são deste cliente (path contém o código "NNN -" ou o nome)
+      const nn = norm(c.name);
+      const doCliente = itens.filter((f) => {
+        const p = f.path || '';
+        if (cod && new RegExp(`(^|/)\\s*${cod}\\s*[-–]`).test(p)) return true;
+        return nn.length >= 6 && norm(p).includes(nn.slice(0, 12));
+      });
+      // agrupa por mês (pasta MM.YYYY) e lista nomes
+      const porMes: Record<string, string[]> = {};
+      for (const f of doCliente) {
+        const mm = (`${f.name} ${f.path}`.match(/(0[1-9]|1[0-2])[.\-\/ ]?20\d\d/) || [])[0] ?? 'sem-mes';
+        (porMes[mm] ??= []).push(f.name);
+      }
+      resultado.push({
+        codigo: cod, cliente: c.name, regime: c.taxRegime,
+        mesesVencidos: meses.sort(),
+        arquivosDoCliente: doCliente.length,
+        porMes: Object.fromEntries(Object.entries(porMes).map(([k, v]) => [k, v.slice(0, 12)])),
+      });
+    }
+    return { ano, clientesComDasVencido: porCliente.size, amostraInvestigada: resultado.length, clientes: resultado };
+  }
+
   /** Link de consentimento de admin p/ liberar as permissões de aplicação. */
   adminConsentUrl() {
     return this.onedrive.adminConsentUrl();

@@ -189,6 +189,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.enumerarSitesEDrives();
   }
 
+  /** Diagnóstico do gap de DAS — lista a pasta real de clientes com DAS vencido. */
+  async diagnosticarDasFaltante(ano?: number) {
+    return this.analise.diagnosticarDasFaltante(ano);
+  }
+
   /** Link de consentimento de admin (Azure) — 1 clique libera as permissões de aplicação. */
   adminConsentUrl() {
     return this.analise.adminConsentUrl();
