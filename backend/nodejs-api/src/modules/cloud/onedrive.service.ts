@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfidentialClientApplication } from '@azure/msal-node';
 import { PrismaService } from '../../database/prisma.service';
 import { encryptToken, decryptToken } from './crypto.util';
+import * as unzipper from 'unzipper';
 
 const SCOPES = ['Files.ReadWrite.All', 'Sites.Read.All', 'User.Read', 'offline_access'];
 const REDIRECT_PATH = '/api/v1/cloud/microsoft/callback';
@@ -358,6 +359,25 @@ export class OneDriveService {
    * os arquivos descendentes da pasta (recursivo, sem BFS nem teto); com o deltaLink
    * guardado, as próximas retornam SÓ o que mudou. Devolve os arquivos + o novo deltaLink.
    */
+  /**
+   * Lê os NOMES dos arquivos DENTRO de um .zip do OneDrive (sem extrair o conteúdo) — baixa o
+   * zip e lê o índice central. Usado p/ achar recibos que o cliente subiu compactados
+   * (ex.: "ARQUIVOS FISCAIS.zip" contendo o PGDASD-RECIBO). Pula zips grandes (> maxMB).
+   */
+  async lerNomesZip(connectionId: string, driveId: string, itemId: string, maxMB = 25): Promise<string[]> {
+    const token = await this.getValidToken(connectionId);
+    const res: any = await fetch(`${GRAPH_BASE}/drives/${driveId}/items/${itemId}/content`, { headers: { Authorization: `Bearer ${token}` }, redirect: 'follow' });
+    if (!res.ok) return [];
+    const len = parseInt(res.headers?.get?.('content-length') ?? '0', 10);
+    if (len && len > maxMB * 1024 * 1024) return []; // zip grande demais — pula
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > maxMB * 1024 * 1024) return [];
+    try {
+      const dir = await unzipper.Open.buffer(buf);
+      return (dir.files ?? []).map((f: any) => f.path as string).filter(Boolean);
+    } catch { return []; }
+  }
+
   async deltaScan(connectionId: string, driveId: string, folderId: string, deltaLink?: string) {
     const token = await this.getValidToken(connectionId);
     const base = `${GRAPH_BASE}/drives/${driveId}`;

@@ -642,22 +642,29 @@ export class AnaliseClienteService {
       orderBy: { updatedAt: 'asc' }, // rotação: menos-recentes primeiro (avança a cada rodada)
     });
     const entregas = new Map<string, Set<string>>();
-    let clientesVarridos = 0, arquivos = 0, semComp = 0, parcial = false;
+    let clientesVarridos = 0, arquivos = 0, semComp = 0, zipsLidos = 0, parcial = false;
     for (const c of companies) {
       if (Date.now() - inicio > budget) { parcial = true; break; }
       // LÊ A PASTA DO CLIENTE (delta) — todos os arquivos com caminho, mesmo os de nome genérico
       // dentro de subpastas (ex.: /2026/05.2026/Obrigacoes/PGDASD-RECIBO.pdf).
-      let itens: Array<{ name: string; path?: string }> = [];
+      let itens: Array<{ id: string; name: string; driveId: string; path?: string }> = [];
       try { itens = (await this.onedrive.deltaScan(conn.id, c.sharepointDriveId!, c.sharepointItemId!)).arquivos; } catch { continue; }
       clientesVarridos++;
+      const add = (tipo: string, comp: string) => { if (!entregas.has(c.id)) entregas.set(c.id, new Set()); entregas.get(c.id)!.add(`${tipo}|${comp}`); };
+      const zipsAbertos = new Set<string>();
       for (const f of itens) {
         arquivos++;
+        const compArq = extractComp(norm(`${f.name} ${f.path ?? ''}`));
         const tipo = detectTipo(norm(f.name));
-        if (!tipo) continue;
-        const comp = extractComp(norm(`${f.name} ${f.path ?? ''}`));
-        if (!comp) { semComp++; continue; }
-        if (!entregas.has(c.id)) entregas.set(c.id, new Set());
-        entregas.get(c.id)!.add(`${tipo}|${comp}`);
+        if (tipo) { if (compArq) add(tipo, compArq); else semComp++; }
+        // ZIP numa pasta de competência 2026: abre e classifica os nomes internos (recibos compactados)
+        if (/\.zip$/i.test(f.name) && compArq && zipsAbertos.size < 40 && Date.now() - inicio < budget) {
+          zipsAbertos.add(f.id);
+          zipsLidos++;
+          let internos: string[] = [];
+          try { internos = await this.onedrive.lerNomesZip(conn.id, f.driveId, f.id); } catch { /* ignora */ }
+          for (const nm of internos) { const t2 = detectTipo(norm(nm)); if (t2) { const c2 = extractComp(norm(`${nm} ${f.path ?? ''}`)) || compArq; add(t2, c2); } }
+        }
       }
       await this.prisma.company.update({ where: { id: c.id }, data: { updatedAt: new Date() } }).catch(() => undefined); // rotaciona
     }
@@ -675,7 +682,7 @@ export class AnaliseClienteService {
         entregue++;
       }
     }
-    return { anos, fluxo: 'Por pasta do cliente (delta) + classificação local', clientesVarridos, arquivos, semComp, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
+    return { anos, fluxo: 'Por pasta do cliente (delta) + zip + classificação local', clientesVarridos, arquivos, zipsLidos, semComp, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
   }
 
   /**
