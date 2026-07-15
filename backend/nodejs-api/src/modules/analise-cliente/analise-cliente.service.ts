@@ -424,21 +424,19 @@ export class AnaliseClienteService {
     // jeitos: "PGDASD-RECIBO", "REC DAS", "Simples Nacional.pdf") + VALIDAÇÃO por regex no NOME
     // do arquivo, p/ não pegar falso positivo (ex.: "vendas" contém "das"). A competência sai
     // sempre da PASTA (ex.: /2026/06.2026/). Só marca entrega com nome que confirma o tipo.
-    const termos: Record<string, { qs: string[]; re: RegExp }> = {
-      // DAS do Simples é nomeado de MUITOS jeitos: PGDASD-RECIBO, "REC DAS", "Simples Nacional",
-      // "RECIBO SN"/"REC SN"/"DEC SN"/"EXTRATO SN" (SN abreviado), e os nomes padrão do portal
-      // PGDAS-D ("Recibo de Pagamento", "Extrato Mensal"). Validação exige contexto p/ não pegar
-      // extrato BANCÁRIO (só "extrato mensal"/"extrato sn", não "extrato" solto).
+    // qs = termos por NOME (validados por regex). conteudo = FRASES DENTRO do PDF (Search API
+    // indexa o texto, inclusive OCR de escaneados) — quando batem, o arquivo É aquele documento,
+    // independente do nome; por isso NÃO precisam de validação de nome (a frase já é a prova).
+    const termos: Record<string, { qs: string[]; re: RegExp; conteudo?: string[] }> = {
       DAS: {
         qs: ['PGDASD', 'DAS', 'Simples Nacional', 'PGMEI', 'RECIBO SN', 'REC SN', 'DECLARACAO SN', 'EXTRATO SN', 'Recibo de Pagamento', 'Extrato Mensal', 'Sem Movimento', 'DEC SM', 'Declaracao'],
-        // inclui a DECLARAÇÃO SEM MOVIMENTO do Simples ("DEC 052026 SM", "sm movimento", "sem
-        // movimento") — quando não há faturamento o cliente entrega só a declaração; é entrega válida.
         re: /pgdas|pgmei|(^|[^a-z])das([^a-z]|$)|simples\s*nacional|(?:rec\w*|dec\w*|declara\w*|extrato)[\s\-]+sn\b|recibo\s+de\s+pagamento|extrato\s+mensal|(?:dec|declara\w*)[\s\d]*\bsm\b|se?m\s*moviment/i,
+        conteudo: ['"Documento de Arrecadacao do Simples Nacional"', 'PGDAS-D'],
       },
       'DASN-SIMEI': { qs: ['DASN', 'DASN-SIMEI'], re: /dasn/i },
-      DCTFWeb: { qs: ['DCTF', 'DCTFWeb'], re: /dctf/i },
+      DCTFWeb: { qs: ['DCTF', 'DCTFWeb'], re: /dctf/i, conteudo: ['"Recibo de Entrega da DCTFWeb"'] },
       FGTS: { qs: ['FGTS', 'GRF'], re: /fgts|(^|[^a-z])grf/i },
-      EFD_REINF: { qs: ['REINF'], re: /reinf/i },
+      EFD_REINF: { qs: ['REINF'], re: /reinf/i, conteudo: ['"Recibo de Entrega da EFD-Reinf"'] },
       DARF: { qs: ['DARF'], re: /darf/i },
       ICMS: { qs: ['GIA', 'GARE', 'ICMS'], re: /(^|[^a-z])gia|gare|icms/i },
       ESOCIAL: { qs: ['eSocial'], re: /esocial|esoc/i },
@@ -466,6 +464,27 @@ export class AnaliseClienteService {
             const cid = resolveClient(f.path || '');
             if (!cid) { semCliente++; continue; }
             const comp = extractComp(norm(`${f.name} ${f.path}`));
+            if (!comp) { semComp++; continue; }
+            if (!entregas.has(cid)) entregas.set(cid, new Set());
+            entregas.get(cid)!.add(`${tipo}|${comp}`);
+          }
+        }
+      }
+      // BUSCA POR CONTEÚDO (frase interna do PDF) — pega recibos de qualquer nome. Sem validação
+      // de nome: a frase indexada já prova o tipo. Competência vem da PASTA (path).
+      for (const q of (cfg.conteudo ?? [])) {
+        for (const { y, m } of janelas) {
+          const mm = String(m).padStart(2, '0');
+          const kql = `${q} AND LastModifiedTime>=${y}-${mm}-01 AND LastModifiedTime<${proxMes(y, m)}`;
+          let arquivos: Array<{ name: string; path: string }> = [];
+          try { arquivos = (await this.onedrive.coletaTenant(conn.id, kql, { maxItens: 3000 })).itens; } catch { continue; }
+          for (const f of arquivos) {
+            const chave = `C:${f.path}/${f.name}`;
+            if (vistos.has(chave)) continue; vistos.add(chave);
+            arquivosVistos++;
+            const cid = resolveClient(f.path || '');
+            if (!cid) { semCliente++; continue; }
+            const comp = extractComp(norm(`${f.name} ${f.path}`)) || extractComp(norm(f.path));
             if (!comp) { semComp++; continue; }
             if (!entregas.has(cid)) entregas.set(cid, new Set());
             entregas.get(cid)!.add(`${tipo}|${comp}`);
