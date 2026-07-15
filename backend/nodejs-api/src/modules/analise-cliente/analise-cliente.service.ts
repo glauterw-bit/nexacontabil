@@ -637,29 +637,29 @@ export class AnaliseClienteService {
       return null;
     };
     const companies = await this.prisma.company.findMany({
-      where: { active: true, clienteCodigo: { not: null } },
-      select: { id: true, name: true, clienteCodigo: true },
+      where: { active: true, sharepointItemId: { not: null }, sharepointDriveId: { not: null } },
+      select: { id: true, name: true, sharepointItemId: true, sharepointDriveId: true },
+      orderBy: { updatedAt: 'asc' }, // rotação: menos-recentes primeiro (avança a cada rodada)
     });
     const entregas = new Map<string, Set<string>>();
     let clientesVarridos = 0, arquivos = 0, semComp = 0, parcial = false;
-    const desde = `${Math.min(...anos)}-01-01`;
     for (const c of companies) {
       if (Date.now() - inicio > budget) { parcial = true; break; }
-      const cod = String(c.clienteCodigo);
-      let itens: Array<{ name: string; path: string }> = [];
-      try { itens = (await this.onedrive.coletaTenant(conn.id, `${cod} LastModifiedTime>=${desde}`, { maxItens: 600 })).itens; } catch { continue; }
+      // LÊ A PASTA DO CLIENTE (delta) — todos os arquivos com caminho, mesmo os de nome genérico
+      // dentro de subpastas (ex.: /2026/05.2026/Obrigacoes/PGDASD-RECIBO.pdf).
+      let itens: Array<{ name: string; path?: string }> = [];
+      try { itens = (await this.onedrive.deltaScan(conn.id, c.sharepointDriveId!, c.sharepointItemId!)).arquivos; } catch { continue; }
       clientesVarridos++;
-      const reCod = new RegExp(`(^|/)\\s*${cod}\\s*[-–]`);
       for (const f of itens) {
-        if (!reCod.test(f.path || '')) continue; // só arquivos DESTE cliente
         arquivos++;
         const tipo = detectTipo(norm(f.name));
         if (!tipo) continue;
-        const comp = extractComp(norm(`${f.name} ${f.path}`));
+        const comp = extractComp(norm(`${f.name} ${f.path ?? ''}`));
         if (!comp) { semComp++; continue; }
         if (!entregas.has(c.id)) entregas.set(c.id, new Set());
         entregas.get(c.id)!.add(`${tipo}|${comp}`);
       }
+      await this.prisma.company.update({ where: { id: c.id }, data: { updatedAt: new Date() } }).catch(() => undefined); // rotaciona
     }
     // aplica (aditivo — só marca ENTREGUE)
     const anosStr = anos.map(String);
@@ -675,7 +675,7 @@ export class AnaliseClienteService {
         entregue++;
       }
     }
-    return { anos, fluxo: 'Por cliente (código) + classificação local', clientesVarridos, arquivos, semComp, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
+    return { anos, fluxo: 'Por pasta do cliente (delta) + classificação local', clientesVarridos, arquivos, semComp, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
   }
 
   /**
