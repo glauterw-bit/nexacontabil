@@ -626,6 +626,40 @@ export class AnaliseClienteService {
   }
 
   /**
+   * EXPLORADOR de pastas do cliente — acha as pastas de um ano (via busca) e LISTA o conteúdo
+   * real de cada uma (arquivos + link p/ abrir no OneDrive). Deixa o gestor conferir manualmente
+   * quais documentos estão (ou não) em cada competência.
+   */
+  async explorarCliente(codigo: string, ano = 2026) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    const company = await this.prisma.company.findFirst({ where: { clienteCodigo: String(codigo) }, select: { name: true, taxRegime: true } });
+    let itens: any[] = [];
+    try { itens = (await this.onedrive.coletaTenant(conn.id, `${codigo} LastModifiedTime>=${ano}-01-01`, { maxItens: 600 })).itens; } catch { /* */ }
+    const reCod = new RegExp(`(^|/)\\s*${codigo}\\s*[-–]`);
+    const doCliente = itens.filter((f) => reCod.test(f.path || '') && new RegExp(`/${ano}`).test(`/${f.path || ''}`) && f.driveId && f.parentId);
+    // agrupa por pasta-pai (driveId|parentId)
+    const grupos = new Map<string, { driveId: string; parentId: string; path: string; url: string }>();
+    for (const f of doCliente) {
+      const k = `${f.driveId}|${f.parentId}`;
+      if (!grupos.has(k)) grupos.set(k, { driveId: f.driveId, parentId: f.parentId, path: f.path || '', url: f.webUrl || '' });
+    }
+    const derivaPastaUrl = (fileUrl: string) => { try { const u = new URL(fileUrl); u.search = ''; u.pathname = u.pathname.split('/').slice(0, -1).join('/'); return u.toString(); } catch { return ''; } };
+    const pastas: any[] = [];
+    for (const g of [...grupos.values()].slice(0, 30)) {
+      let children: any[] = [];
+      try { children = await this.onedrive.listarChildrenComUrl(conn.id, g.driveId, g.parentId); } catch { /* */ }
+      pastas.push({
+        pasta: g.path,
+        abrirPasta: derivaPastaUrl(g.url),
+        arquivos: children.map((c) => ({ nome: c.name, tipo: c.isFolder ? 'pasta' : 'arquivo', abrir: c.webUrl, tamanhoKB: Math.round((c.size || 0) / 1024), modificado: c.modified })),
+      });
+    }
+    pastas.sort((a, b) => String(a.pasta).localeCompare(String(b.pasta)));
+    return { codigo, cliente: company?.name ?? null, regime: company?.taxRegime ?? null, ano, totalPastas: pastas.length, pastas };
+  }
+
+  /**
    * DIAGNÓSTICO Camada 3: pega um cliente e BAIXA os PDFs de 2026 da pasta dele, lendo o texto
    * (pdf-parse). Mostra se cada PDF é NATIVO (tem texto → busca por conteúdo acha) ou ESCANEADO
    * (texto vazio → precisa OCR). Responde: os recibos que faltam são escaneados ou não existem?

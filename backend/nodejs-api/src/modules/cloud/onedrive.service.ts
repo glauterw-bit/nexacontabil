@@ -397,6 +397,23 @@ export class OneDriveService {
     } catch { return { texto: '', bytes: buf.length, escaneado: true }; }
   }
 
+  /** Lista os filhos DIRETOS de uma pasta com webUrl (link p/ abrir no OneDrive) — p/ o explorador. */
+  async listarChildrenComUrl(connectionId: string, driveId: string, folderId: string): Promise<Array<{ id: string; name: string; isFolder: boolean; webUrl: string; size: number; modified: string | null }>> {
+    const token = await this.getValidToken(connectionId);
+    const out: Array<{ id: string; name: string; isFolder: boolean; webUrl: string; size: number; modified: string | null }> = [];
+    let url: string | null = `${GRAPH_BASE}/drives/${driveId}/items/${folderId}/children?$select=id,name,webUrl,folder,file,size,lastModifiedDateTime&$top=200`;
+    let guard = 0, r429 = 0;
+    while (url && guard++ < 20) {
+      const res: any = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if ((res.status === 429 || res.status === 503) && r429 < 5) { r429++; await new Promise((r) => setTimeout(r, Math.min(30, 2 ** r429) * 1000)); guard--; continue; }
+      if (!res.ok) break;
+      const json: any = await res.json();
+      for (const it of (json.value ?? [])) out.push({ id: it.id, name: it.name ?? '', isFolder: !!it.folder, webUrl: it.webUrl ?? '', size: it.size ?? 0, modified: it.lastModifiedDateTime ?? null });
+      url = json['@odata.nextLink'] ?? null;
+    }
+    return out;
+  }
+
   async deltaScan(connectionId: string, driveId: string, folderId: string, deltaLink?: string) {
     const token = await this.getValidToken(connectionId);
     const base = `${GRAPH_BASE}/drives/${driveId}`;

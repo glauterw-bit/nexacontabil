@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { AnaliseClienteService } from '../analise-cliente/analise-cliente.service';
 import { monofasicoPorNcm, regraMonofasico } from '../organizacao/classificacao.util';
 
 function safe(s: any) { try { return s ? JSON.parse(s) : null; } catch { return null; } }
@@ -88,7 +89,22 @@ function comoCorrigir(erro: string) {
 
 @Injectable()
 export class PaineisService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly analise: AnaliseClienteService) {}
+
+  /** Explorador de pastas do cliente (delega ao serviço de análise). */
+  explorarCliente(codigo: string, ano?: number) {
+    return this.analise.explorarCliente(codigo, ano);
+  }
+
+  /** Lista simples de clientes ativos (código + nome + regime) p/ o seletor do explorador. */
+  async listaClientesSimples() {
+    const cs = await this.prisma.company.findMany({
+      where: { active: true },
+      select: { id: true, name: true, clienteCodigo: true, taxRegime: true },
+      orderBy: { name: 'asc' },
+    });
+    return cs.map((c) => ({ companyId: c.id, nome: c.name, codigo: c.clienteCodigo, regime: c.taxRegime }));
+  }
 
   // ───────────────────────────────────────────────────────────
   // 1. CENTRAL DE INCONSISTÊNCIAS (malha fina)
