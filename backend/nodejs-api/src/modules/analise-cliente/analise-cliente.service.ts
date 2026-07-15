@@ -425,7 +425,14 @@ export class AnaliseClienteService {
     // do arquivo, p/ não pegar falso positivo (ex.: "vendas" contém "das"). A competência sai
     // sempre da PASTA (ex.: /2026/06.2026/). Só marca entrega com nome que confirma o tipo.
     const termos: Record<string, { qs: string[]; re: RegExp }> = {
-      DAS: { qs: ['PGDASD', 'DAS', 'Simples Nacional', 'PGMEI'], re: /pgdas|pgmei|(^|[^a-z])das([^a-z]|$)|simples\s*nacional/i },
+      // DAS do Simples é nomeado de MUITOS jeitos: PGDASD-RECIBO, "REC DAS", "Simples Nacional",
+      // "RECIBO SN"/"REC SN"/"DEC SN"/"EXTRATO SN" (SN abreviado), e os nomes padrão do portal
+      // PGDAS-D ("Recibo de Pagamento", "Extrato Mensal"). Validação exige contexto p/ não pegar
+      // extrato BANCÁRIO (só "extrato mensal"/"extrato sn", não "extrato" solto).
+      DAS: {
+        qs: ['PGDASD', 'DAS', 'Simples Nacional', 'PGMEI', 'RECIBO SN', 'REC SN', 'DECLARACAO SN', 'EXTRATO SN', 'Recibo de Pagamento', 'Extrato Mensal'],
+        re: /pgdas|pgmei|(^|[^a-z])das([^a-z]|$)|simples\s*nacional|(?:rec\w*|dec\w*|declara\w*|extrato)[\s\-]+sn\b|recibo\s+de\s+pagamento|extrato\s+mensal/i,
+      },
       'DASN-SIMEI': { qs: ['DASN', 'DASN-SIMEI'], re: /dasn/i },
       DCTFWeb: { qs: ['DCTF', 'DCTFWeb'], re: /dctf/i },
       FGTS: { qs: ['FGTS', 'GRF'], re: /fgts|(^|[^a-z])grf/i },
@@ -529,7 +536,7 @@ export class AnaliseClienteService {
     // detecta o TIPO de obrigação pelo nome do comprovante
     const detectTipo = (n: string): string | null => {
       if (/dasnsimei|\bdasn\b/.test(n)) return 'DASN-SIMEI';
-      if (/pgdasd|pgdas|pgmei|\bdas\b|simples nacional/.test(n)) return 'DAS';
+      if (/pgdasd|pgdas|pgmei|\bdas\b|simples nacional|(?:rec\w*|dec\w*|declara\w*|extrato)[\s\-]+sn\b|recibo de pagamento|extrato mensal/.test(n)) return 'DAS';
       if (/dctf/.test(n)) return 'DCTFWeb';
       if (/reinf/.test(n)) return 'EFD_REINF';
       if (/\bgia\b|gare|icms/.test(n)) return 'ICMS';
