@@ -222,6 +222,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.diagnosticarPdfCliente(codigo);
   }
 
+  /** Teste do explorador (arvore real) por codigo. */
+  async explorar(codigo: string) {
+    return this.analise.explorarCliente(codigo);
+  }
+
   /** Diagnóstico do gap de DAS — lista a pasta real de clientes com DAS vencido. */
   async diagnosticarDasFaltante(ano?: number) {
     return this.analise.diagnosticarDasFaltante(ano);

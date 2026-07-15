@@ -197,6 +197,13 @@ class SyncSchedulerController {
     return this.service.diagnosticarPdfCliente(codigo);
   }
 
+  /** Teste publico do explorador (arvore real de pastas do cliente). */
+  @Public()
+  @Get('explorar')
+  explorar(@Query('codigo') codigo: string) {
+    return this.service.explorar(codigo);
+  }
+
   /** Link de CONSENTIMENTO de admin (Azure) — abrir 1x libera as permissões de aplicação. */
   @Public()
   @Get('admin-consent-url')
