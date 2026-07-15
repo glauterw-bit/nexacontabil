@@ -788,8 +788,19 @@ export class AnaliseClienteService {
       }
     }
     // 2. LISTA cada pasta descoberta e classifica TODO arquivo (pega os de nome genérico)
+    // classifica pelo TEXTO DE DENTRO do PDF (frases dos documentos) — independe do nome
+    const detectTipoConteudo = (t: string): string | null => {
+      const n = norm(t);
+      if (/documento de arrecadacao do simples nacional|pgdas|extrato do simples nacional|apuracao do simples/.test(n)) return 'DAS';
+      if (/recibo de entrega da dctfweb|dctfweb|dctf web/.test(n)) return 'DCTFWeb';
+      if (/efd reinf|reinf/.test(n)) return 'EFD_REINF';
+      if (/gia|apuracao do icms|guia de informacao/.test(n)) return 'ICMS';
+      if (/dasn simei|declaracao anual do simples/.test(n)) return 'DASN-SIMEI';
+      return null;
+    };
     const entregas = new Map<string, Set<string>>();
-    let pastasListadas = 0, arquivos = 0, zipsLidos = 0, parcial = false;
+    let pastasListadas = 0, arquivos = 0, zipsLidos = 0, pdfsLidos = 0, escaneados = 0, porConteudo = 0, parcial = false;
+    const capDownloads = 4000;
     for (const { driveId, parentId, path } of pastas.values()) {
       if (Date.now() - inicio > budget) { parcial = true; break; }
       const cid = resolveClient(path);
@@ -801,8 +812,17 @@ export class AnaliseClienteService {
       for (const ch of children) {
         arquivos++;
         const compArq = extractComp(norm(`${ch.name} ${ch.path ?? path}`)) || extractComp(norm(path));
-        const tipo = detectTipo(norm(ch.name));
-        if (tipo && compArq) add(tipo, compArq);
+        const tipoNome = detectTipo(norm(ch.name));
+        if (tipoNome && compArq) add(tipoNome, compArq);
+        // LÊ O CONTEÚDO do PDF quando o NOME não classificou (nome genérico) — baixa e parseia
+        else if (/\.pdf$/i.test(ch.name) && compArq && pdfsLidos < capDownloads && Date.now() - inicio < budget) {
+          pdfsLidos++;
+          let r = { texto: '', bytes: 0, escaneado: false };
+          try { r = await this.onedrive.lerTextoPdf(conn.id, ch.driveId, ch.id); } catch { /* */ }
+          if (r.escaneado) escaneados++;
+          const tipoCont = detectTipoConteudo(r.texto);
+          if (tipoCont) { add(tipoCont, compArq); porConteudo++; }
+        }
         if (/\.zip$/i.test(ch.name) && compArq && zipsLidos < 60 && Date.now() - inicio < budget) {
           zipsLidos++;
           let internos: string[] = [];
@@ -822,7 +842,7 @@ export class AnaliseClienteService {
       const set = entregas.get(it.companyId);
       if (set && set.has(`${it.tipo}|${it.competencia}`)) { await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined); entregue++; }
     }
-    return { anos, fluxo: 'Listador de pastas 2026 (descobre pasta + lista tudo + zip)', pastasDescobertas: pastas.size, pastasListadas, arquivos, zipsLidos, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
+    return { anos, fluxo: 'Listador 2026 + LEITURA de conteúdo dos PDFs (baixa e parseia)', pastasDescobertas: pastas.size, pastasListadas, arquivos, pdfsLidos, escaneados, porConteudo, zipsLidos, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
   }
 
   /**
