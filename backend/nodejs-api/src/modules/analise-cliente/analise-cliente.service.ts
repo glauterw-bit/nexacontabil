@@ -607,6 +607,78 @@ export class AnaliseClienteService {
   }
 
   /**
+   * RECONCILIAÇÃO POR CLIENTE (escopada pelo código) — a mais robusta p/ nomes variados: em vez
+   * de buscar por palavra da obrigação (a Search API não indexa bem abreviações curtas como "SM"),
+   * busca os ARQUIVOS DE CADA CLIENTE pelo código e CLASSIFICA localmente cada nome (regex ampla).
+   * Assim pega DAS nomeado "RECIBO SN", "DEC 052026 SM", "sm movimento", etc. Bounded por tempo.
+   */
+  async reconciliarPorClienteScoped(opts?: { anos?: number[]; timeBudgetMs?: number }) {
+    const anos = opts?.anos ?? [new Date().getFullYear()];
+    const budget = opts?.timeBudgetMs ?? 10 * 60_000;
+    const inicio = Date.now();
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'Nenhuma conexão OneDrive ativa.' };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const detectTipo = (n: string): string | null => {
+      if (/dasnsimei|\bdasn\b/.test(n)) return 'DASN-SIMEI';
+      if (/pgdasd|pgdas|pgmei|\bdas\b|simples nacional|(?:rec\w*|dec\w*|declara\w*|extrato)[\s-]+sn\b|recibo de pagamento|extrato mensal|(?:dec|declara\w*)[\s\d]*\bsm\b|se?m\s*moviment/.test(n)) return 'DAS';
+      if (/dctf/.test(n)) return 'DCTFWeb';
+      if (/reinf/.test(n)) return 'EFD_REINF';
+      if (/\bgia\b|gare|icms/.test(n)) return 'ICMS';
+      if (/defis/.test(n)) return 'DEFIS';
+      return null;
+    };
+    const extractComp = (s: string): string | null => {
+      for (const y of anos) for (let m = 1; m <= 12; m++) {
+        const mm = String(m).padStart(2, '0');
+        if (s.includes(`${mm} ${y}`) || s.includes(`${y} ${mm}`) || s.includes(`${mm}${y}`) || s.includes(`${y}${mm}`) || (s.includes(MESES[m - 1]) && s.includes(String(y)))) return `${y}-${mm}`;
+      }
+      return null;
+    };
+    const companies = await this.prisma.company.findMany({
+      where: { active: true, clienteCodigo: { not: null } },
+      select: { id: true, name: true, clienteCodigo: true },
+    });
+    const entregas = new Map<string, Set<string>>();
+    let clientesVarridos = 0, arquivos = 0, semComp = 0, parcial = false;
+    const desde = `${Math.min(...anos)}-01-01`;
+    for (const c of companies) {
+      if (Date.now() - inicio > budget) { parcial = true; break; }
+      const cod = String(c.clienteCodigo);
+      let itens: Array<{ name: string; path: string }> = [];
+      try { itens = (await this.onedrive.coletaTenant(conn.id, `${cod} LastModifiedTime>=${desde}`, { maxItens: 600 })).itens; } catch { continue; }
+      clientesVarridos++;
+      const reCod = new RegExp(`(^|/)\\s*${cod}\\s*[-–]`);
+      for (const f of itens) {
+        if (!reCod.test(f.path || '')) continue; // só arquivos DESTE cliente
+        arquivos++;
+        const tipo = detectTipo(norm(f.name));
+        if (!tipo) continue;
+        const comp = extractComp(norm(`${f.name} ${f.path}`));
+        if (!comp) { semComp++; continue; }
+        if (!entregas.has(c.id)) entregas.set(c.id, new Set());
+        entregas.get(c.id)!.add(`${tipo}|${comp}`);
+      }
+    }
+    // aplica (aditivo — só marca ENTREGUE)
+    const anosStr = anos.map(String);
+    const obr = await this.prisma.fiscalCalendarItem.findMany({
+      where: { status: { in: ['pendente', 'vencida'] }, OR: anosStr.map((a) => ({ competencia: { startsWith: a } })) },
+      select: { id: true, companyId: true, tipo: true, competencia: true },
+    });
+    let entregue = 0;
+    for (const it of obr) {
+      const set = entregas.get(it.companyId);
+      if (set && set.has(`${it.tipo}|${it.competencia}`)) {
+        await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined);
+        entregue++;
+      }
+    }
+    return { anos, fluxo: 'Por cliente (código) + classificação local', clientesVarridos, arquivos, semComp, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
+  }
+
+  /**
    * DIAGNÓSTICO do gap de DAS — pega clientes do Simples/MEI com DAS VENCIDO num mês passado e
    * LISTA o conteúdo REAL da pasta deles naquele mês (via Search API), pra revelar por que o
    * recibo não casou: nome diferente? dentro de zip? subpasta? ou realmente ausente?

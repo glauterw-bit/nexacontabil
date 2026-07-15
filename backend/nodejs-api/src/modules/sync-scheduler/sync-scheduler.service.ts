@@ -174,6 +174,20 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.reconGlobalManual ?? { status: 'nunca_rodou' };
   }
 
+  private reconClienteManual: any = null;
+  /** Reconciliação POR CLIENTE (código + classificação local) — background. */
+  reconciliarPorCliente(anos = [new Date().getFullYear()]) {
+    if (this.reconClienteManual?.status === 'rodando') return { status: 'rodando', desde: this.reconClienteManual.em };
+    this.reconClienteManual = { status: 'rodando', em: new Date().toISOString(), anos };
+    (async () => {
+      for (const a of anos) await this.fiscalCalendar.garantirAno(a).catch(() => undefined);
+      const r = await this.analise.reconciliarPorClienteScoped({ anos, timeBudgetMs: 12 * 60_000 });
+      this.reconClienteManual = { status: (r as any)?.erro ? 'erro' : 'concluido', em: new Date().toISOString(), ...r };
+    })().catch((e) => { this.reconClienteManual = { status: 'erro', msg: e?.message ?? String(e) }; });
+    return { status: 'disparado', anos, dica: 'consulte /sync-drive/reconciliar-cliente-status' };
+  }
+  reconciliarPorClienteStatus() { return this.reconClienteManual ?? { status: 'nunca_rodou' }; }
+
   /**
    * Reconciliação por DOCUMENTOS do banco (companyId 100% atribuído pelo delta) — para cada
    * ano, varre TODAS as empresas ativas em lotes até esgotar. É a fonte mais confiável:

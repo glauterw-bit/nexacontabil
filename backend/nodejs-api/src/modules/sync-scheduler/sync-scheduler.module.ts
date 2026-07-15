@@ -121,6 +121,19 @@ class SyncSchedulerController {
     return this.service.reconciliarGlobalStatus();
   }
 
+  /** Reconciliação POR CLIENTE (código + classificação local) — background, acha nomes variados. */
+  @Public()
+  @Get('reconciliar-cliente')
+  reconciliarCliente(@Query('anos') anos?: string) {
+    const lista = anos ? anos.split(',').map((a) => parseInt(a, 10)).filter(Boolean) : undefined;
+    return this.service.reconciliarPorCliente(lista);
+  }
+  @Public()
+  @Get('reconciliar-cliente-status')
+  reconciliarClienteStatus() {
+    return this.service.reconciliarPorClienteStatus();
+  }
+
   /** Reconciliação por DOCUMENTOS do banco (companyId 100%) — fonte confiável, varre todas as empresas. */
   @Public()
   @Get('reconciliar-docs')
