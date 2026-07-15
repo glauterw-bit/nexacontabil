@@ -430,8 +430,10 @@ export class AnaliseClienteService {
       // PGDAS-D ("Recibo de Pagamento", "Extrato Mensal"). Validação exige contexto p/ não pegar
       // extrato BANCÁRIO (só "extrato mensal"/"extrato sn", não "extrato" solto).
       DAS: {
-        qs: ['PGDASD', 'DAS', 'Simples Nacional', 'PGMEI', 'RECIBO SN', 'REC SN', 'DECLARACAO SN', 'EXTRATO SN', 'Recibo de Pagamento', 'Extrato Mensal'],
-        re: /pgdas|pgmei|(^|[^a-z])das([^a-z]|$)|simples\s*nacional|(?:rec\w*|dec\w*|declara\w*|extrato)[\s\-]+sn\b|recibo\s+de\s+pagamento|extrato\s+mensal/i,
+        qs: ['PGDASD', 'DAS', 'Simples Nacional', 'PGMEI', 'RECIBO SN', 'REC SN', 'DECLARACAO SN', 'EXTRATO SN', 'Recibo de Pagamento', 'Extrato Mensal', 'Sem Movimento', 'DEC SM', 'Declaracao'],
+        // inclui a DECLARAÇÃO SEM MOVIMENTO do Simples ("DEC 052026 SM", "sm movimento", "sem
+        // movimento") — quando não há faturamento o cliente entrega só a declaração; é entrega válida.
+        re: /pgdas|pgmei|(^|[^a-z])das([^a-z]|$)|simples\s*nacional|(?:rec\w*|dec\w*|declara\w*|extrato)[\s\-]+sn\b|recibo\s+de\s+pagamento|extrato\s+mensal|(?:dec|declara\w*)[\s\d]*\bsm\b|se?m\s*moviment/i,
       },
       'DASN-SIMEI': { qs: ['DASN', 'DASN-SIMEI'], re: /dasn/i },
       DCTFWeb: { qs: ['DCTF', 'DCTFWeb'], re: /dctf/i },
@@ -536,7 +538,7 @@ export class AnaliseClienteService {
     // detecta o TIPO de obrigação pelo nome do comprovante
     const detectTipo = (n: string): string | null => {
       if (/dasnsimei|\bdasn\b/.test(n)) return 'DASN-SIMEI';
-      if (/pgdasd|pgdas|pgmei|\bdas\b|simples nacional|(?:rec\w*|dec\w*|declara\w*|extrato)[\s\-]+sn\b|recibo de pagamento|extrato mensal/.test(n)) return 'DAS';
+      if (/pgdasd|pgdas|pgmei|\bdas\b|simples nacional|(?:rec\w*|dec\w*|declara\w*|extrato)[\s\-]+sn\b|recibo de pagamento|extrato mensal|(?:dec|declara\w*)[\s\d]*\bsm\b|se?m\s*moviment/.test(n)) return 'DAS';
       if (/dctf/.test(n)) return 'DCTFWeb';
       if (/reinf/.test(n)) return 'EFD_REINF';
       if (/\bgia\b|gare|icms/.test(n)) return 'ICMS';
