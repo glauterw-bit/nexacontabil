@@ -20,7 +20,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      router.replace('/dashboard');
+      router.replace('/'); // a raiz roteia por papel (gestor → Central de Entregas)
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer login');
     } finally {
