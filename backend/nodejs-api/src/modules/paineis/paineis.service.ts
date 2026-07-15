@@ -1469,4 +1469,69 @@ export class PaineisService {
       aFazer: aFazer.slice(0, 80),
     };
   }
+
+  /**
+   * MAPA DE RECIBOS FALTANTES — por cliente × mês, o status da obrigação PRINCIPAL (DAS pro
+   * Simples/MEI, DCTFWeb pro Lucro). Objetivo: a equipe ver de relance quem não subiu o recibo
+   * de cada competência, pra cobrar. FGTS/eSocial ficam de fora (controle no portal).
+   */
+  async recibosFaltantes(ano = new Date().getFullYear(), tipoFiltro?: string) {
+    const now = new Date();
+    const anoAtual = now.getFullYear();
+    const mesLimite = ano < anoAtual ? 12 : (ano > anoAtual ? 0 : now.getMonth() + 1); // até que mês cobrar
+    const principalPorRegime = (regime?: string): string => {
+      const r = (regime ?? '').toUpperCase();
+      if (r.includes('MEI')) return 'DAS';
+      if (r.includes('SIMPLES')) return 'DAS';
+      if (r.includes('PRESUMIDO') || r.includes('REAL')) return 'DCTFWeb';
+      return 'DAS';
+    };
+    const companies = await this.prisma.company.findMany({
+      where: { active: true },
+      select: { id: true, name: true, clienteCodigo: true, taxRegime: true, responsavel: true },
+      orderBy: { name: 'asc' },
+    });
+    const ids = companies.map((c) => c.id);
+    const itens = await this.prisma.fiscalCalendarItem.findMany({
+      where: { companyId: { in: ids }, competencia: { startsWith: `${ano}-` }, tipo: { in: ['DAS', 'DCTFWeb'] } },
+      select: { companyId: true, tipo: true, competencia: true, status: true, dataVencimento: true },
+    });
+    // index: companyId|tipo|mes -> {status, venc}
+    const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    const idx = new Map<string, { status: string; venc: Date }>();
+    for (const it of itens) {
+      const m = it.competencia.split('-')[1];
+      if (!m) continue;
+      idx.set(`${it.companyId}|${it.tipo}|${parseInt(m, 10)}`, { status: it.status, venc: new Date(it.dataVencimento) });
+    }
+    let totFaltantes = 0, totEntregues = 0, clientesComFalta = 0;
+    const clientes = companies.map((c) => {
+      const tipo = principalPorRegime(c.taxRegime);
+      if (tipoFiltro && tipo !== tipoFiltro) return null;
+      const meses: Array<{ mes: number; status: 'ok' | 'faltante' | 'futuro' | 'na' }> = [];
+      let faltam = 0, ok = 0;
+      for (let m = 1; m <= 12; m++) {
+        const cell = idx.get(`${c.id}|${tipo}|${m}`);
+        let st: 'ok' | 'faltante' | 'futuro' | 'na';
+        if (!cell) st = 'na';
+        else if (ENTREGUE.has(cell.status)) { st = 'ok'; ok++; }
+        else if (m <= mesLimite && cell.venc < now) { st = 'faltante'; faltam++; }
+        else st = 'futuro';
+        meses.push({ mes: m, status: st });
+      }
+      totFaltantes += faltam; totEntregues += ok; if (faltam > 0) clientesComFalta++;
+      return {
+        companyId: c.id, cliente: c.name, codigo: c.clienteCodigo, regime: c.taxRegime, responsavel: c.responsavel,
+        tipo, faltam, entregues: ok, meses,
+        mesesFaltantes: meses.filter((x) => x.status === 'faltante').map((x) => x.mes),
+      };
+    }).filter(Boolean) as any[];
+    // ordena: quem mais deve primeiro
+    clientes.sort((a, b) => b.faltam - a.faltam || String(a.cliente).localeCompare(String(b.cliente)));
+    return {
+      ano, mesLimite,
+      resumo: { clientes: clientes.length, clientesComFalta, recibosFaltantes: totFaltantes, recibosEntregues: totEntregues },
+      clientes,
+    };
+  }
 }

@@ -72,6 +72,7 @@ const CAMINHO: Step[] = [
     n: 4, label: 'Entregar', cor: '#3ee0a0',
     items: [
       { href: '/fluxo',            icon: Workflow,      label: 'Quadro & Recibos' },
+      { href: '/recibos-faltantes', icon: CalendarClock, label: 'Recibos Faltantes' },
       { href: '/checklist',        icon: ClipboardCheck, label: 'Checklists' },
       { href: '/prazos',           icon: CalendarClock, label: 'Prazos & SLA' },
       { href: '/exportar-dominio', icon: FileDown,      label: 'Exportar p/ Domínio' },

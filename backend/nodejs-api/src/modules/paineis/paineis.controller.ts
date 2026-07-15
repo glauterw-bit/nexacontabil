@@ -47,6 +47,11 @@ export class PaineisController {
     return this.service.operacao(competencia);
   }
 
+  @Get('recibos-faltantes')
+  recibosFaltantes(@Query('ano') ano?: string, @Query('tipo') tipo?: string) {
+    return this.service.recibosFaltantes(ano ? parseInt(ano, 10) : undefined, tipo);
+  }
+
   @Get('farois')
   farois() {
     return this.service.farois();
