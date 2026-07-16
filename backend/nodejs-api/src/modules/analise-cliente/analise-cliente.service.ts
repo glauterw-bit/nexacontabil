@@ -450,7 +450,7 @@ export class AnaliseClienteService {
     };
     const entregas = new Map<string, Map<string, string>>(); // cid -> ("tipo|comp" -> webUrl do comprovante)
     const addEnt = (cid: string, key: string, url?: string) => { if (!entregas.has(cid)) entregas.set(cid, new Map()); const m = entregas.get(cid)!; if (!m.has(key) || (url && !m.get(key))) m.set(key, url || ''); };
-    let arquivosVistos = 0, semCliente = 0, semComp = 0, nomeNaoConfere = 0;
+    let arquivosVistos = 0, semCliente = 0, semComp = 0, nomeNaoConfere = 0, zipsAbertos = 0;
     // Search API tem teto de ~3000 por query → particiona por MÊS via KQL LastModifiedTime
     // (janela mensal cabe sempre abaixo do teto, mesmo em tipos volumosos como DAS). Dedup por
     // caminho+nome. Competência sai sempre do PATH (arquivo modificado no mês seguinte ao da comp).
@@ -483,7 +483,7 @@ export class AnaliseClienteService {
         for (const { y, m } of janelas) {
           const mm = String(m).padStart(2, '0');
           const kql = `${q} AND LastModifiedTime>=${y}-${mm}-01 AND LastModifiedTime<${proxMes(y, m)}`;
-          let arquivos: Array<{ name: string; path: string; webUrl?: string }> = [];
+          let arquivos: Array<{ id?: string; name: string; path: string; webUrl?: string; driveId?: string }> = [];
           try { arquivos = (await this.onedrive.coletaTenant(conn.id, kql, { maxItens: 3000 })).itens; } catch { continue; }
           for (const f of arquivos) {
             const chave = `C:${f.path}/${f.name}`;
@@ -492,6 +492,17 @@ export class AnaliseClienteService {
             const cid = resolveClient(f.path || '');
             if (!cid) { semCliente++; continue; }
             const comp = extractComp(norm(`${f.name} ${f.path}`)) || extractComp(norm(f.path));
+            // ZIP sem competência no caminho (comum em 2025): ABRE e extrai a competência dos
+            // arquivos internos (ex.: "SIMPLES NACIONAL/2025/102025/PGDASD.pdf" dentro do zip).
+            if (!comp && /\.zip$/i.test(f.name || '') && f.driveId && f.id && zipsAbertos < 500) {
+              zipsAbertos++;
+              let internos: string[] = [];
+              try { internos = await this.onedrive.lerNomesZip(conn.id, f.driveId, f.id); } catch { /* */ }
+              let achou = false;
+              for (const nm of internos) { const c2 = extractComp(norm(nm)); if (c2) { addEnt(cid, `${tipo}|${c2}`, f.webUrl); achou = true; } }
+              if (!achou) semComp++;
+              continue;
+            }
             if (!comp) { semComp++; continue; }
             addEnt(cid, `${tipo}|${comp}`, f.webUrl);
           }
