@@ -191,11 +191,19 @@ export default function CentralEntregas() {
                       <summary className="ce-moh"><span className="t">{MESL[mm - 1]} {ano}</span><span className={`b ${bcls}`}>{ent}/{tot} {tot && ent === tot ? '✓' : ''}</span></summary>
                       <ul className="ce-ob">
                         {obrs.map((o, idx) => (
-                          <li key={idx}>
-                            <span className={`oi ${o.status === 'ok' ? 'ok' : o.status === 'portal' ? 'portal' : 'late'}`}>{o.status === 'ok' ? '✓' : o.status === 'portal' ? '•' : '!'}</span>
-                            <span className="on">{o.tipo}{o.status === 'portal' ? <span className="od"> · controle no portal/banco</span> : null}</span>
-                            {o.status === 'ok' ? <span className="od">entregue</span> : o.status === 'portal' ? null : <span className="od" style={{ color: 'var(--ce-late)' }}>{new Date(o.vencimento) < new Date() ? 'vencida' : 'a vencer'}</span>}
-                          </li>
+                          o.abrir ? (
+                            <li key={idx} className="ce-ob-link" onClick={() => window.open(o.abrir, '_blank', 'noopener')} title="Abrir o documento no OneDrive">
+                              <span className={`oi ${o.status === 'ok' ? 'ok' : o.status === 'portal' ? 'portal' : 'late'}`}>{o.status === 'ok' ? '✓' : o.status === 'portal' ? '•' : '!'}</span>
+                              <span className="on">{o.tipo}</span>
+                              <span className="od abrir">abrir <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><path d="M15 3h6v6" /><path d="M10 14 21 3" /></svg></span>
+                            </li>
+                          ) : (
+                            <li key={idx}>
+                              <span className={`oi ${o.status === 'ok' ? 'ok' : o.status === 'portal' ? 'portal' : 'late'}`}>{o.status === 'ok' ? '✓' : o.status === 'portal' ? '•' : '!'}</span>
+                              <span className="on">{o.tipo}{o.status === 'portal' ? <span className="od"> · controle no portal/banco</span> : null}</span>
+                              {o.status === 'ok' ? <span className="od">entregue (sem link)</span> : o.status === 'portal' ? null : <span className="od" style={{ color: 'var(--ce-late)' }}>{new Date(o.vencimento) < new Date() ? 'vencida' : 'a vencer'}</span>}
+                            </li>
+                          )
                         ))}
                       </ul>
                     </details>
@@ -297,6 +305,9 @@ const CSS = `
 .ce-moh .b.ok{background:var(--ce-ok-bg);color:var(--ce-ok)}.ce-moh .b.warn{background:var(--ce-warn-bg);color:var(--ce-warn)}.ce-moh .b.late{background:var(--ce-late-bg);color:var(--ce-late)}
 .ce-ob{list-style:none;padding:0 22px 12px;margin:0}
 .ce-ob li{display:flex;align-items:center;gap:11px;padding:8px 0;border-top:1px dashed var(--ce-border-soft)}.ce-ob li:first-child{border-top:none}
+.ce-ob-link{cursor:pointer;margin:0 -8px;padding-left:8px!important;padding-right:8px!important;border-radius:7px}
+.ce-ob-link:hover{background:var(--ce-accent-soft)}
+.ce-ob .abrir{margin-left:auto;color:var(--ce-accent);font-weight:600;display:inline-flex;align-items:center;gap:4px}
 .oi{width:20px;height:20px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:none}
 .oi.ok{background:var(--ce-ok-bg);color:var(--ce-ok)}.oi.late{background:var(--ce-late-bg);color:var(--ce-late)}.oi.portal{background:var(--ce-surface2);color:var(--ce-tx3)}
 .ce-ob .on{flex:1;font-size:13px}.ce-ob .od{font-size:11.5px;color:var(--ce-tx3)}

@@ -1594,13 +1594,16 @@ export class PaineisService {
       select: { tipo: true, descricao: true, competencia: true, status: true, dataVencimento: true },
       orderBy: { dataVencimento: 'asc' },
     });
+    // mapa "tipo|competência → link do comprovante" (pra abrir o documento ao clicar)
+    let recibos: Record<string, string> = {};
+    if (c?.clienteCodigo) { try { recibos = await this.analise.mapaRecibosCliente(String(c.clienteCodigo), ano); } catch { /* segue sem links */ } }
     const meses: Record<number, any[]> = {};
     for (const it of itens) {
       const mm = parseInt(it.competencia.split('-')[1] ?? '0', 10); if (!mm) continue;
       const entregue = ENTREGUE.has(it.status);
       const venc = new Date(it.dataVencimento);
       const st = PORTAL.has(it.tipo) ? 'portal' : (entregue ? 'ok' : (venc < now ? 'late' : 'pendente'));
-      (meses[mm] ??= []).push({ tipo: it.tipo, descricao: it.descricao, status: st, vencimento: it.dataVencimento });
+      (meses[mm] ??= []).push({ tipo: it.tipo, descricao: it.descricao, status: st, vencimento: it.dataVencimento, abrir: recibos[`${it.tipo}|${it.competencia}`] ?? null });
     }
     return { empresa: c, ano, meses };
   }

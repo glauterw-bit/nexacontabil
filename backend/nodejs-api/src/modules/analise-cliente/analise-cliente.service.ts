@@ -633,6 +633,49 @@ export class AnaliseClienteService {
   }
 
   /**
+   * MAPA "obrigação → link do documento" de um cliente — busca os arquivos dele (por código e por
+   * conteúdo do DAS), classifica por tipo+competência e devolve o webUrl do comprovante. Usado no
+   * drawer p/ abrir o documento ao clicar na obrigação.
+   */
+  async mapaRecibosCliente(codigo: string, ano = new Date().getFullYear()): Promise<Record<string, string>> {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return {};
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const detectTipo = (n: string): string | null => {
+      if (/dasnsimei|\bdasn\b/.test(n)) return 'DASN-SIMEI';
+      if (/pgdasd|pgdas|pgmei|\bdas\b|simples nacional|(?:rec\w*|dec\w*|declara\w*|extrato)[\s-]+sn\b|recibo de pagamento|extrato mensal|(?:dec|declara\w*)[\s\d]*\bsm\b|se?m\s*moviment/.test(n)) return 'DAS';
+      if (/dctf/.test(n)) return 'DCTFWeb';
+      if (/reinf/.test(n)) return 'EFD_REINF';
+      if (/\bgia\b|gare|icms/.test(n)) return 'ICMS';
+      if (/defis/.test(n)) return 'DEFIS';
+      return null;
+    };
+    const extractComp = (s: string): string | null => {
+      for (let m = 1; m <= 12; m++) { const mm = String(m).padStart(2, '0'); if (s.includes(`${mm} ${ano}`) || s.includes(`${ano} ${mm}`) || s.includes(`${mm}${ano}`) || s.includes(`${ano}${mm}`) || (s.includes(MESES[m - 1]) && s.includes(String(ano)))) return `${ano}-${mm}`; }
+      return null;
+    };
+    const reCod = new RegExp(`(^|/)\\s*${codigo}\\s*[-–]`);
+    const mapa: Record<string, string> = {};
+    const queries = [`${codigo}`, `${codigo} "Documento de Arrecadacao do Simples Nacional"`, `${codigo} recibo`, `${codigo} DCTF`, `${codigo} GIA`];
+    for (const q of queries) {
+      let itens: any[] = [];
+      try { itens = (await this.onedrive.coletaTenant(conn.id, `${q} LastModifiedTime>=${ano}-01-01`, { maxItens: 300 })).itens; } catch { continue; }
+      for (const f of itens) {
+        if (!reCod.test(f.path || '') || !f.webUrl) continue;
+        if (/\.(xml|zip)$/i.test(f.name || '')) continue;
+        const tipo = detectTipo(norm(f.name));
+        if (!tipo) continue;
+        const comp = extractComp(norm(`${f.name} ${f.path}`));
+        if (!comp) continue;
+        const k = `${tipo}|${comp}`;
+        if (!mapa[k]) mapa[k] = f.webUrl; // 1º comprovante achado daquela obrigação
+      }
+    }
+    return mapa;
+  }
+
+  /**
    * EXPLORADOR de pastas do cliente — acha as pastas de um ano (via busca) e LISTA o conteúdo
    * real de cada uma (arquivos + link p/ abrir no OneDrive). Deixa o gestor conferir manualmente
    * quais documentos estão (ou não) em cada competência.
