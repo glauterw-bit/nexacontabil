@@ -426,6 +426,18 @@ export class AnaliseClienteService {
       }
       return null;
     };
+    // Competência de um recibo, à prova da DATA DE VENCIMENTO no nome ("DAS - VENCIMENTO 20.07.2026"
+    // é competência 06/2026, não 07). DAS/DCTF/Reinf/FGTS vencem SEMPRE no mês seguinte ao da apuração.
+    const compDe = (nome: string, path: string): string | null => {
+      const pth = norm(path);
+      let c = extractComp(pth); if (c) return c;            // 1) competência na PASTA (/2026/06/) — mais confiável
+      const nm = norm(nome);
+      const nmSemVenc = nm.replace(/vencer?\w*\s*\d{1,2}\s*\d{1,2}\s*\d{4}/g, ' ').replace(/pagar?\s*ate\s*\d{1,2}\s*\d{1,2}\s*\d{4}/g, ' ');
+      c = extractComp(nmSemVenc); if (c) return c;          // 2) no NOME, ignorando a data de vencimento
+      const mv = nm.match(/(?:vencer?\w*|pagar?\s*ate)\s*(\d{1,2})\s*(\d{1,2})\s*(\d{4})/); // 3) só tem vencimento → mês anterior
+      if (mv) { const dm = +mv[2], dy = +mv[3]; if (dm >= 1 && dm <= 12) return dm === 1 ? `${dy - 1}-12` : `${dy}-${String(dm - 1).padStart(2, '0')}`; }
+      return null;
+    };
 
     // busca cada tipo TENANT-WIDE (Search API). Termos AMPLOS (o escritório nomeia de vários
     // jeitos: "PGDASD-RECIBO", "REC DAS", "Simples Nacional.pdf") + VALIDAÇÃO por regex no NOME
@@ -473,7 +485,7 @@ export class AnaliseClienteService {
             if (!cfg.re.test(f.name || '')) { nomeNaoConfere++; continue; }
             const cid = resolveClient(f.path || '');
             if (!cid) { semCliente++; continue; }
-            const comp = extractComp(norm(`${f.name} ${f.path}`));
+            const comp = compDe(f.name || '', f.path || '');
             if (!comp) { semComp++; continue; }
             addEnt(cid, `${tipo}|${comp}`, f.webUrl);
           }
@@ -493,7 +505,7 @@ export class AnaliseClienteService {
             arquivosVistos++; cVistos++;
             const cid = resolveClient(f.path || '');
             if (!cid) { semCliente++; cSemCliente++; continue; }
-            const comp = extractComp(norm(`${f.name} ${f.path}`)) || extractComp(norm(f.path));
+            const comp = compDe(f.name || '', f.path || '');
             // ZIP sem competência no caminho (comum em 2025): ABRE e extrai a competência dos
             // arquivos internos (ex.: "SIMPLES NACIONAL/2025/102025/PGDASD.pdf" dentro do zip).
             if (!comp && /\.zip$/i.test(f.name || '') && zipsAbertos < 800) {
@@ -709,6 +721,15 @@ export class AnaliseClienteService {
       for (let m = 1; m <= 12; m++) { const mm = String(m).padStart(2, '0'); if (s.includes(`${mm} ${ano}`) || s.includes(`${ano} ${mm}`) || s.includes(`${mm}${ano}`) || s.includes(`${ano}${mm}`) || (s.includes(MESES[m - 1]) && s.includes(String(ano)))) return `${ano}-${mm}`; }
       return null;
     };
+    // à prova da data de VENCIMENTO no nome (competência = mês anterior ao vencimento)
+    const compDe = (nome: string, path: string): string | null => {
+      let c = extractComp(norm(path)); if (c) return c;
+      const nm = norm(nome);
+      c = extractComp(nm.replace(/vencer?\w*\s*\d{1,2}\s*\d{1,2}\s*\d{4}/g, ' ').replace(/pagar?\s*ate\s*\d{1,2}\s*\d{1,2}\s*\d{4}/g, ' ')); if (c) return c;
+      const mv = nm.match(/(?:vencer?\w*|pagar?\s*ate)\s*(\d{1,2})\s*(\d{1,2})\s*(\d{4})/);
+      if (mv) { const dm = +mv[2], dy = +mv[3]; if (dm >= 1 && dm <= 12 && (dy === ano || (dm === 1 && dy === ano + 1))) return dm === 1 ? `${dy - 1}-12` : `${dy}-${String(dm - 1).padStart(2, '0')}`; }
+      return null;
+    };
     const isDasName = (n: string) => /pgdasd|pgdas|pgmei|(^| )das( |$)|simples nacional|sem moviment|recibo de pagamento|extrato mensal|(?:rec\w*|dec\w*|declara\w*|extrato)[\s]+sn( |$)/.test(n);
     // clientes SN/MEI com DAS vencida no ano — menor código (mais antigos) primeiro
     const companies = await this.prisma.company.findMany({ where: { active: true, taxRegime: { in: ['SIMPLES_NACIONAL', 'SIMPLES', 'MEI'] } }, select: { id: true, name: true, clienteCodigo: true } });
@@ -757,7 +778,7 @@ export class AnaliseClienteService {
           }
           if (/\.(xml|zip)$/i.test(f.name || '')) continue;
           if (!isDasName(norm(f.name))) continue;
-          const comp = extractComp(norm(`${f.name} ${f.path}`));
+          const comp = compDe(f.name || '', f.path || '');
           if (comp) { achadas.add(comp); if (arquivos.length < 12) arquivos.push(`${comp}: ${f.name}`); continue; }
           // SEM competência no nome/pasta → LÊ o PDF e extrai o Período de Apuração
           if (f.driveId && f.id && lidos < 30) {
