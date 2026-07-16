@@ -451,6 +451,8 @@ export class AnaliseClienteService {
     const entregas = new Map<string, Map<string, string>>(); // cid -> ("tipo|comp" -> webUrl do comprovante)
     const addEnt = (cid: string, key: string, url?: string) => { if (!entregas.has(cid)) entregas.set(cid, new Map()); const m = entregas.get(cid)!; if (!m.has(key) || (url && !m.get(key))) m.set(key, url || ''); };
     let arquivosVistos = 0, semCliente = 0, semComp = 0, nomeNaoConfere = 0, zipsAbertos = 0;
+    // diagnóstico ESPECÍFICO do loop de CONTEÚDO (onde vivem os recibos 2025 empacotados)
+    let cVistos = 0, cSemCliente = 0, cSemComp = 0, cSemId = 0, cZipComComp = 0, cAdd = 0;
     // Search API tem teto de ~3000 por query → particiona por MÊS via KQL LastModifiedTime
     // (janela mensal cabe sempre abaixo do teto, mesmo em tipos volumosos como DAS). Dedup por
     // caminho+nome. Competência sai sempre do PATH (arquivo modificado no mês seguinte ao da comp).
@@ -488,23 +490,24 @@ export class AnaliseClienteService {
           for (const f of arquivos) {
             const chave = `C:${f.path}/${f.name}`;
             if (vistos.has(chave)) continue; vistos.add(chave);
-            arquivosVistos++;
+            arquivosVistos++; cVistos++;
             const cid = resolveClient(f.path || '');
-            if (!cid) { semCliente++; continue; }
+            if (!cid) { semCliente++; cSemCliente++; continue; }
             const comp = extractComp(norm(`${f.name} ${f.path}`)) || extractComp(norm(f.path));
             // ZIP sem competência no caminho (comum em 2025): ABRE e extrai a competência dos
             // arquivos internos (ex.: "SIMPLES NACIONAL/2025/102025/PGDASD.pdf" dentro do zip).
-            if (!comp && /\.zip$/i.test(f.name || '') && f.driveId && f.id && zipsAbertos < 500) {
+            if (!comp && /\.zip$/i.test(f.name || '') && zipsAbertos < 800) {
+              if (!f.driveId || !f.id) { cSemId++; semComp++; continue; }
               zipsAbertos++;
               let internos: string[] = [];
               try { internos = await this.onedrive.lerNomesZip(conn.id, f.driveId, f.id); } catch { /* */ }
               let achou = false;
-              for (const nm of internos) { const c2 = extractComp(norm(nm)); if (c2) { addEnt(cid, `${tipo}|${c2}`, f.webUrl); achou = true; } }
-              if (!achou) semComp++;
+              for (const nm of internos) { const c2 = extractComp(norm(nm)); if (c2) { addEnt(cid, `${tipo}|${c2}`, f.webUrl); achou = true; cAdd++; } }
+              if (achou) cZipComComp++; else { semComp++; cSemComp++; }
               continue;
             }
-            if (!comp) { semComp++; continue; }
-            addEnt(cid, `${tipo}|${comp}`, f.webUrl);
+            if (!comp) { semComp++; cSemComp++; continue; }
+            addEnt(cid, `${tipo}|${comp}`, f.webUrl); cAdd++;
           }
         }
       }
@@ -531,7 +534,7 @@ export class AnaliseClienteService {
         if (!jaEntregue) entregue++;
       }
     }
-    return { anos, arquivosVistos, nomeNaoConfere, semCliente, semComp, clientesComEntrega: entregas.size, obrigacoesAnalisadas: itens.length, marcadasEntregue: entregue };
+    return { anos, arquivosVistos, nomeNaoConfere, semCliente, semComp, zipsAbertos, clientesComEntrega: entregas.size, obrigacoesAnalisadas: itens.length, marcadasEntregue: entregue, conteudo: { cVistos, cSemCliente, cSemComp, cSemId, cZipComComp, cAdd } };
   }
 
   /**

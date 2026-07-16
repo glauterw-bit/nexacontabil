@@ -835,7 +835,7 @@ export class OneDriveService {
           entityTypes: ['driveItem'],
           query: { queryString: query },
           from, size: 200,
-          fields: ['name', 'webUrl', 'parentReference', 'lastModifiedDateTime'],
+          fields: ['id', 'name', 'webUrl', 'parentReference', 'lastModifiedDateTime'],
           sortProperties: [{ name: 'lastModifiedDateTime', isDescending: true }],
         }] }),
       });
@@ -848,7 +848,7 @@ export class OneDriveService {
         const it = hit.resource ?? {};
         if (it.folder) continue;
         const webUrl = it.webUrl ?? '';
-        achados.push({ id: it.id, name: it.name ?? '', path: this._pastaDoWebUrl(webUrl) || (it.parentReference?.path ?? ''), webUrl, driveId: it.parentReference?.driveId, parentId: it.parentReference?.id });
+        achados.push({ id: it.id ?? hit.hitId, name: it.name ?? '', path: this._pastaDoWebUrl(webUrl) || (it.parentReference?.path ?? ''), webUrl, driveId: it.parentReference?.driveId, parentId: it.parentReference?.id });
       }
       more = !!container.moreResultsAvailable;
       from += 200;
