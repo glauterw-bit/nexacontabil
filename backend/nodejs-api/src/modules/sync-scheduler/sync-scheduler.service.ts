@@ -297,6 +297,10 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.diagnosticarDasFaltante(ano);
   }
 
+  async auditarDasClientes(ano?: number, limit?: number) {
+    return this.analise.auditarDasClientes(ano, limit);
+  }
+
   /** Link de consentimento de admin (Azure) — 1 clique libera as permissões de aplicação. */
   adminConsentUrl() {
     return this.analise.adminConsentUrl();

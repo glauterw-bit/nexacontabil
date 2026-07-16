@@ -197,6 +197,13 @@ class SyncSchedulerController {
     return this.service.diagnosticarPdfCliente(codigo);
   }
 
+  /** AUDITORIA DAS — N clientes SN estabelecidos: recibo existe no drive mas nao casou vs nao entregue. */
+  @Public()
+  @Get('auditar-das')
+  auditarDas(@Query('ano') ano?: string, @Query('limit') limit?: string) {
+    return this.service.auditarDasClientes(ano ? parseInt(ano, 10) : undefined, limit ? parseInt(limit, 10) : undefined);
+  }
+
   /** Teste publico do explorador (arvore real de pastas do cliente). */
   @Public()
   @Get('explorar')

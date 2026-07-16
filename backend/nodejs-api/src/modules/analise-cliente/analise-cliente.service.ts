@@ -695,6 +695,72 @@ export class AnaliseClienteService {
   }
 
   /**
+   * AUDITORIA DAS — pega N clientes Simples/MEI ESTABELECIDOS (código baixo) com DAS marcado
+   * 'vencida' no ano e, pra CADA competência vencida, busca o recibo no OneDrive (nome + frase de
+   * conteúdo + ABRE zips). Retorna, por cliente: meses vencidos × meses ACHADOS no drive × os que
+   * faltam DE VERDADE. Separa "não lido" (recibo existe → bug de casamento) de "não entregue".
+   */
+  async auditarDasClientes(ano = new Date().getFullYear(), limit = 10) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'sem conexão OneDrive' };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const extractComp = (s: string): string | null => {
+      for (let m = 1; m <= 12; m++) { const mm = String(m).padStart(2, '0'); if (s.includes(`${mm} ${ano}`) || s.includes(`${ano} ${mm}`) || s.includes(`${mm}${ano}`) || s.includes(`${ano}${mm}`) || (s.includes(MESES[m - 1]) && s.includes(String(ano)))) return `${ano}-${mm}`; }
+      return null;
+    };
+    const isDasName = (n: string) => /pgdasd|pgdas|pgmei|(^| )das( |$)|simples nacional|sem moviment|recibo de pagamento|extrato mensal|(?:rec\w*|dec\w*|declara\w*|extrato)[\s]+sn( |$)/.test(n);
+    // clientes SN/MEI com DAS vencida no ano — menor código (mais antigos) primeiro
+    const companies = await this.prisma.company.findMany({ where: { active: true, taxRegime: { in: ['SIMPLES_NACIONAL', 'SIMPLES', 'MEI'] } }, select: { id: true, name: true, clienteCodigo: true } });
+    const alvo: Array<{ id: string; name: string; codigo: string; vencidas: string[] }> = [];
+    for (const c of companies) {
+      const venc = await this.prisma.fiscalCalendarItem.findMany({ where: { companyId: c.id, tipo: 'DAS', status: 'vencida', competencia: { startsWith: `${ano}-` } }, select: { competencia: true } });
+      if (venc.length) alvo.push({ id: c.id, name: c.name, codigo: String(c.clienteCodigo || ''), vencidas: [...new Set(venc.map((v) => v.competencia))].sort() });
+    }
+    alvo.sort((a, b) => (parseInt(a.codigo || '999999', 10) || 999999) - (parseInt(b.codigo || '999999', 10) || 999999));
+    const amostra = alvo.slice(0, limit);
+    const out: any[] = [];
+    for (const c of amostra) {
+      const reCod = c.codigo ? new RegExp(`(^|/)\\s*${c.codigo}\\s*[-–]`) : null;
+      const nomeN = norm(c.name);
+      const chaveNome = nomeN.split(' ').filter((w) => w.length >= 4).slice(0, 2).join(' '); // 2 primeiras palavras "fortes"
+      const pertence = (path: string): boolean => {
+        if (reCod && reCod.test(path)) return true;
+        const pn = norm(path);
+        return chaveNome.length >= 6 && pn.includes(chaveNome);
+      };
+      const achadas = new Set<string>();
+      const arquivos: string[] = [];
+      const vistos = new Set<string>();
+      const queries = [c.codigo, '"Documento de Arrecadacao do Simples Nacional"', 'PGDASD', `${c.codigo} recibo`, chaveNome].filter(Boolean);
+      let zips = 0;
+      for (const q of queries) {
+        let itens: Array<{ id?: string; name: string; path: string; webUrl?: string; driveId?: string }> = [];
+        try { itens = (await this.onedrive.coletaTenant(conn.id, `${q} LastModifiedTime>=${ano}-01-01 AND LastModifiedTime<${ano + 1}-01-01`, { maxItens: 400 })).itens; } catch { continue; }
+        for (const f of itens) {
+          if (!pertence(f.path || '')) continue;
+          const k = `${f.path}/${f.name}`; if (vistos.has(k)) continue; vistos.add(k);
+          if (/\.zip$/i.test(f.name || '') && f.driveId && f.id && zips < 40) {
+            zips++;
+            try { const nomes = await this.onedrive.lerNomesZip(conn.id, f.driveId, f.id); for (const nm of nomes) { if (isDasName(norm(nm))) { const c2 = extractComp(norm(nm)); if (c2) { achadas.add(c2); if (arquivos.length < 10) arquivos.push(`${c2}: [zip] ${nm.split('/').pop()}`); } } } } catch { /* */ }
+            continue;
+          }
+          if (/\.(xml|zip)$/i.test(f.name || '')) continue;
+          if (!isDasName(norm(f.name))) continue;
+          const comp = extractComp(norm(`${f.name} ${f.path}`));
+          if (comp) { achadas.add(comp); if (arquivos.length < 10) arquivos.push(`${comp}: ${f.name}`); }
+        }
+      }
+      const faltam = c.vencidas.filter((v) => !achadas.has(v));
+      out.push({ codigo: c.codigo, cliente: c.name, totalVencidas: c.vencidas.length, vencidas: c.vencidas, achadasNoDrive: [...achadas].sort(), recibExisteMasNaoCasou: c.vencidas.filter((v) => achadas.has(v)), faltamDeVerdade: faltam, amostraArquivos: arquivos });
+    }
+    const somaVenc = out.reduce((s, o) => s + o.totalVencidas, 0);
+    const somaAchou = out.reduce((s, o) => s + o.recibExisteMasNaoCasou.length, 0);
+    const somaFalta = out.reduce((s, o) => s + o.faltamDeVerdade.length, 0);
+    return { ano, clientesAuditados: out.length, resumo: { vencidasTotal: somaVenc, recibExisteMasNaoCasou: somaAchou, faltamDeVerdade: somaFalta }, resultado: out };
+  }
+
+  /**
    * EXPLORADOR de pastas do cliente — acha as pastas de um ano (via busca) e LISTA o conteúdo
    * real de cada uma (arquivos + link p/ abrir no OneDrive). Deixa o gestor conferir manualmente
    * quais documentos estão (ou não) em cada competência.
