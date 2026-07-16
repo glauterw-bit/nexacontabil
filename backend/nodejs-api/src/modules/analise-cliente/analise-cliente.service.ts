@@ -448,7 +448,8 @@ export class AnaliseClienteService {
       ICMS: { qs: ['GIA', 'GARE', 'ICMS'], re: /(^|[^a-z])gia|gare|icms/i },
       ESOCIAL: { qs: ['eSocial'], re: /esocial|esoc/i },
     };
-    const entregas = new Map<string, Set<string>>();
+    const entregas = new Map<string, Map<string, string>>(); // cid -> ("tipo|comp" -> webUrl do comprovante)
+    const addEnt = (cid: string, key: string, url?: string) => { if (!entregas.has(cid)) entregas.set(cid, new Map()); const m = entregas.get(cid)!; if (!m.has(key) || (url && !m.get(key))) m.set(key, url || ''); };
     let arquivosVistos = 0, semCliente = 0, semComp = 0, nomeNaoConfere = 0;
     // Search API tem teto de ~3000 por query → particiona por MÊS via KQL LastModifiedTime
     // (janela mensal cabe sempre abaixo do teto, mesmo em tipos volumosos como DAS). Dedup por
@@ -460,7 +461,7 @@ export class AnaliseClienteService {
         for (const { y, m } of janelas) {
           const mm = String(m).padStart(2, '0');
           const kql = `${q} LastModifiedTime>=${y}-${mm}-01 AND LastModifiedTime<${proxMes(y, m)}`;
-          let arquivos: Array<{ name: string; path: string }> = [];
+          let arquivos: Array<{ name: string; path: string; webUrl?: string }> = [];
           try { arquivos = (await this.onedrive.coletaTenant(conn.id, kql, { maxItens: 3000 })).itens; } catch { continue; }
           for (const f of arquivos) {
             const chave = `${f.path}/${f.name}`;
@@ -472,8 +473,7 @@ export class AnaliseClienteService {
             if (!cid) { semCliente++; continue; }
             const comp = extractComp(norm(`${f.name} ${f.path}`));
             if (!comp) { semComp++; continue; }
-            if (!entregas.has(cid)) entregas.set(cid, new Set());
-            entregas.get(cid)!.add(`${tipo}|${comp}`);
+            addEnt(cid, `${tipo}|${comp}`, f.webUrl);
           }
         }
       }
@@ -483,7 +483,7 @@ export class AnaliseClienteService {
         for (const { y, m } of janelas) {
           const mm = String(m).padStart(2, '0');
           const kql = `${q} AND LastModifiedTime>=${y}-${mm}-01 AND LastModifiedTime<${proxMes(y, m)}`;
-          let arquivos: Array<{ name: string; path: string }> = [];
+          let arquivos: Array<{ name: string; path: string; webUrl?: string }> = [];
           try { arquivos = (await this.onedrive.coletaTenant(conn.id, kql, { maxItens: 3000 })).itens; } catch { continue; }
           for (const f of arquivos) {
             const chave = `C:${f.path}/${f.name}`;
@@ -493,8 +493,7 @@ export class AnaliseClienteService {
             if (!cid) { semCliente++; continue; }
             const comp = extractComp(norm(`${f.name} ${f.path}`)) || extractComp(norm(f.path));
             if (!comp) { semComp++; continue; }
-            if (!entregas.has(cid)) entregas.set(cid, new Set());
-            entregas.get(cid)!.add(`${tipo}|${comp}`);
+            addEnt(cid, `${tipo}|${comp}`, f.webUrl);
           }
         }
       }
@@ -504,15 +503,21 @@ export class AnaliseClienteService {
     // falsa quando o casamento não acha; a ausência de match não prova não-entrega).
     let entregue = 0;
     const anosStr = anos.map(String);
+    // inclui 'entregue' p/ GRAVAR o link do comprovante mesmo nos que já estavam marcados
     const itens = await this.prisma.fiscalCalendarItem.findMany({
-      where: { status: { in: ['pendente', 'vencida'] }, OR: anosStr.map((a) => ({ competencia: { startsWith: a } })) },
-      select: { id: true, companyId: true, tipo: true, competencia: true },
+      where: { status: { in: ['pendente', 'vencida', 'entregue'] }, OR: anosStr.map((a) => ({ competencia: { startsWith: a } })) },
+      select: { id: true, companyId: true, tipo: true, competencia: true, status: true, comprovanteUrl: true },
     });
     for (const it of itens) {
       const set = entregas.get(it.companyId);
-      if (set && set.has(`${it.tipo}|${it.competencia}`) && !this._compFutura(it.competencia)) {
-        await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined);
-        entregue++;
+      const key = `${it.tipo}|${it.competencia}`;
+      if (set && set.has(key) && !this._compFutura(it.competencia)) {
+        const url = set.get(key) || undefined;
+        const jaEntregue = it.status === 'entregue';
+        // se já entregue e já tem link igual, não precisa escrever
+        if (jaEntregue && (!url || it.comprovanteUrl === url)) continue;
+        await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue', ...(url ? { comprovanteUrl: url } : {}) } }).catch(() => undefined);
+        if (!jaEntregue) entregue++;
       }
     }
     return { anos, arquivosVistos, nomeNaoConfere, semCliente, semComp, clientesComEntrega: entregas.size, obrigacoesAnalisadas: itens.length, marcadasEntregue: entregue };

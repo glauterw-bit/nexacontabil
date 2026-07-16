@@ -1591,19 +1591,20 @@ export class PaineisService {
     const c = await this.prisma.company.findUnique({ where: { id: companyId }, select: { name: true, clienteCodigo: true, taxRegime: true, responsavel: true } });
     const itens = await this.prisma.fiscalCalendarItem.findMany({
       where: { companyId, competencia: { startsWith: `${ano}-` } },
-      select: { tipo: true, descricao: true, competencia: true, status: true, dataVencimento: true },
+      select: { tipo: true, descricao: true, competencia: true, status: true, dataVencimento: true, comprovanteUrl: true },
       orderBy: { dataVencimento: 'asc' },
     });
-    // mapa "tipo|competência → link do comprovante" (pra abrir o documento ao clicar)
+    // link do comprovante: 1º o URL GRAVADO na reconciliação; se faltar, busca on-demand
+    const faltamLink = itens.some((it) => ENTREGUE.has(it.status) && !it.comprovanteUrl && !PORTAL.has(it.tipo));
     let recibos: Record<string, string> = {};
-    if (c?.clienteCodigo) { try { recibos = await this.analise.mapaRecibosCliente(String(c.clienteCodigo), ano); } catch { /* segue sem links */ } }
+    if (faltamLink && c?.clienteCodigo) { try { recibos = await this.analise.mapaRecibosCliente(String(c.clienteCodigo), ano); } catch { /* segue sem links */ } }
     const meses: Record<number, any[]> = {};
     for (const it of itens) {
       const mm = parseInt(it.competencia.split('-')[1] ?? '0', 10); if (!mm) continue;
       const entregue = ENTREGUE.has(it.status);
       const venc = new Date(it.dataVencimento);
       const st = PORTAL.has(it.tipo) ? 'portal' : (entregue ? 'ok' : (venc < now ? 'late' : 'pendente'));
-      (meses[mm] ??= []).push({ tipo: it.tipo, descricao: it.descricao, status: st, vencimento: it.dataVencimento, abrir: recibos[`${it.tipo}|${it.competencia}`] ?? null });
+      (meses[mm] ??= []).push({ tipo: it.tipo, descricao: it.descricao, status: st, vencimento: it.dataVencimento, abrir: it.comprovanteUrl || recibos[`${it.tipo}|${it.competencia}`] || null });
     }
     return { empresa: c, ano, meses };
   }
