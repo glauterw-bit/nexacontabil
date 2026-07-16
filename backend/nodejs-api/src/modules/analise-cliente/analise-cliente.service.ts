@@ -409,9 +409,15 @@ export class AnaliseClienteService {
     const resolveSeg = (seg: string): string | null => {
       const codeM = seg.match(/^\s*(\d+)\s*[-–]/);
       if (codeM && porCodigo.has(codeM[1])) return porCodigo.get(codeM[1])!;
+      // pasta nomeada SÓ com o número do cliente ("16/DP Fiscal/...") — exclui ano (20xx)
+      const soNum = seg.trim();
+      if (/^\d{1,4}$/.test(soNum) && !/^20\d\d$/.test(soNum) && porCodigo.has(soNum)) return porCodigo.get(soNum)!;
       const nn = norm(seg.replace(/^\s*\d+\s*[-–]\s*/, '').replace(/\([^)]*\)/g, ''));
       if (nn.length >= 5 && porNome.has(nn)) return porNome.get(nn)!;
       if (nn.length >= 8) for (const [n, id] of porNome) if (n.length >= 8 && (nn.includes(n) || n.includes(nn))) return id;
+      // "DP <NOME>" / "DEPTO <NOME>" — pasta de Departamento Pessoal com nome do cliente
+      const semDP = norm(seg.replace(/^\s*(dp|depto|departamento)\s+/i, '')).replace(/\([^)]*\)/g, '').trim();
+      if (semDP !== nn && semDP.length >= 8) for (const [n, id] of porNome) if (n.length >= 8 && (semDP.includes(n) || n.includes(semDP))) return id;
       return null;
     };
     // a pasta do cliente pode estar em QUALQUER nível ("Empresas Ativas/113 - CLINICA OWEN/...")
