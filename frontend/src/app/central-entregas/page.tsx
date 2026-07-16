@@ -11,14 +11,14 @@ const MESL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho
 const ICON: Record<string, string> = { ok: '✓', warn: '◐', late: '!', na: '' };
 
 type Mes = { mes: number; status: 'ok' | 'warn' | 'late' | 'na'; ent: number; tot: number };
-type Cli = { companyId: string; nome: string; codigo?: string; regime?: string; responsavel?: string; meses: Mes[]; pendencia: number };
+type Cli = { companyId: string; nome: string; codigo?: string; regime?: string; responsavel?: string; clienteDesde?: string | null; meses: Mes[]; pendencia: number };
 type Dados = { ano: number; mesAtual: number; resumo: { totalClientes: number; emDia: number; parciais: number; atrasados: number; pct: number; proximoPrazoDias: number | null }; responsaveis: string[]; clientes: Cli[] };
 
 function Spark({ meses }: { meses: Mes[] }) {
   const pts = meses.filter((x) => x.status !== 'na').map((x) => (x.status === 'ok' ? 1 : x.status === 'warn' ? 0.5 : 0));
-  const w = 56, h = 18, step = w / Math.max(1, pts.length - 1);
-  const d = pts.map((v, i) => `${i * step},${h - 2 - v * (h - 4)}`).join(' ');
-  return <svg width={w} height={h}><polyline points={d} fill="none" stroke="#B7B2AB" strokeWidth={1.5} /></svg>;
+  const w = 52, h = 16, step = w / Math.max(1, pts.length - 1);
+  const dd = pts.map((v, i) => `${i * step},${h - 2 - v * (h - 4)}`).join(' ');
+  return <svg width={w} height={h}><polyline points={dd} fill="none" stroke="#B7B2AB" strokeWidth={1.5} /></svg>;
 }
 
 export default function CentralEntregas() {
@@ -30,6 +30,8 @@ export default function CentralEntregas() {
   const [regime, setRegime] = useState('');
   const [sel, setSel] = useState<Cli | null>(null);
   const [det, setDet] = useState<any>(null);
+  const [dataInicio, setDataInicio] = useState('');
+  const [salvando, setSalvando] = useState(false);
 
   const carregar = useCallback(() => {
     setLoading(true);
@@ -40,10 +42,20 @@ export default function CentralEntregas() {
 
   useEffect(() => {
     if (!sel) { setDet(null); return; }
-    setDet(null);
+    setDet(null); setDataInicio(sel.clienteDesde || '');
     fetch(`${API}/api/v1/paineis/calendario-cliente?companyId=${sel.companyId}&ano=${ano}`, { headers: authHeaders() })
       .then((r) => r.json()).then(setDet).catch(() => setDet(null));
   }, [sel, ano]);
+
+  const salvarInicio = async () => {
+    if (!sel || !dataInicio) return;
+    setSalvando(true);
+    try {
+      await fetch(`${API}/api/v1/paineis/cliente-inicio`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ companyId: sel.companyId, data: dataInicio }) });
+      setSel(null);
+      carregar();
+    } finally { setSalvando(false); }
+  };
 
   const clientes = useMemo(() => {
     let l = d?.clientes ?? [];
@@ -76,17 +88,17 @@ export default function CentralEntregas() {
           <div className="ce-ringwrap">
             <div className="ce-ring" style={{ ['--p' as any]: r?.pct ?? 0 }}><b className="tnum">{r?.pct ?? 0}%</b></div>
             <div className="ce-ringlbl">
-              <h2>{MESL[mAtual - 1]} de {ano}</h2>
-              <p><b className="tnum">{r?.emDia ?? 0}</b> de <b className="tnum">{r?.totalClientes ?? 0}</b> clientes 100% em dia</p>
-              {r && r.emDia === r.totalClientes && r.totalClientes > 0
-                ? <span className="ce-chip ok">✓ Mês fechado — todos entregaram</span>
-                : <span className="ce-chip">acompanhe as pendências ao lado →</span>}
+              <h2>{ano}</h2>
+              <p><b className="tnum">{r?.emDia ?? 0}</b> de <b className="tnum">{r?.totalClientes ?? 0}</b> clientes sem nenhum atraso</p>
+              {r && r.atrasados === 0
+                ? <span className="ce-chip ok">✓ Nenhum cliente atrasado</span>
+                : <span className="ce-chip">{r?.atrasados ?? 0} cliente(s) com mês vencido em aberto</span>}
             </div>
           </div>
           <div className="ce-stats">
-            <div className="ce-stat ok"><div className="n tnum">{r?.emDia ?? 0}</div><div className="l">Tudo entregue</div></div>
-            <div className="ce-stat warn"><div className="n tnum">{r?.parciais ?? 0}</div><div className="l">Falta algo</div></div>
-            <div className="ce-stat late"><div className="n tnum">{r?.atrasados ?? 0}</div><div className="l">Atrasados</div></div>
+            <div className="ce-stat ok"><div className="n tnum">{r?.emDia ?? 0}</div><div className="l">Em dia</div></div>
+            <div className="ce-stat warn"><div className="n tnum">{r?.parciais ?? 0}</div><div className="l">Parcial</div></div>
+            <div className="ce-stat late"><div className="n tnum">{r?.atrasados ?? 0}</div><div className="l">Com atraso</div></div>
             <div className="ce-stat due"><div className="n tnum">{r?.proximoPrazoDias != null ? `${r.proximoPrazoDias}d` : '—'}</div><div className="l">Próximo prazo</div></div>
           </div>
         </section>
@@ -106,33 +118,40 @@ export default function CentralEntregas() {
           <div className="ce-legend">
             <span><i className="sw" style={{ background: 'var(--ce-ok-cell)' }} />entregue</span>
             <span><i className="sw" style={{ background: 'var(--ce-warn-cell)' }} />parcial</span>
-            <span><i className="sw" style={{ background: 'var(--ce-late-cell)' }} />atrasado</span>
+            <span><i className="sw" style={{ background: 'var(--ce-late-cell)' }} />vencido</span>
             <span><i className="sw" style={{ background: 'var(--ce-na)' }} />a vencer</span>
           </div>
         </div>
 
         <div className="ce-board">
           <div className="ce-gridscroll">
-            <div className="ce-grid">
-              <div className="ce-ghead">
-                <div className="cli">Cliente ({clientes.length})</div>
-                {MES.map((m, i) => <div key={i}>{m}</div>)}
-                <div className="spark">tendência</div>
-              </div>
-              {clientes.map((c) => {
-                const dotc = c.pendencia === 0 ? 'var(--ce-ok)' : (c.meses.some((m) => m.status === 'late') ? 'var(--ce-late)' : 'var(--ce-warn)');
-                return (
-                  <div className="ce-grow" key={c.companyId} onClick={() => setSel(c)}>
-                    <div className="cli"><span className="cdot" style={{ background: dotc }} /><span className="cinfo"><b>{c.nome}</b><small>{c.codigo ? `#${c.codigo} · ` : ''}{c.regime} · {c.responsavel || '—'}</small></span></div>
-                    {c.meses.map((m) => <div key={m.mes}><div className={`ce-cell ${m.status}`} title={m.status === 'na' ? 'a vencer' : `${m.ent}/${m.tot} entregue`}>{ICON[m.status]}</div></div>)}
-                    <div className="spark"><Spark meses={c.meses} /></div>
-                  </div>
-                );
-              })}
-            </div>
+            <table className="ce-table">
+              <thead>
+                <tr>
+                  <th className="ce-cli-h">Cliente ({clientes.length})</th>
+                  {MES.map((m, i) => <th key={i} className="ce-mh">{m}</th>)}
+                  <th className="ce-sp-h">tendência</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clientes.map((c) => {
+                  const dotc = c.pendencia === 0 ? 'var(--ce-ok)' : (c.meses.some((m) => m.status === 'late') ? 'var(--ce-late)' : 'var(--ce-warn)');
+                  return (
+                    <tr className="ce-row" key={c.companyId} onClick={() => setSel(c)}>
+                      <td className="ce-cli">
+                        <span className="cdot" style={{ background: dotc }} />
+                        <span className="cinfo"><b title={c.nome}>{c.nome}</b><small>{c.codigo ? `#${c.codigo} · ` : ''}{c.regime}{c.responsavel ? ` · ${c.responsavel}` : ''}{c.clienteDesde ? ` · desde ${c.clienteDesde.slice(5, 7)}/${c.clienteDesde.slice(0, 4)}` : ''}</small></span>
+                      </td>
+                      {c.meses.map((m) => <td key={m.mes} className="ce-mc"><span className={`ce-cell ${m.status}`} title={m.status === 'na' ? 'a vencer' : `${m.ent}/${m.tot} entregue`}>{ICON[m.status]}</span></td>)}
+                      <td className="ce-sp"><Spark meses={c.meses} /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
-        <p className="ce-note">FGTS, eSocial e DARF são controlados no portal/banco (sem PDF) — não entram como pendência. Meses a vencer aparecem em cinza. Baseado nos comprovantes reais das pastas do Drive.</p>
+        <p className="ce-note">Só é pendência o que já venceu. Meses a vencer ficam em cinza. FGTS, eSocial e DARF são controlados no portal/banco (fora daqui). Clique num cliente para o detalhe e para marcar a data de entrada dele.</p>
       </>)}
 
       <div className={`ce-scrim ${sel ? 'open' : ''}`} onClick={() => setSel(null)} />
@@ -148,6 +167,14 @@ export default function CentralEntregas() {
                 <button className="xbtn" onClick={() => setSel(null)}>✕</button>
               </div>
               <div className="ce-mini">{sel.meses.map((m) => <i key={m.mes} className={`ce-cell ${m.status}`}>{ICON[m.status]}</i>)}</div>
+              <div className="ce-novo">
+                <div className="ce-novo-t">📅 Cliente novo? Marque a data de entrada — os meses antes disso viram “isento” (não cobram):</div>
+                <div className="ce-novo-r">
+                  <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+                  <button onClick={salvarInicio} disabled={!dataInicio || salvando}>{salvando ? 'Salvando…' : 'Aplicar'}</button>
+                </div>
+                {sel.clienteDesde ? <div className="ce-novo-cur">Início atual: {sel.clienteDesde.slice(8, 10)}/{sel.clienteDesde.slice(5, 7)}/{sel.clienteDesde.slice(0, 4)}</div> : null}
+              </div>
             </div>
             <div className="ce-dbody">
               {!det ? <div className="ce-load sm">Carregando…</div> : (
@@ -184,7 +211,7 @@ export default function CentralEntregas() {
 }
 
 const CSS = `
-.ce-wrap{--ce-surface:#fff;--ce-surface2:#F5F5F4;--ce-border:#E7E5E4;--ce-border-soft:#EFEEEC;--ce-tx:#1C1917;--ce-tx2:#57534E;--ce-tx3:#8A857E;--ce-accent:#0F766E;--ce-accent-soft:#E6F1EF;--ce-ok:#2E7D5B;--ce-ok-bg:#E4F3EC;--ce-ok-cell:#8FD0B0;--ce-warn:#B7791F;--ce-warn-bg:#FBF0DA;--ce-warn-cell:#F0C270;--ce-late:#C0362C;--ce-late-bg:#FBE5E2;--ce-late-cell:#E88A82;--ce-na:#F1F1F0;max-width:1180px;margin:0 auto;padding:22px 22px 80px;color:var(--ce-tx);font-size:14px}
+.ce-wrap{--ce-surface:#fff;--ce-surface2:#F5F5F4;--ce-border:#E7E5E4;--ce-border-soft:#EFEEEC;--ce-tx:#1C1917;--ce-tx2:#57534E;--ce-tx3:#8A857E;--ce-accent:#0F766E;--ce-accent-soft:#E6F1EF;--ce-ok:#2E7D5B;--ce-ok-bg:#E4F3EC;--ce-ok-cell:#8FD0B0;--ce-warn:#B7791F;--ce-warn-bg:#FBF0DA;--ce-warn-cell:#F0C270;--ce-late:#C0362C;--ce-late-bg:#FBE5E2;--ce-late-cell:#E88A82;--ce-na:#EDEBE9;max-width:1180px;margin:0 auto;padding:22px 22px 80px;color:var(--ce-tx);font-size:14px}
 .ce-wrap .tnum{font-variant-numeric:tabular-nums}
 .ce-load{padding:60px;text-align:center;color:var(--ce-tx3)}.ce-load.sm{padding:30px}
 .ce-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}
@@ -220,25 +247,31 @@ const CSS = `
 .ce-legend span{display:inline-flex;align-items:center;gap:6px}.ce-legend .sw{width:13px;height:13px;border-radius:4px}
 .ce-board{background:var(--ce-surface);border:1px solid var(--ce-border);border-radius:16px;box-shadow:0 1px 2px rgba(28,25,23,.05);overflow:hidden}
 .ce-gridscroll{overflow-x:auto}
-.ce-grid{display:grid;grid-template-columns:230px repeat(12,30px) 72px;min-width:682px}
-.ce-ghead{display:contents}
-.ce-ghead>div{position:sticky;top:0;background:var(--ce-surface);z-index:3;border-bottom:1px solid var(--ce-border);padding:11px 0;font-size:11.5px;font-weight:600;color:var(--ce-tx3);text-align:center}
-.ce-ghead .cli{left:0;z-index:4;text-align:left;padding-left:16px;text-transform:uppercase;letter-spacing:.04em}
-.ce-grow{display:contents;cursor:pointer}
-.ce-grow>div{border-bottom:1px solid var(--ce-border-soft);height:44px;display:flex;align-items:center;justify-content:center}
-.ce-grow:hover>div{background:var(--ce-accent-soft)}
-.ce-grow .cli{position:sticky;left:0;background:var(--ce-surface);z-index:2;justify-content:flex-start;padding-left:16px;gap:9px;overflow:hidden}
-.ce-grow:hover .cli{background:var(--ce-accent-soft)}
-.cdot{width:7px;height:7px;border-radius:50%;flex:none}.cinfo{overflow:hidden}
-.cinfo b{font-size:13px;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:160px}
-.cinfo small{font-size:11px;color:var(--ce-tx3)}
-.ce-cell{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:11px;font-weight:700}
+/* TABELA robusta: sem sobreposição, nome do cliente com largura total da coluna */
+.ce-table{border-collapse:separate;border-spacing:0;width:100%;min-width:660px;table-layout:fixed}
+.ce-table th,.ce-table td{padding:0}
+.ce-table thead th{position:sticky;top:0;background:var(--ce-surface);z-index:3;height:38px;font-size:11.5px;font-weight:600;color:var(--ce-tx3);border-bottom:1px solid var(--ce-border);text-align:center;vertical-align:middle}
+.ce-cli-h{width:250px;text-align:left!important;padding-left:16px!important;position:sticky;left:0;z-index:5!important;text-transform:uppercase;letter-spacing:.04em}
+.ce-mh{width:30px}
+.ce-sp-h{width:66px;padding-right:12px!important}
+.ce-row{cursor:pointer}
+.ce-row:hover td{background:var(--ce-accent-soft)}
+.ce-row td{height:50px;border-bottom:1px solid var(--ce-border-soft);background:var(--ce-surface);vertical-align:middle}
+.ce-cli{position:sticky;left:0;z-index:2;background:var(--ce-surface);padding:0 10px 0 16px!important;max-width:250px}
+.ce-row:hover .ce-cli{background:var(--ce-accent-soft)}
+.ce-cli-inner,.ce-cli{display:table-cell}
+.ce-cli>.cdot{display:inline-block;width:7px;height:7px;border-radius:50%;vertical-align:middle;margin-right:9px}
+.ce-cli>.cinfo{display:inline-block;vertical-align:middle;width:calc(100% - 18px);min-width:0}
+.cinfo b{display:block;font-size:13px;font-weight:550;color:var(--ce-tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cinfo small{display:block;font-size:11px;color:var(--ce-tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ce-mc{text-align:center}
+.ce-cell{width:22px;height:22px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
 .ce-cell.ok{background:var(--ce-ok-cell);color:#12503a}.ce-cell.warn{background:var(--ce-warn-cell);color:#6b470c}.ce-cell.late{background:var(--ce-late-cell);color:#6b1712}.ce-cell.na{background:var(--ce-na)}
-.ce-grow .spark{justify-content:flex-end;padding-right:12px}
+.ce-sp{text-align:right;padding-right:12px!important}.ce-sp svg{vertical-align:middle}
 .ce-note{font-size:12px;color:var(--ce-tx3);margin-top:12px;text-align:center}
 .ce-scrim{position:fixed;inset:0;background:rgba(28,25,23,.32);opacity:0;pointer-events:none;transition:opacity .18s;z-index:40}
 .ce-scrim.open{opacity:1;pointer-events:auto}
-.ce-drawer{position:fixed;top:0;right:0;height:100%;width:420px;max-width:92vw;background:var(--ce-surface);border-left:1px solid var(--ce-border);transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);z-index:41;display:flex;flex-direction:column;box-shadow:-8px 0 30px rgba(28,25,23,.10)}
+.ce-drawer{position:fixed;top:0;right:0;height:100%;width:430px;max-width:92vw;background:var(--ce-surface);border-left:1px solid var(--ce-border);transform:translateX(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);z-index:41;display:flex;flex-direction:column;box-shadow:-8px 0 30px rgba(28,25,23,.10)}
 .ce-drawer.open{transform:none}
 .ce-dhead{padding:20px 22px 16px;border-bottom:1px solid var(--ce-border)}
 .ce-dhead .row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
@@ -247,7 +280,14 @@ const CSS = `
 .tag{background:var(--ce-surface2);border:1px solid var(--ce-border);border-radius:999px;padding:2px 9px;font-size:11.5px;color:var(--ce-tx2)}
 .xbtn{border:none;background:var(--ce-surface2);width:30px;height:30px;border-radius:8px;cursor:pointer;color:var(--ce-tx2);font-size:15px;flex:none}
 .xbtn:hover{background:var(--ce-border)}
-.ce-mini{display:flex;gap:3px;margin-top:14px;flex-wrap:wrap}.ce-mini i{width:20px;height:20px;border-radius:5px;font-style:normal;font-size:10px;font-weight:700;display:grid;place-items:center}
+.ce-mini{display:flex;gap:3px;margin-top:14px;flex-wrap:wrap}.ce-mini i{width:20px;height:20px;border-radius:5px;font-style:normal;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.ce-novo{margin-top:14px;background:var(--ce-surface2);border:1px solid var(--ce-border);border-radius:10px;padding:11px 12px}
+.ce-novo-t{font-size:12px;color:var(--ce-tx2);margin-bottom:8px;line-height:1.4}
+.ce-novo-r{display:flex;gap:8px}
+.ce-novo-r input{flex:1;border:1px solid var(--ce-border);border-radius:8px;padding:7px 9px;font-size:13px;font-family:inherit}
+.ce-novo-r button{border:none;background:var(--ce-accent);color:#fff;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}
+.ce-novo-r button:disabled{opacity:.5;cursor:default}
+.ce-novo-cur{font-size:11.5px;color:var(--ce-tx3);margin-top:7px}
 .ce-dbody{overflow-y:auto;padding:6px 0 30px}
 .ce-mo{border-bottom:1px solid var(--ce-border-soft)}
 .ce-moh{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;cursor:pointer;list-style:none}
@@ -257,7 +297,7 @@ const CSS = `
 .ce-moh .b.ok{background:var(--ce-ok-bg);color:var(--ce-ok)}.ce-moh .b.warn{background:var(--ce-warn-bg);color:var(--ce-warn)}.ce-moh .b.late{background:var(--ce-late-bg);color:var(--ce-late)}
 .ce-ob{list-style:none;padding:0 22px 12px;margin:0}
 .ce-ob li{display:flex;align-items:center;gap:11px;padding:8px 0;border-top:1px dashed var(--ce-border-soft)}.ce-ob li:first-child{border-top:none}
-.oi{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
+.oi{width:20px;height:20px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:none}
 .oi.ok{background:var(--ce-ok-bg);color:var(--ce-ok)}.oi.late{background:var(--ce-late-bg);color:var(--ce-late)}.oi.portal{background:var(--ce-surface2);color:var(--ce-tx3)}
 .ce-ob .on{flex:1;font-size:13px}.ce-ob .od{font-size:11.5px;color:var(--ce-tx3)}
 @media(max-width:640px){.ce-summary{grid-template-columns:1fr;gap:16px}.ce-stats{grid-template-columns:repeat(2,1fr)}}

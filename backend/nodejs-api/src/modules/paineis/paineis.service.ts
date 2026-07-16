@@ -96,6 +96,28 @@ export class PaineisService {
     return this.analise.explorarCliente(codigo, ano);
   }
 
+  /**
+   * Marca um cliente como NOVO com data de início — as obrigações de competências ANTERIORES ao
+   * início dele viram 'isenta' (não são cobradas, pois o cliente não existia). Idempotente.
+   */
+  async definirInicioCliente(companyId: string, dataISO: string) {
+    const data = new Date(dataISO);
+    if (isNaN(data.getTime())) return { erro: 'data inválida' };
+    await this.prisma.company.update({ where: { id: companyId }, data: { clienteDesde: data } }).catch(() => undefined);
+    // competência de início (YYYY-MM); tudo ANTES vira isenta
+    const compInicio = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+    const itens = await this.prisma.fiscalCalendarItem.findMany({
+      where: { companyId, status: { in: ['pendente', 'vencida'] } },
+      select: { id: true, competencia: true },
+    });
+    let isentadas = 0;
+    for (const it of itens) {
+      const comp = /^\d{4}-\d{2}$/.test(it.competencia) ? it.competencia : (it.competencia.match(/^(\d{4})/) ? `${it.competencia.slice(0, 4)}-01` : null);
+      if (comp && comp < compInicio) { await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'isenta' } }).catch(() => undefined); isentadas++; }
+    }
+    return { companyId, clienteDesde: data.toISOString().slice(0, 10), competenciaInicio: compInicio, obrigacoesIsentadas: isentadas };
+  }
+
   /** Lista simples de clientes ativos (código + nome + regime) p/ o seletor do explorador. */
   async listaClientesSimples() {
     const cs = await this.prisma.company.findMany({
@@ -1500,7 +1522,7 @@ export class PaineisService {
     const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
     const companies = await this.prisma.company.findMany({
       where: { active: true },
-      select: { id: true, name: true, clienteCodigo: true, taxRegime: true, responsavel: true },
+      select: { id: true, name: true, clienteCodigo: true, taxRegime: true, responsavel: true, clienteDesde: true },
     });
     const ids = companies.map((c) => c.id);
     const itens = await this.prisma.fiscalCalendarItem.findMany({
@@ -1544,6 +1566,7 @@ export class PaineisService {
       for (let m = mesAtual - 1; m < 12; m++) { const pv = cells[m].proxVenc; if (pv && pv >= now) { const d = Math.ceil((pv.getTime() - now.getTime()) / 86400000); if (proxDias === null || d < proxDias) { proxDias = d; } } }
       return {
         companyId: c.id, nome: c.name, codigo: c.clienteCodigo, regime: c.taxRegime, responsavel: c.responsavel,
+        clienteDesde: c.clienteDesde ? c.clienteDesde.toISOString().slice(0, 10) : null,
         meses, pendencia,
       };
     }).sort((a, b) => b.pendencia - a.pendencia || String(a.nome).localeCompare(String(b.nome)));

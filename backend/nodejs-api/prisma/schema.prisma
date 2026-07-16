@@ -18,6 +18,7 @@ model Company {
   phone           String?
   email           String?
   active          Boolean  @default(true)
+  clienteDesde    DateTime? // data de início do cliente no escritório (meses anteriores = isentos)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

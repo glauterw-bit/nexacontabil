@@ -72,6 +72,11 @@ export class PaineisController {
     return this.service.listaClientesSimples();
   }
 
+  @Post('cliente-inicio')
+  clienteInicio(@Body() body: { companyId: string; data: string }) {
+    return this.service.definirInicioCliente(body.companyId, body.data);
+  }
+
   @Get('farois')
   farois() {
     return this.service.farois();

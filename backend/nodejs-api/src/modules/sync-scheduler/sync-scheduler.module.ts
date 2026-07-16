@@ -204,6 +204,13 @@ class SyncSchedulerController {
     return this.service.explorar(codigo);
   }
 
+  /** Checa empresas demo/ficticias (nome/CNPJ suspeito). */
+  @Public()
+  @Get('checar-demo')
+  checarDemo() {
+    return this.service.checarDemo();
+  }
+
   /** Verificacao "tudo foi lido" via arvore completa — background. */
   @Public()
   @Get('reconciliar-arvore')

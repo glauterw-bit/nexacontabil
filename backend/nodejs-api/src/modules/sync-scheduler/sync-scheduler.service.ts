@@ -241,6 +241,32 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.explorarCliente(codigo);
   }
 
+  /** Detecta empresas DEMO/ficticias (nome ou CNPJ suspeito). Reporta; nao remove. */
+  async checarDemo() {
+    const susp = await this.prisma.company.findMany({
+      where: { OR: [
+        { name: { contains: 'DEMO', mode: 'insensitive' } },
+        { name: { contains: 'TESTE', mode: 'insensitive' } },
+        { name: { contains: 'EXEMPLO', mode: 'insensitive' } },
+        { name: { contains: 'FICTIC', mode: 'insensitive' } },
+        { name: { contains: 'MODELO', mode: 'insensitive' } },
+        { name: { contains: 'SAMPLE', mode: 'insensitive' } },
+        { name: { contains: 'MOCK', mode: 'insensitive' } },
+      ] },
+      select: { id: true, name: true, cnpj: true, active: true, clienteCodigo: true },
+    });
+    // CNPJs claramente falsos (todos iguais, sequenciais, ou 000...)
+    const todos = await this.prisma.company.findMany({ select: { id: true, name: true, cnpj: true, active: true } });
+    const cnpjFalso = todos.filter((c) => { const n = (c.cnpj || '').replace(/\D/g, ''); return n && (/^(\d)\1+$/.test(n) || n === '00000000000000' || n.startsWith('11111111') || n.length !== 14); });
+    return {
+      totalEmpresas: todos.length,
+      ativas: todos.filter((c) => c.active).length,
+      suspeitasPorNome: susp.map((c) => ({ nome: c.name, cnpj: c.cnpj, ativa: c.active, codigo: c.clienteCodigo })),
+      suspeitasPorCnpj: cnpjFalso.slice(0, 40).map((c) => ({ nome: c.name, cnpj: c.cnpj, ativa: c.active })),
+      resumo: susp.length === 0 && cnpjFalso.length === 0 ? 'Nenhuma empresa demo/ficticia encontrada.' : `${susp.length} suspeita(s) por nome, ${cnpjFalso.length} por CNPJ.`,
+    };
+  }
+
   /** Diagnóstico do gap de DAS — lista a pasta real de clientes com DAS vencido. */
   async diagnosticarDasFaltante(ano?: number) {
     return this.analise.diagnosticarDasFaltante(ano);
