@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../../common/public.decorator';
 import { PaineisService } from './paineis.service';
 
 // Analista só enxerga a própria carteira: ignora o param e usa o nome do login.
@@ -75,6 +76,13 @@ export class PaineisController {
   @Post('cliente-inicio')
   clienteInicio(@Body() body: { companyId: string; data: string }) {
     return this.service.definirInicioCliente(body.companyId, body.data);
+  }
+
+  /** Infere o início de TODOS os clientes (abertura + 1ª entrega) e isenta meses anteriores. */
+  @Public()
+  @Get('inicio-automatico')
+  inicioAutomatico(@Query('dry') dry?: string) {
+    return this.service.definirInicioAutomatico({ dryRun: dry === '1' || dry === 'true' });
   }
 
   @Get('farois')

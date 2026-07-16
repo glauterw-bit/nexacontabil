@@ -118,6 +118,59 @@ export class PaineisService {
     return { companyId, clienteDesde: data.toISOString().slice(0, 10), competenciaInicio: compInicio, obrigacoesIsentadas: isentadas };
   }
 
+  /**
+   * Infere AUTOMATICAMENTE o início de cada cliente e isenta as obrigações de competências
+   * anteriores. Corrige o denominador (ex.: 2025 mostrava ~1% pq geravam-se 'vencidas' de meses
+   * em que a empresa NÃO EXISTIA ou o cliente ainda NÃO era do escritório — VENEZA PARFUMS abriu
+   * em 2026, INOVA entrou out/2025). NÃO é falha de leitura: o que existe já é lido; aqui só
+   * removemos cobrança de meses impossíveis. Sinais:
+   *   (a) data de ABERTURA da empresa (RadarEcac) — não há obrigação antes de a empresa existir;
+   *   (b) 1ª competência com ENTREGA comprovada — prova de quando passou a ser cliente.
+   * compInicio = o MAIOR entre (a) e (b). Idempotente e reversível. dryRun só conta, não grava.
+   */
+  async definirInicioAutomatico(opts?: { dryRun?: boolean }) {
+    const dry = !!opts?.dryRun;
+    const parseMonth = (s?: string | null): string | null => {
+      if (!s) return null;
+      let m = s.match(/(\d{4})-(\d{2})-\d{2}/); if (m) return `${m[1]}-${m[2]}`;
+      m = s.match(/(\d{2})\/(\d{2})\/(\d{4})/); if (m) return `${m[3]}-${m[2]}`;
+      m = s.match(/(\d{2})-(\d{2})-(\d{4})/); if (m) return `${m[3]}-${m[2]}`;
+      m = s.match(/^(\d{4})-(\d{2})$/); if (m) return `${m[1]}-${m[2]}`;
+      return null;
+    };
+    const companies = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true, cnpj: true, clienteCodigo: true } });
+    let ajustados = 0, isentadasTotal = 0, semSinal = 0; const amostra: any[] = [];
+    for (const c of companies) {
+      // (b) 1ª competência já comprovada (qualquer tipo) — prova de que era cliente
+      const ent = await this.prisma.fiscalCalendarItem.findFirst({
+        where: { companyId: c.id, status: { in: ['entregue', 'paga'] }, competencia: { not: '' } },
+        select: { competencia: true }, orderBy: { competencia: 'asc' },
+      });
+      const compEnt = ent?.competencia && /^\d{4}-\d{2}$/.test(ent.competencia) ? ent.competencia : null;
+      // (a) data de abertura (RadarEcac por CNPJ)
+      const radar = c.cnpj ? await this.prisma.radarEcacConsulta.findFirst({ where: { cnpj: c.cnpj }, orderBy: { ultimaConsulta: 'desc' }, select: { dataAbertura: true } }) : null;
+      const compAbertura = parseMonth(radar?.dataAbertura);
+      const cands = [compEnt, compAbertura].filter(Boolean) as string[];
+      if (!cands.length) { semSinal++; continue; }
+      const compInicio = cands.sort().pop()!; // o MAIOR (empresa+cliente ambos precisam valer)
+      const itens = await this.prisma.fiscalCalendarItem.findMany({
+        where: { companyId: c.id, status: { in: ['pendente', 'vencida'] } },
+        select: { id: true, competencia: true },
+      });
+      let isentadas = 0;
+      for (const it of itens) {
+        const comp = /^\d{4}-\d{2}$/.test(it.competencia) ? it.competencia : (it.competencia.match(/^(\d{4})/) ? `${it.competencia.slice(0, 4)}-01` : null);
+        if (comp && comp < compInicio) { if (!dry) await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'isenta' } }).catch(() => undefined); isentadas++; }
+      }
+      if (isentadas > 0) {
+        if (!dry) { const [y, m] = compInicio.split('-').map(Number); await this.prisma.company.update({ where: { id: c.id }, data: { clienteDesde: new Date(Date.UTC(y, m - 1, 1)) } }).catch(() => undefined); }
+        ajustados++; isentadasTotal += isentadas;
+        if (amostra.length < 50) amostra.push({ codigo: c.clienteCodigo, cliente: c.name, inicio: compInicio, isentadas, sinal: compAbertura === compInicio ? 'abertura' : 'primeira-entrega' });
+      }
+    }
+    return { dryRun: dry, clientesAjustados: ajustados, obrigacoesIsentadas: isentadasTotal, semSinal, amostra };
+  }
+
   /** Lista simples de clientes ativos (código + nome + regime) p/ o seletor do explorador. */
   async listaClientesSimples() {
     const cs = await this.prisma.company.findMany({
