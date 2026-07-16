@@ -1588,6 +1588,7 @@ export class PaineisService {
     for (const c of companies) mapa.set(c.id, Array.from({ length: 12 }, () => ({ tot: 0, ent: 0, overdueFalta: 0, proxVenc: null })));
     for (const it of itens) {
       if (PORTAL.has(it.tipo)) continue;
+      if (it.status === 'isenta') continue; // cliente não existia/não era do escritório → fora do semáforo e da taxa
       const mm = parseInt(it.competencia.split('-')[1] ?? '0', 10);
       if (!mm) continue;
       const cell = mapa.get(it.companyId)?.[mm - 1]; if (!cell) continue;
@@ -1662,7 +1663,7 @@ export class PaineisService {
       const mm = parseInt(it.competencia.split('-')[1] ?? '0', 10); if (!mm) continue;
       const entregue = ENTREGUE.has(it.status);
       const venc = new Date(it.dataVencimento);
-      const st = PORTAL.has(it.tipo) ? 'portal' : (entregue ? 'ok' : (venc < now ? 'late' : 'pendente'));
+      const st = it.status === 'isenta' ? 'isenta' : (PORTAL.has(it.tipo) ? 'portal' : (entregue ? 'ok' : (venc < now ? 'late' : 'pendente')));
       (meses[mm] ??= []).push({ tipo: it.tipo, descricao: it.descricao, status: st, vencimento: it.dataVencimento, abrir: it.comprovanteUrl || recibos[`${it.tipo}|${it.competencia}`] || null });
     }
     return { empresa: c, ano, meses };

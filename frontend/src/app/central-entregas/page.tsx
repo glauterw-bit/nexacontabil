@@ -181,10 +181,10 @@ export default function CentralEntregas() {
                 Array.from({ length: 12 }, (_, k) => 12 - k).map((mm) => {
                   const obrs = (det.meses?.[mm] ?? []) as any[];
                   if (!obrs.length) return null;
-                  const naoPortal = obrs.filter((o) => o.status !== 'portal');
+                  const naoPortal = obrs.filter((o) => o.status !== 'portal' && o.status !== 'isenta');
                   const ent = naoPortal.filter((o) => o.status === 'ok').length;
                   const tot = naoPortal.length;
-                  const bcls = tot && ent === tot ? 'ok' : obrs.some((o) => o.status === 'late') ? 'late' : 'warn';
+                  const bcls = !tot ? 'na' : ent === tot ? 'ok' : obrs.some((o) => o.status === 'late') ? 'late' : 'warn';
                   const open = mm === mAtual;
                   return (
                     <details key={mm} open={open} className="ce-mo">
@@ -199,9 +199,9 @@ export default function CentralEntregas() {
                             </li>
                           ) : (
                             <li key={idx}>
-                              <span className={`oi ${o.status === 'ok' ? 'ok' : o.status === 'portal' ? 'portal' : 'late'}`}>{o.status === 'ok' ? '✓' : o.status === 'portal' ? '•' : '!'}</span>
-                              <span className="on">{o.tipo}{o.status === 'portal' ? <span className="od"> · controle no portal/banco</span> : null}</span>
-                              {o.status === 'ok' ? <span className="od">entregue (sem link)</span> : o.status === 'portal' ? null : <span className="od" style={{ color: 'var(--ce-late)' }}>{new Date(o.vencimento) < new Date() ? 'vencida' : 'a vencer'}</span>}
+                              <span className={`oi ${o.status === 'ok' ? 'ok' : o.status === 'portal' ? 'portal' : o.status === 'isenta' ? 'portal' : 'late'}`}>{o.status === 'ok' ? '✓' : o.status === 'portal' ? '•' : o.status === 'isenta' ? '–' : '!'}</span>
+                              <span className="on">{o.tipo}{o.status === 'portal' ? <span className="od"> · controle no portal/banco</span> : o.status === 'isenta' ? <span className="od"> · antes do início do cliente</span> : null}</span>
+                              {o.status === 'ok' ? <span className="od">entregue (sem link)</span> : o.status === 'portal' || o.status === 'isenta' ? null : <span className="od" style={{ color: 'var(--ce-late)' }}>{new Date(o.vencimento) < new Date() ? 'vencida' : 'a vencer'}</span>}
                             </li>
                           )
                         ))}
