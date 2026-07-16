@@ -723,17 +723,27 @@ export class AnaliseClienteService {
     for (const c of amostra) {
       const reCod = c.codigo ? new RegExp(`(^|/)\\s*${c.codigo}\\s*[-–]`) : null;
       const nomeN = norm(c.name);
-      const chaveNome = nomeN.split(' ').filter((w) => w.length >= 4).slice(0, 2).join(' '); // 2 primeiras palavras "fortes"
+      // NOME "limpo" do cliente (sem sufixos societários) p/ casamento ESTRITO por nome
+      const nomeLimpo = norm(c.name).replace(/\b(ltda|epp|me|eireli|sa|s a|ss|comercio|servicos|de|do|da|dos|das|e)\b/g, ' ').replace(/\s+/g, ' ').trim();
       const pertence = (path: string): boolean => {
-        if (reCod && reCod.test(path)) return true;
-        const pn = norm(path);
-        return chaveNome.length >= 6 && pn.includes(chaveNome);
+        if (reCod && reCod.test(path)) return true;        // "110 - ..." → confiável
+        return nomeLimpo.length >= 10 && norm(path).includes(nomeLimpo); // nome completo (evita colisão "auto pecas")
+      };
+      // competência a partir do TEXTO do recibo (Período de Apuração MM/AAAA) — p/ recibos sem data no nome
+      const extractCompText = (t: string): string | null => {
+        const s = norm(t);
+        let m = s.match(/apura[a-z]{0,3}[a-z ]{0,8}(\d{2})\s*(\d{4})/) || s.match(/\bpa\b[a-z ]{0,4}(\d{2})\s*(\d{4})/);
+        if (m && m[2] === String(ano) && +m[1] >= 1 && +m[1] <= 12) return `${ano}-${m[1]}`;
+        for (let mo = 1; mo <= 12; mo++) if (s.includes(MESES[mo - 1]) && s.includes(String(ano))) return `${ano}-${String(mo).padStart(2, '0')}`;
+        m = s.match(new RegExp(`(\\d{2})\\s*${ano}`)); if (m && +m[1] >= 1 && +m[1] <= 12) return `${ano}-${m[1]}`;
+        return null;
       };
       const achadas = new Set<string>();
+      const viaConteudo = new Set<string>();
       const arquivos: string[] = [];
       const vistos = new Set<string>();
-      const queries = [c.codigo, '"Documento de Arrecadacao do Simples Nacional"', 'PGDASD', `${c.codigo} recibo`, chaveNome].filter(Boolean);
-      let zips = 0;
+      const queries = [c.codigo, '"Documento de Arrecadacao do Simples Nacional"', 'PGDASD', `${c.codigo} simples`].filter(Boolean);
+      let zips = 0, lidos = 0;
       for (const q of queries) {
         let itens: Array<{ id?: string; name: string; path: string; webUrl?: string; driveId?: string }> = [];
         try { itens = (await this.onedrive.coletaTenant(conn.id, `${q} LastModifiedTime>=${ano}-01-01 AND LastModifiedTime<${ano + 1}-01-01`, { maxItens: 400 })).itens; } catch { continue; }
@@ -742,22 +752,28 @@ export class AnaliseClienteService {
           const k = `${f.path}/${f.name}`; if (vistos.has(k)) continue; vistos.add(k);
           if (/\.zip$/i.test(f.name || '') && f.driveId && f.id && zips < 40) {
             zips++;
-            try { const nomes = await this.onedrive.lerNomesZip(conn.id, f.driveId, f.id); for (const nm of nomes) { if (isDasName(norm(nm))) { const c2 = extractComp(norm(nm)); if (c2) { achadas.add(c2); if (arquivos.length < 10) arquivos.push(`${c2}: [zip] ${nm.split('/').pop()}`); } } } } catch { /* */ }
+            try { const nomes = await this.onedrive.lerNomesZip(conn.id, f.driveId, f.id); for (const nm of nomes) { if (isDasName(norm(nm))) { const c2 = extractComp(norm(nm)); if (c2) { achadas.add(c2); if (arquivos.length < 12) arquivos.push(`${c2}: [zip] ${nm.split('/').pop()}`); } } } } catch { /* */ }
             continue;
           }
           if (/\.(xml|zip)$/i.test(f.name || '')) continue;
           if (!isDasName(norm(f.name))) continue;
           const comp = extractComp(norm(`${f.name} ${f.path}`));
-          if (comp) { achadas.add(comp); if (arquivos.length < 10) arquivos.push(`${comp}: ${f.name}`); }
+          if (comp) { achadas.add(comp); if (arquivos.length < 12) arquivos.push(`${comp}: ${f.name}`); continue; }
+          // SEM competência no nome/pasta → LÊ o PDF e extrai o Período de Apuração
+          if (f.driveId && f.id && lidos < 30) {
+            lidos++;
+            try { const { texto } = await this.onedrive.lerTextoPdf(conn.id, f.driveId, f.id); const c2 = extractCompText(texto); if (c2) { achadas.add(c2); viaConteudo.add(c2); if (arquivos.length < 12) arquivos.push(`${c2}: [conteúdo] ${f.name}`); } } catch { /* */ }
+          }
         }
       }
       const faltam = c.vencidas.filter((v) => !achadas.has(v));
-      out.push({ codigo: c.codigo, cliente: c.name, totalVencidas: c.vencidas.length, vencidas: c.vencidas, achadasNoDrive: [...achadas].sort(), recibExisteMasNaoCasou: c.vencidas.filter((v) => achadas.has(v)), faltamDeVerdade: faltam, amostraArquivos: arquivos });
+      out.push({ codigo: c.codigo, cliente: c.name, totalVencidas: c.vencidas.length, vencidas: c.vencidas, achadasNoDrive: [...achadas].sort(), recibExisteMasNaoCasou: c.vencidas.filter((v) => achadas.has(v)), recuperadoViaConteudo: [...viaConteudo].sort(), faltamDeVerdade: faltam, amostraArquivos: arquivos });
     }
     const somaVenc = out.reduce((s, o) => s + o.totalVencidas, 0);
     const somaAchou = out.reduce((s, o) => s + o.recibExisteMasNaoCasou.length, 0);
+    const somaConteudo = out.reduce((s, o) => s + o.recuperadoViaConteudo.length, 0);
     const somaFalta = out.reduce((s, o) => s + o.faltamDeVerdade.length, 0);
-    return { ano, clientesAuditados: out.length, resumo: { vencidasTotal: somaVenc, recibExisteMasNaoCasou: somaAchou, faltamDeVerdade: somaFalta }, resultado: out };
+    return { ano, clientesAuditados: out.length, resumo: { vencidasTotal: somaVenc, recibExisteMasNaoCasou: somaAchou, viaConteudoPdf: somaConteudo, faltamDeVerdade: somaFalta }, resultado: out };
   }
 
   /**
