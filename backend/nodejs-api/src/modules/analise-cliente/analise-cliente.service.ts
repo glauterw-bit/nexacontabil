@@ -798,6 +798,49 @@ export class AnaliseClienteService {
   }
 
   /**
+   * SONDA onde os documentos de um cliente REALMENTE vivem — busca por CNPJ (aparece no nome do
+   * recibo PGDASD-RECIBO-{CNPJ}{AAAAMM}), por nome e por código, IGNORANDO estrutura de pasta.
+   * Mostra as PASTAS-RAIZ distintas onde aparecem docs do cliente (revela "Documentos - Fiscais",
+   * "Documentos - Contábeis", pasta com nome diferente do código, etc.) e amostra de DAS achados.
+   */
+  async sondarClientePastas(codigo: string) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'sem conexão OneDrive' };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const comp = await this.prisma.company.findFirst({ where: { OR: [{ clienteCodigo: String(codigo) }, { clienteCodigo: String(parseInt(codigo, 10)) }] }, select: { name: true, cnpj: true, clienteCodigo: true } });
+    if (!comp) return { erro: `cliente ${codigo} não encontrado no banco` };
+    const cnpjDigits = (comp.cnpj || '').replace(/\D/g, '');
+    const cnpjRaiz = cnpjDigits.slice(0, 8); // 8 primeiros dígitos = raiz do CNPJ (aparece no nome do PGDASD)
+    const nomeN = norm(comp.name);
+    const chave = nomeN.split(' ').filter((w) => w.length >= 4).slice(0, 2).join(' ');
+    const queries = [cnpjRaiz, `PGDASD ${cnpjRaiz}`, chave, `${codigo}`].filter((q) => q && q.length >= 3);
+    const raizes = new Map<string, number>(); // pasta-raiz (1º segmento) -> contagem
+    const nivel2 = new Map<string, number>();
+    const dasAchados: string[] = [];
+    const vistos = new Set<string>();
+    let total = 0;
+    for (const q of queries) {
+      let itens: Array<{ name: string; path: string; webUrl?: string }> = [];
+      try { itens = (await this.onedrive.coletaTenant(conn.id, q, { maxItens: 500 })).itens; } catch { continue; }
+      for (const f of itens) {
+        // só considera itens que mencionam o cliente (nome OU cnpj) no caminho/nome — evita ruído
+        const hay = norm(`${f.path} ${f.name}`);
+        const nomeArqDig = (f.name || '').replace(/\D/g, '');
+        const bate = (chave.length >= 6 && hay.includes(chave)) || (cnpjRaiz.length === 8 && (hay.includes(cnpjRaiz) || nomeArqDig.includes(cnpjRaiz)));
+        if (!bate) continue;
+        const k = `${f.path}/${f.name}`; if (vistos.has(k)) continue; vistos.add(k);
+        total++;
+        const segs = (f.path || '').split('/').filter(Boolean);
+        if (segs[0]) raizes.set(segs[0], (raizes.get(segs[0]) || 0) + 1);
+        if (segs[1]) nivel2.set(`${segs[0]} / ${segs[1]}`, (nivel2.get(`${segs[0]} / ${segs[1]}`) || 0) + 1);
+        if (/pgdasd|(^| )das( |$)|simples nacional/.test(norm(f.name)) && dasAchados.length < 25) dasAchados.push(`${f.path}/${f.name}`);
+      }
+    }
+    const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, n]) => `${n}× ${k}`);
+    return { codigo: comp.clienteCodigo, cliente: comp.name, cnpj: comp.cnpj, cnpjRaiz, totalItensDoCliente: total, pastasRaiz: top(raizes), pastasNivel2: top(nivel2), amostraDAS: dasAchados };
+  }
+
+  /**
    * EXPLORADOR de pastas do cliente — acha as pastas de um ano (via busca) e LISTA o conteúdo
    * real de cada uma (arquivos + link p/ abrir no OneDrive). Deixa o gestor conferir manualmente
    * quais documentos estão (ou não) em cada competência.

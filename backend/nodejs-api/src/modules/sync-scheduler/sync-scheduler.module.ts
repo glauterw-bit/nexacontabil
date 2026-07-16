@@ -204,6 +204,13 @@ class SyncSchedulerController {
     return this.service.auditarDasClientes(ano ? parseInt(ano, 10) : undefined, limit ? parseInt(limit, 10) : undefined);
   }
 
+  /** SONDA onde os docs de um cliente vivem (por CNPJ/nome, ignorando estrutura de pasta). */
+  @Public()
+  @Get('sondar-cliente')
+  sondarCliente(@Query('codigo') codigo: string) {
+    return this.service.sondarClientePastas(codigo);
+  }
+
   /** Teste publico do explorador (arvore real de pastas do cliente). */
   @Public()
   @Get('explorar')
