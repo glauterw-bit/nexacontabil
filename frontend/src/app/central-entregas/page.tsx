@@ -12,7 +12,7 @@ const ICON: Record<string, string> = { ok: '✓', warn: '◐', late: '!', na: ''
 
 type Mes = { mes: number; status: 'ok' | 'warn' | 'late' | 'na'; ent: number; tot: number };
 type Cli = { companyId: string; nome: string; codigo?: string; regime?: string; responsavel?: string; clienteDesde?: string | null; meses: Mes[]; pendencia: number };
-type Dados = { ano: number; mesAtual: number; resumo: { totalClientes: number; emDia: number; parciais: number; atrasados: number; pct: number; proximoPrazoDias: number | null }; responsaveis: string[]; clientes: Cli[] };
+type Dados = { ano: number; mesAtual: number; resumo: { totalClientes: number; emDia: number; parciais: number; atrasados: number; pct: number; obEntregues?: number; obDevidas?: number; proximoPrazoDias: number | null }; responsaveis: string[]; clientes: Cli[] };
 
 function Spark({ meses }: { meses: Mes[] }) {
   const pts = meses.filter((x) => x.status !== 'na').map((x) => (x.status === 'ok' ? 1 : x.status === 'warn' ? 0.5 : 0));
@@ -88,11 +88,11 @@ export default function CentralEntregas() {
           <div className="ce-ringwrap">
             <div className="ce-ring" style={{ ['--p' as any]: r?.pct ?? 0 }}><b className="tnum">{r?.pct ?? 0}%</b></div>
             <div className="ce-ringlbl">
-              <h2>{ano}</h2>
-              <p><b className="tnum">{r?.emDia ?? 0}</b> de <b className="tnum">{r?.totalClientes ?? 0}</b> clientes sem nenhum atraso</p>
+              <h2>{ano} · entregas</h2>
+              <p><b className="tnum">{(r?.obEntregues ?? 0).toLocaleString('pt-BR')}</b> de <b className="tnum">{(r?.obDevidas ?? 0).toLocaleString('pt-BR')}</b> obrigações vencidas entregues</p>
               {r && r.atrasados === 0
                 ? <span className="ce-chip ok">✓ Nenhum cliente atrasado</span>
-                : <span className="ce-chip">{r?.atrasados ?? 0} cliente(s) com mês vencido em aberto</span>}
+                : <span className="ce-chip">{r?.emDia ?? 0} em dia · {r?.atrasados ?? 0} com atraso</span>}
             </div>
           </div>
           <div className="ce-stats">

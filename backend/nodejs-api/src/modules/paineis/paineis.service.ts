@@ -1554,6 +1554,7 @@ export class PaineisService {
       return 'warn';                                         // parcial com algo vencido → âmbar
     };
     let emDia = 0, parciais = 0, atrasados = 0, proxDias: number | null = null, proxTipo = '';
+    let obEntregues = 0, obDevidas = 0; // p/ a TAXA DE ENTREGA (obrigações entregues / vencidas)
     const clientes = companies.map((c) => {
       const cells = mapa.get(c.id)!;
       const meses = cells.map((cell, m) => ({ mes: m + 1, status: statusCell(cell), ent: cell.ent, tot: cell.tot }));
@@ -1561,6 +1562,8 @@ export class PaineisService {
       const temLate = meses.some((x) => x.status === 'late');
       const temWarn = meses.some((x) => x.status === 'warn');
       if (temLate) atrasados++; else if (temWarn) parciais++; else emDia++;
+      // taxa de entrega: entregues + vencidas (as que já deviam estar entregues)
+      for (const cell of cells) { obEntregues += cell.ent; obDevidas += cell.ent + cell.overdueFalta; }
       const pendencia = meses.filter((x) => x.status === 'late').length * 2 + meses.filter((x) => x.status === 'warn').length;
       // próximo prazo (menor dias) entre obrigações não entregues do mês atual em diante
       for (let m = mesAtual - 1; m < 12; m++) { const pv = cells[m].proxVenc; if (pv && pv >= now) { const d = Math.ceil((pv.getTime() - now.getTime()) / 86400000); if (proxDias === null || d < proxDias) { proxDias = d; } } }
@@ -1575,7 +1578,10 @@ export class PaineisService {
       ano, mesAtual,
       resumo: {
         totalClientes, emDia, parciais, atrasados,
-        pct: totalClientes ? Math.round((emDia / totalClientes) * 100) : 0,
+        // pct = TAXA DE ENTREGA das obrigações que já venceram (entregues ÷ devidas) — bem mais
+        // representativo que "clientes 100% perfeitos" (que dava ~1% em anos passados).
+        pct: obDevidas ? Math.round((obEntregues / obDevidas) * 100) : 0,
+        obEntregues, obDevidas,
         proximoPrazoDias: proxDias, proximoPrazoTipo: proxTipo,
       },
       responsaveis: [...new Set(companies.map((c) => c.responsavel).filter(Boolean))],
