@@ -869,9 +869,17 @@ export class AnaliseClienteService {
     // 1. DESCOBRE o driveId + o caminho da PASTA-RAIZ do cliente (via busca por código)
     const reCodSeg = new RegExp(`^\\s*${codigo}\\s*[-–]`);
     const reCod = new RegExp(`(^|/)\\s*${codigo}\\s*[-–]`);
-    let arquivos: any[] = [];
-    try { arquivos = (await this.onedrive.coletaTenant(conn.id, `${codigo}`, { maxItens: 400 })).itens; } catch { /* */ }
-    const ref = arquivos.find((f) => reCod.test(f.path || '') && f.driveId);
+    // busca por CÓDIGO e, como fallback, por NOME do cliente (a pasta pode não vir nos 1ºs 400 do código)
+    const normNome = (company?.name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const chaveNome = normNome.split(' ').filter((w) => w.length >= 4).slice(0, 2).join(' ');
+    const queries = [`${codigo}`, `${codigo} -`, chaveNome].filter((q) => q && q.trim().length >= 2);
+    let ref: any = null;
+    for (const q of queries) {
+      let arquivos: any[] = [];
+      try { arquivos = (await this.onedrive.coletaTenant(conn.id, q, { maxItens: 500 })).itens; } catch { continue; }
+      ref = arquivos.find((f) => reCod.test(f.path || '') && f.driveId);
+      if (ref) break;
+    }
     if (!ref) return { codigo, cliente: company?.name ?? null, regime: company?.taxRegime ?? null, ano, erro: 'nao_localizado', total: 0, itens: [], msg: 'Não localizei a pasta deste cliente no OneDrive conectado (nenhum arquivo com o código foi encontrado).' };
     const driveId = ref.driveId as string;
     // caminho da raiz = segmentos até (inclusive) o que começa com o código
