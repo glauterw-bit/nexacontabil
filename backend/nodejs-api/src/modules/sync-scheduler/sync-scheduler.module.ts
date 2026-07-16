@@ -211,6 +211,13 @@ class SyncSchedulerController {
     return this.service.checarDemo();
   }
 
+  /** Remove de vez as empresas demo/ficticias. */
+  @Public()
+  @Get('remover-demo')
+  removerDemo() {
+    return this.service.removerDemo();
+  }
+
   /** Verificacao "tudo foi lido" via arvore completa — background. */
   @Public()
   @Get('reconciliar-arvore')

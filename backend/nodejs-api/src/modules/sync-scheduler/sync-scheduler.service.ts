@@ -241,6 +241,31 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.explorarCliente(codigo);
   }
 
+  /** REMOVE de vez as empresas demo/ficticias (e seus registros dependentes). */
+  async removerDemo() {
+    const demos = await this.prisma.company.findMany({
+      where: { OR: [
+        { name: { contains: 'DEMO', mode: 'insensitive' } },
+        { name: { contains: 'TESTE', mode: 'insensitive' } },
+        { name: { contains: 'EXEMPLO', mode: 'insensitive' } },
+        { name: { contains: 'FICTIC', mode: 'insensitive' } },
+        { name: { contains: 'MODELO', mode: 'insensitive' } },
+        { name: { contains: 'SAMPLE', mode: 'insensitive' } },
+        { name: { contains: 'MOCK', mode: 'insensitive' } },
+      ] },
+      select: { id: true, name: true },
+    });
+    let removidas = 0;
+    for (const c of demos) {
+      await this.prisma.fiscalCalendarItem.deleteMany({ where: { companyId: c.id } }).catch(() => undefined);
+      await this.prisma.document.deleteMany({ where: { companyId: c.id } }).catch(() => undefined);
+      await this.prisma.fluxoEstado.deleteMany({ where: { companyId: c.id } }).catch(() => undefined);
+      const ok = await this.prisma.company.delete({ where: { id: c.id } }).then(() => true).catch(() => false);
+      if (ok) removidas++;
+    }
+    return { encontradas: demos.map((c) => c.name), removidas };
+  }
+
   /** Detecta empresas DEMO/ficticias (nome ou CNPJ suspeito). Reporta; nao remove. */
   async checarDemo() {
     const susp = await this.prisma.company.findMany({
