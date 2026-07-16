@@ -8,6 +8,13 @@ import { regraMonofasico } from '../organizacao/classificacao.util';
 
 @Injectable()
 export class AnaliseClienteService {
+  /** true se a competência (YYYY-MM) ainda NÃO ocorreu (mês futuro) — não pode estar entregue. */
+  private _compFutura(comp: string): boolean {
+    if (!/^\d{4}-\d{2}$/.test(comp)) return false; // anuais/trimestrais: não bloqueia
+    const now = new Date();
+    const atual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return comp > atual;
+  }
   /** Limpa os marcadores 'xml_sem_valor' uma vez por processo (após deploy) p/ retentar. */
   private static _semValorReset = false;
 
@@ -503,7 +510,7 @@ export class AnaliseClienteService {
     });
     for (const it of itens) {
       const set = entregas.get(it.companyId);
-      if (set && set.has(`${it.tipo}|${it.competencia}`)) {
+      if (set && set.has(`${it.tipo}|${it.competencia}`) && !this._compFutura(it.competencia)) {
         await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined);
         entregue++;
       }
@@ -593,7 +600,7 @@ export class AnaliseClienteService {
     let entregue = 0;
     for (const it of itens) {
       const set = entregas.get(it.companyId);
-      if (set && set.has(`${it.tipo}|${it.competencia}`)) {
+      if (set && set.has(`${it.tipo}|${it.competencia}`) && !this._compFutura(it.competencia)) {
         await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined);
         entregue++;
       }
@@ -763,7 +770,7 @@ export class AnaliseClienteService {
     let entregue = 0;
     for (const it of obr) {
       const set = entregas.get(it.companyId);
-      if (set && set.has(`${it.tipo}|${it.competencia}`)) {
+      if (set && set.has(`${it.tipo}|${it.competencia}`) && !this._compFutura(it.competencia)) {
         await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined);
         entregue++;
       }
@@ -904,7 +911,7 @@ export class AnaliseClienteService {
     let entregue = 0;
     for (const it of obr) {
       const set = entregas.get(it.companyId);
-      if (set && set.has(`${it.tipo}|${it.competencia}`)) { await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined); entregue++; }
+      if (set && set.has(`${it.tipo}|${it.competencia}`) && !this._compFutura(it.competencia)) { await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined); entregue++; }
     }
     return { anos, fluxo: 'Listador 2026 + LEITURA de conteúdo dos PDFs (baixa e parseia)', pastasDescobertas: pastas.size, pastasListadas, arquivos, pdfsLidos, escaneados, porConteudo, zipsLidos, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
   }
@@ -1000,7 +1007,7 @@ export class AnaliseClienteService {
       select: { id: true, companyId: true, tipo: true, competencia: true },
     });
     let entregue = 0;
-    for (const it of obr) { const set = entregas.get(it.companyId); if (set && set.has(`${it.tipo}|${it.competencia}`)) { await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined); entregue++; } }
+    for (const it of obr) { const set = entregas.get(it.companyId); if (set && set.has(`${it.tipo}|${it.competencia}`) && !this._compFutura(it.competencia)) { await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'entregue' } }).catch(() => undefined); entregue++; } }
     return { anos, fluxo: 'Verificação via ÁRVORE COMPLETA (paginação corrigida) + nome + conteúdo', clientesVarridos, semPasta, arquivos, pdfsLidos, porConteudo, parcial, clientesComEntrega: entregas.size, marcadasEntregue: entregue };
   }
 

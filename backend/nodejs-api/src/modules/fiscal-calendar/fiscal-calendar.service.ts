@@ -313,7 +313,17 @@ export class FiscalCalendarService {
       where: { tipo: { in: ['FGTS', 'ESOCIAL', 'DARF'] }, status: 'vencida' },
       data: { status: 'pendente' },
     });
-    return { updated: result.count, revertidosPortal: rev.count };
+    // CORRIGE marcações de FUTURO: obrigação cuja competência ainda NÃO ocorreu não pode estar
+    // 'entregue' (o comprovante não existe). Reverte competências mensais > mês atual → pendente.
+    const compAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const futEnt = await this.prisma.fiscalCalendarItem.findMany({
+      where: { status: 'entregue', competencia: { gt: compAtual } },
+      select: { id: true, competencia: true },
+    });
+    const idsFut = futEnt.filter((i) => /^\d{4}-\d{2}$/.test(i.competencia) && i.competencia > compAtual).map((i) => i.id);
+    let futuros = 0;
+    if (idsFut.length) { const r = await this.prisma.fiscalCalendarItem.updateMany({ where: { id: { in: idsFut } }, data: { status: 'pendente' } }); futuros = r.count; }
+    return { updated: result.count, revertidosPortal: rev.count, futurosRevertidos: futuros };
   }
 
   // ── RECONCILIAÇÃO POR EVIDÊNCIA ────────────────────────────────────────────
