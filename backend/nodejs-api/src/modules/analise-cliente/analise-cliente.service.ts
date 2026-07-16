@@ -8,12 +8,12 @@ import { regraMonofasico } from '../organizacao/classificacao.util';
 
 @Injectable()
 export class AnaliseClienteService {
-  /** true se a competência (YYYY-MM) ainda NÃO ocorreu (mês futuro) — não pode estar entregue. */
+  /** true se a competência (YYYY-MM) ainda NÃO fechou (mês atual ou futuro) — recibo não existe. */
   private _compFutura(comp: string): boolean {
     if (!/^\d{4}-\d{2}$/.test(comp)) return false; // anuais/trimestrais: não bloqueia
     const now = new Date();
     const atual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    return comp > atual;
+    return comp >= atual; // competência do mês corrente ainda não fechou → não pode estar entregue
   }
   /** Limpa os marcadores 'xml_sem_valor' uma vez por processo (após deploy) p/ retentar. */
   private static _semValorReset = false;

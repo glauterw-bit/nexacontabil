@@ -317,10 +317,11 @@ export class FiscalCalendarService {
     // 'entregue' (o comprovante não existe). Reverte competências mensais > mês atual → pendente.
     const compAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const futEnt = await this.prisma.fiscalCalendarItem.findMany({
-      where: { status: 'entregue', competencia: { gt: compAtual } },
+      where: { status: 'entregue', competencia: { gte: compAtual } },
       select: { id: true, competencia: true },
     });
-    const idsFut = futEnt.filter((i) => /^\d{4}-\d{2}$/.test(i.competencia) && i.competencia > compAtual).map((i) => i.id);
+    // competência do mês corrente ainda não fechou → recibo não existe → reverte
+    const idsFut = futEnt.filter((i) => /^\d{4}-\d{2}$/.test(i.competencia) && i.competencia >= compAtual).map((i) => i.id);
     let futuros = 0;
     if (idsFut.length) { const r = await this.prisma.fiscalCalendarItem.updateMany({ where: { id: { in: idsFut } }, data: { status: 'pendente' } }); futuros = r.count; }
     return { updated: result.count, revertidosPortal: rev.count, futurosRevertidos: futuros };
