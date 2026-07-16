@@ -465,6 +465,7 @@ export class AnaliseClienteService {
     let arquivosVistos = 0, semCliente = 0, semComp = 0, nomeNaoConfere = 0, zipsAbertos = 0;
     // diagnóstico ESPECÍFICO do loop de CONTEÚDO (onde vivem os recibos 2025 empacotados)
     let cVistos = 0, cSemCliente = 0, cSemComp = 0, cSemId = 0, cZipComComp = 0, cAdd = 0;
+    const cSemClienteAmostra: string[] = [];
     // Search API tem teto de ~3000 por query → particiona por MÊS via KQL LastModifiedTime
     // (janela mensal cabe sempre abaixo do teto, mesmo em tipos volumosos como DAS). Dedup por
     // caminho+nome. Competência sai sempre do PATH (arquivo modificado no mês seguinte ao da comp).
@@ -504,7 +505,7 @@ export class AnaliseClienteService {
             if (vistos.has(chave)) continue; vistos.add(chave);
             arquivosVistos++; cVistos++;
             const cid = resolveClient(f.path || '');
-            if (!cid) { semCliente++; cSemCliente++; continue; }
+            if (!cid) { semCliente++; cSemCliente++; if (cSemClienteAmostra.length < 40) cSemClienteAmostra.push(`${f.path}/${f.name}`); continue; }
             const comp = compDe(f.name || '', f.path || '');
             // ZIP sem competência no caminho (comum em 2025): ABRE e extrai a competência dos
             // arquivos internos (ex.: "SIMPLES NACIONAL/2025/102025/PGDASD.pdf" dentro do zip).
@@ -546,7 +547,7 @@ export class AnaliseClienteService {
         if (!jaEntregue) entregue++;
       }
     }
-    return { anos, arquivosVistos, nomeNaoConfere, semCliente, semComp, zipsAbertos, clientesComEntrega: entregas.size, obrigacoesAnalisadas: itens.length, marcadasEntregue: entregue, conteudo: { cVistos, cSemCliente, cSemComp, cSemId, cZipComComp, cAdd } };
+    return { anos, arquivosVistos, nomeNaoConfere, semCliente, semComp, zipsAbertos, clientesComEntrega: entregas.size, obrigacoesAnalisadas: itens.length, marcadasEntregue: entregue, conteudo: { cVistos, cSemCliente, cSemComp, cSemId, cZipComComp, cAdd }, cSemClienteAmostra };
   }
 
   /**
