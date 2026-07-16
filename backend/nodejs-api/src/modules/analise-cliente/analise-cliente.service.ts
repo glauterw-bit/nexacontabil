@@ -837,7 +837,24 @@ export class AnaliseClienteService {
       }
     }
     const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, n]) => `${n}× ${k}`);
-    return { codigo: comp.clienteCodigo, cliente: comp.name, cnpj: comp.cnpj, cnpjRaiz, totalItensDoCliente: total, pastasRaiz: top(raizes), pastasNivel2: top(nivel2), amostraDAS: dasAchados };
+    // COMPETÊNCIAS com recibo DAS no drive (extrai de cada caminho/nome achado)
+    const MESES2 = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const compAny = (s: string): string | null => {
+      const n = norm(s);
+      for (const y of [2024, 2025, 2026]) for (let m = 1; m <= 12; m++) { const mm = String(m).padStart(2, '0'); if (n.includes(`${mm} ${y}`) || n.includes(`${y} ${mm}`) || n.includes(`${mm}${y}`) || n.includes(`${y}${mm}`) || (n.includes(MESES2[m - 1]) && n.includes(String(y)))) return `${y}-${mm}`; }
+      return null;
+    };
+    const compsComRecibo = new Set<string>();
+    for (const p of dasAchados) { const c2 = compAny(p); if (c2) compsComRecibo.add(c2); }
+    // STATUS das obrigações DAS no banco (2025-2026)
+    const company = await this.prisma.company.findFirst({ where: { OR: [{ clienteCodigo: String(codigo) }, { clienteCodigo: String(parseInt(codigo, 10)) }] }, select: { id: true, taxRegime: true } });
+    const obr = company ? await this.prisma.fiscalCalendarItem.findMany({ where: { companyId: company.id, tipo: 'DAS', OR: [{ competencia: { startsWith: '2025-' } }, { competencia: { startsWith: '2026-' } }] }, select: { competencia: true, status: true } }) : [];
+    const statusDb: Record<string, string> = {}; for (const o of obr) statusDb[o.competencia] = o.status;
+    // tabela-verdade: por competência, recibo no drive? status no banco?
+    const meses = [...new Set([...compsComRecibo, ...Object.keys(statusDb)])].sort();
+    const tabela = meses.map((m) => ({ comp: m, reciboNoDrive: compsComRecibo.has(m), statusObrigacao: statusDb[m] || '—', DIVERGENCIA: compsComRecibo.has(m) && !['entregue', 'paga', 'isenta'].includes(statusDb[m]) }));
+    const divergencias = tabela.filter((t) => t.DIVERGENCIA);
+    return { codigo: comp.clienteCodigo, cliente: comp.name, cnpj: comp.cnpj, cnpjRaiz, regime: company?.taxRegime, totalItensDoCliente: total, pastasRaiz: top(raizes), pastasNivel2: top(nivel2), compsComRecibo: [...compsComRecibo].sort(), divergencias, tabela, amostraDAS: dasAchados };
   }
 
   /**
