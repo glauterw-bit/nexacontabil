@@ -379,6 +379,84 @@ export class OneDriveService {
   }
 
   /**
+   * Lê uma planilha .xlsx (zip de XMLs) e devolve as linhas como matriz de strings. Resolve
+   * sharedStrings e converte números de série de DATA do Excel (>= 1) em ISO (YYYY-MM-DD) quando
+   * a célula tem formato de data. Sem dependência externa (só unzipper + parse leve de XML).
+   */
+  async lerPlanilhaXlsx(connectionId: string, driveId: string, itemId: string, opts?: { maxRows?: number; maxMB?: number }): Promise<{ linhas: string[][]; aba: string }> {
+    const maxMB = opts?.maxMB ?? 30, maxRows = opts?.maxRows ?? 5000;
+    const token = await this.getValidToken(connectionId);
+    const res: any = await fetch(`${GRAPH_BASE}/drives/${driveId}/items/${itemId}/content`, { headers: { Authorization: `Bearer ${token}` }, redirect: 'follow' });
+    if (!res.ok) return { linhas: [], aba: '' };
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > maxMB * 1024 * 1024) return { linhas: [], aba: '' };
+    const dir = await unzipper.Open.buffer(buf);
+    const readEntry = async (re: RegExp): Promise<string> => {
+      const f = (dir.files ?? []).find((x: any) => re.test(x.path));
+      if (!f) return '';
+      try { return (await f.buffer()).toString('utf8'); } catch { return ''; }
+    };
+    // sharedStrings
+    const ssXml = await readEntry(/^xl\/sharedStrings\.xml$/);
+    const shared: string[] = [];
+    for (const si of ssXml.match(/<si\b[\s\S]*?<\/si>/g) ?? []) {
+      const txt = (si.match(/<t\b[^>]*>([\s\S]*?)<\/t>/g) ?? []).map((t) => t.replace(/<[^>]+>/g, '')).join('');
+      shared.push(this._unxml(txt));
+    }
+    // estilos → quais numFmt são DATA (p/ converter série → ISO)
+    const stylesXml = await readEntry(/^xl\/styles\.xml$/);
+    const dateStyleIdx = this._estilosDeData(stylesXml);
+    // 1ª worksheet (workbook aponta, mas sheet1 basta na prática)
+    const sheetXml = await readEntry(/^xl\/worksheets\/sheet1\.xml$/) || await readEntry(/^xl\/worksheets\/.*\.xml$/);
+    const linhas: string[][] = [];
+    const colToIdx = (ref: string) => { const m = ref.match(/^([A-Z]+)/); if (!m) return 0; let n = 0; for (const ch of m[1]) n = n * 26 + (ch.charCodeAt(0) - 64); return n - 1; };
+    for (const row of sheetXml.match(/<row\b[\s\S]*?<\/row>/g) ?? []) {
+      if (linhas.length >= maxRows) break;
+      const cells: string[] = [];
+      for (const c of row.match(/<c\b[^>]*(?:\/>|>[\s\S]*?<\/c>)/g) ?? []) {
+        const ref = (c.match(/\br="([A-Z]+\d+)"/) || [])[1] || '';
+        const t = (c.match(/\bt="([^"]+)"/) || [])[1] || '';
+        const s = (c.match(/\bs="(\d+)"/) || [])[1];
+        const idx = ref ? colToIdx(ref) : cells.length;
+        let val = '';
+        if (t === 'inlineStr') { val = this._unxml((c.match(/<t\b[^>]*>([\s\S]*?)<\/t>/) || [])[1] || ''); }
+        else { const v = (c.match(/<v\b[^>]*>([\s\S]*?)<\/v>/) || [])[1] || ''; if (t === 's') val = shared[parseInt(v, 10)] ?? ''; else if (t === 'str') val = this._unxml(v); else { val = v; if (v && s !== undefined && dateStyleIdx.has(parseInt(s, 10)) && /^\d+(\.\d+)?$/.test(v)) val = this._serialParaISO(parseFloat(v)); } }
+        while (cells.length < idx) cells.push('');
+        cells[idx] = val;
+      }
+      linhas.push(cells);
+    }
+    return { linhas, aba: 'sheet1' };
+  }
+
+  private _unxml(s: string): string { return (s || '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').trim(); }
+  private _serialParaISO(serial: number): string {
+    // Excel: dia 1 = 1900-01-01, com bug do ano bissexto 1900 → base 1899-12-30 (UTC)
+    const ms = Math.round(serial) * 86400000 + Date.UTC(1899, 11, 30);
+    const d = new Date(ms);
+    if (isNaN(d.getTime()) || serial < 1 || serial > 80000) return String(serial);
+    return d.toISOString().slice(0, 10);
+  }
+  private _estilosDeData(stylesXml: string): Set<number> {
+    // numFmts de data (custom com d/m/y ou builtin 14-22,45-47) → ids de cellXfs que os usam
+    const fmtData = new Set<number>([14, 15, 16, 17, 18, 19, 20, 21, 22, 45, 46, 47]);
+    for (const nf of stylesXml.match(/<numFmt\b[^>]*\/>/g) ?? []) {
+      const id = parseInt((nf.match(/numFmtId="(\d+)"/) || [])[1] || '-1', 10);
+      const code = ((nf.match(/formatCode="([^"]*)"/) || [])[1] || '').toLowerCase();
+      if (id >= 0 && /[dmy]/.test(code) && !/[h]/.test(code.replace(/["'][^"']*["']/g, ''))) fmtData.add(id);
+    }
+    const out = new Set<number>();
+    const cellXfs = (stylesXml.match(/<cellXfs\b[\s\S]*?<\/cellXfs>/) || [])[0] || '';
+    let i = 0;
+    for (const xf of cellXfs.match(/<xf\b[^>]*(?:\/>|>[\s\S]*?<\/xf>)/g) ?? []) {
+      const nfid = parseInt((xf.match(/numFmtId="(\d+)"/) || [])[1] || '-1', 10);
+      if (fmtData.has(nfid)) out.add(i);
+      i++;
+    }
+    return out;
+  }
+
+  /**
    * Baixa um PDF e extrai o TEXTO (pdf-parse). Retorna o texto (nativo). Se vier vazio/curto, o
    * PDF é escaneado (imagem) e precisaria de OCR. Base da "Camada 3" (ler o conteúdo do arquivo).
    */

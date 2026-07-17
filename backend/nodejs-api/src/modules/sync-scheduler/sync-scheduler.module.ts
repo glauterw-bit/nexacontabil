@@ -211,6 +211,13 @@ class SyncSchedulerController {
     return this.service.sondarClientePastas(codigo);
   }
 
+  /** Preview da planilha de clientes (.xlsx) — mostra linhas/colunas p/ achar a data de inicio. */
+  @Public()
+  @Get('preview-planilha')
+  previewPlanilha(@Query('nome') nome?: string, @Query('rows') rows?: string) {
+    return this.service.previewPlanilha(nome, rows ? parseInt(rows, 10) : undefined);
+  }
+
   /** Teste publico do explorador (arvore real de pastas do cliente). */
   @Public()
   @Get('explorar')
