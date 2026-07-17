@@ -397,14 +397,21 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
     const JUNK = /^(gerencia|agencia|agencias|anexo|anexos|controle|diversos|documentos|docs|modelo|modelos|arquivo|arquivos|backup|lixeira|teste|temp|pasta|fechamento|planilha|obrigacoes|encargos|folha|dp|departamento)\b/;
     const SUFIXO = /\b(ltda|eireli|epp|mei|sa|s\/a|me|ss|associacao|igreja|congregacao|condominio|instituto|fundacao|sociedade|servicos|comercio|distribuidora|industria|transportes|construcoes|consultoria)\b/;
+    const cnpjValido = (raw?: string): boolean => {
+      const s = (raw || '').replace(/\D/g, '');
+      if (s.length !== 14 || /^(\d)\1{13}$/.test(s)) return false;
+      const calc = (base: string, pesos: number[]) => { let sum = 0; for (let i = 0; i < pesos.length; i++) sum += parseInt(base[i], 10) * pesos[i]; const r = sum % 11; return r < 2 ? 0 : 11 - r; };
+      const d1 = calc(s, [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+      const d2 = calc(s, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+      return d1 === parseInt(s[12], 10) && d2 === parseInt(s[13], 10);
+    };
     const empresas = await this.prisma.company.findMany({ select: { id: true, name: true, clienteCodigo: true, cnpj: true, active: true } });
     const comNomeJunk = empresas.filter((c) => JUNK.test(norm(c.name)) && !SUFIXO.test(norm(c.name)));
     const alvos = comNomeJunk.filter((c) => {
       const semCod = !c.clienteCodigo || !String(c.clienteCodigo).trim();
-      const cnpjOk = (c.cnpj || '').replace(/\D/g, '').length === 14 && !/^0+$/.test((c.cnpj || '').replace(/\D/g, ''));
-      return semCod && !cnpjOk;
+      return semCod && !cnpjValido(c.cnpj); // nome de pasta + sem código + CNPJ inválido/ausente = lixo
     });
-    const excluidos = comNomeJunk.filter((c) => !alvos.includes(c)).map((c) => ({ nome: c.name, codigo: c.clienteCodigo || null, cnpj: c.cnpj || null, motivo: (c.clienteCodigo && String(c.clienteCodigo).trim()) ? 'tem-codigo' : 'tem-cnpj' }));
+    const excluidos = comNomeJunk.filter((c) => !alvos.includes(c)).map((c) => ({ nome: c.name, codigo: c.clienteCodigo || null, cnpj: c.cnpj || null, motivo: (c.clienteCodigo && String(c.clienteCodigo).trim()) ? 'tem-codigo' : 'cnpj-valido' }));
     let obrigApagadas = 0, empresasDeletadas = 0, soInativadas = 0; const removidos: any[] = [];
     for (const c of alvos) {
       const nObr = await this.prisma.fiscalCalendarItem.count({ where: { companyId: c.id } });
