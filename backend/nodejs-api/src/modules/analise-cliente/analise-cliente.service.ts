@@ -820,6 +820,36 @@ export class AnaliseClienteService {
     return { arquivo: `${ref.path}/${ref.name}`, abas, abaLida, totalLinhas: linhas.length, outrasPlanilhas: planilhas.map((f) => `${f.path}/${f.name}`).slice(0, 8), linhas };
   }
 
+  /** Varre TODAS as planilhas candidatas e TODAS as abas procurando um cabeçalho (ex.: "cliente desde"). */
+  async acharColunaPlanilha(termo = 'desde') {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'sem conexão OneDrive' };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const t = norm(termo);
+    const nomes = ['RELAÇÃO CLIENTES DOMO', 'Relação de Regime de Empresas', 'RELAÇÃO CLIENTES DOMO 2025', 'Relação de Clientes DOMO', 'Controle Fiscal'];
+    const vistos = new Set<string>();
+    const achados: any[] = [];
+    for (const nm of nomes) {
+      let itens: Array<{ id?: string; name: string; path: string; driveId?: string }> = [];
+      try { itens = (await this.onedrive.coletaTenant(conn.id, nm, { maxItens: 100 })).itens; } catch { continue; }
+      for (const f of itens.filter((x) => /\.xls[xm]?$/i.test(x.name || '') && x.driveId && x.id)) {
+        const key = `${f.path}/${f.name}`; if (vistos.has(key)) continue; vistos.add(key);
+        let abas: string[] = [];
+        try { abas = (await this.onedrive.lerPlanilhaXlsx(conn.id, f.driveId!, f.id!, { maxRows: 1 })).abas; } catch { continue; }
+        for (const ab of abas) {
+          let linhas: string[][] = [];
+          try { linhas = (await this.onedrive.lerPlanilhaXlsx(conn.id, f.driveId!, f.id!, { maxRows: 4, aba: ab })).linhas; } catch { continue; }
+          // procura o termo em qualquer célula das 4 primeiras linhas (cabeçalho pode não ser a linha 0)
+          for (let r = 0; r < linhas.length; r++) {
+            const cols = linhas[r].map((c, j) => ({ col: j < 26 ? String.fromCharCode(65 + j) : 'A' + String.fromCharCode(65 + j - 26), txt: c })).filter((x) => norm(x.txt).includes(t));
+            if (cols.length) achados.push({ arquivo: key, aba: ab, linhaHeader: r, colunas: cols, cabecalhoCompleto: linhas[r].map((c, j) => `${j < 26 ? String.fromCharCode(65 + j) : 'A' + String.fromCharCode(65 + j - 26)}:${c}`).filter((s) => s.split(':')[1]) });
+          }
+        }
+      }
+    }
+    return { termo, achados };
+  }
+
   /**
    * SONDA onde os documentos de um cliente REALMENTE vivem — busca por CNPJ (aparece no nome do
    * recibo PGDASD-RECIBO-{CNPJ}{AAAAMM}), por nome e por código, IGNORANDO estrutura de pasta.

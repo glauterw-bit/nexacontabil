@@ -85,6 +85,13 @@ export class PaineisController {
     return this.service.definirInicioAutomatico({ dryRun: dry === '1' || dry === 'true' });
   }
 
+  /** BULK — aplica a coluna "Cliente desde" da planilha oficial (payload) e isenta meses anteriores. */
+  @Public()
+  @Post('aplicar-cliente-desde')
+  aplicarClienteDesde(@Body() body: { empresas: Array<{ cod?: string; cnpj?: string; desde?: string; sit?: string }>; syncSituacao?: boolean; dryRun?: boolean }) {
+    return this.service.aplicarClienteDesde(body?.empresas ?? [], { syncSituacao: body?.syncSituacao, dryRun: body?.dryRun });
+  }
+
   @Get('farois')
   farois() {
     return this.service.farois();

@@ -171,6 +171,42 @@ export class PaineisService {
     return { dryRun: dry, clientesAjustados: ajustados, obrigacoesIsentadas: isentadasTotal, semSinal, amostra };
   }
 
+  /**
+   * BULK — aplica a data "Cliente desde" da planilha oficial (RELAÇÃO DE EMPRESAS) a TODAS as
+   * empresas: grava clienteDesde e ISENTA as obrigações de competências ANTERIORES ao início
+   * (não eram cobradas, o cliente ainda não existia no escritório). Casa por código OU CNPJ.
+   * `syncSituacao` (opcional) sincroniza o flag ativo/inativo da planilha (P = A/I).
+   */
+  async aplicarClienteDesde(empresas: Array<{ cod?: string; cnpj?: string; desde?: string; sit?: string }>, opts?: { syncSituacao?: boolean; dryRun?: boolean }) {
+    const dry = !!opts?.dryRun;
+    const companies = await this.prisma.company.findMany({ select: { id: true, clienteCodigo: true, cnpj: true, active: true } });
+    const porCod = new Map<string, string>(); const porCnpj = new Map<string, string>();
+    for (const c of companies) { if (c.clienteCodigo) porCod.set(String(c.clienteCodigo).trim(), c.id); if (c.cnpj) porCnpj.set(String(c.cnpj).replace(/\D/g, ''), c.id); }
+    let casados = 0, naoCasados = 0, isentadasTotal = 0, reativados = 0, inativados = 0; const semMatch: string[] = [];
+    for (const e of empresas) {
+      const cnpjD = (e.cnpj || '').replace(/\D/g, '');
+      const id = (e.cod && porCod.get(String(e.cod).trim())) || (cnpjD && porCnpj.get(cnpjD)) || null;
+      if (!id) { naoCasados++; if (semMatch.length < 60) semMatch.push(`${e.cod || '?'} ${e.cnpj || ''}`.trim()); continue; }
+      casados++;
+      // situação (opcional)
+      if (opts?.syncSituacao && e.sit) {
+        const ativo = e.sit.toUpperCase().startsWith('A');
+        const atual = companies.find((c) => c.id === id);
+        if (atual && atual.active !== ativo) { if (!dry) await this.prisma.company.update({ where: { id }, data: { active: ativo } }).catch(() => undefined); ativo ? reativados++ : inativados++; }
+      }
+      if (!e.desde || !/^\d{4}-\d{2}$/.test(e.desde)) continue;
+      const compInicio = e.desde;
+      const [y, m] = compInicio.split('-').map(Number);
+      if (!dry) await this.prisma.company.update({ where: { id }, data: { clienteDesde: new Date(Date.UTC(y, m - 1, 1)) } }).catch(() => undefined);
+      const itens = await this.prisma.fiscalCalendarItem.findMany({ where: { companyId: id, status: { in: ['pendente', 'vencida'] } }, select: { id: true, competencia: true } });
+      for (const it of itens) {
+        const comp = /^\d{4}-\d{2}$/.test(it.competencia) ? it.competencia : (it.competencia.match(/^(\d{4})/) ? `${it.competencia.slice(0, 4)}-01` : null);
+        if (comp && comp < compInicio) { if (!dry) await this.prisma.fiscalCalendarItem.update({ where: { id: it.id }, data: { status: 'isenta' } }).catch(() => undefined); isentadasTotal++; }
+      }
+    }
+    return { dryRun: dry, recebidas: empresas.length, casados, naoCasados, obrigacoesIsentadas: isentadasTotal, reativados, inativados, semMatchAmostra: semMatch };
+  }
+
   /** Lista simples de clientes ativos (código + nome + regime) p/ o seletor do explorador. */
   async listaClientesSimples() {
     const cs = await this.prisma.company.findMany({
