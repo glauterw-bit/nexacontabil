@@ -305,8 +305,8 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.sondarClientePastas(codigo);
   }
 
-  async previewPlanilha(nome?: string, maxRows?: number) {
-    return this.analise.previewPlanilha(nome, maxRows);
+  async previewPlanilha(nome?: string, maxRows?: number, aba?: string) {
+    return this.analise.previewPlanilha(nome, maxRows, aba);
   }
 
   /** Link de consentimento de admin (Azure) — 1 clique libera as permissões de aplicação. */

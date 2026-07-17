@@ -805,18 +805,19 @@ export class AnaliseClienteService {
   }
 
   /** Acha a planilha (por nome) no tenant e devolve o driveId/id + as N primeiras linhas p/ inspeção. */
-  async previewPlanilha(nome = 'RELAÇÃO CLIENTES DOMO', maxRows = 20) {
+  async previewPlanilha(nome = 'Relação de Regime de Empresas', maxRows = 20, aba?: string) {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
     if (!conn) return { erro: 'sem conexão OneDrive' };
     const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     const alvoN = norm(nome);
     let itens: Array<{ id?: string; name: string; path: string; driveId?: string }> = [];
     try { itens = (await this.onedrive.coletaTenant(conn.id, nome, { maxItens: 200 })).itens; } catch { /* */ }
-    const cand = itens.filter((f) => /\.xlsx$/i.test(f.name || '') && norm(f.name).includes(alvoN.split(' ')[0]));
-    const ref = cand.find((f) => norm(f.name).includes('relacao') || norm(f.name).includes(alvoN.slice(0, 8))) || cand[0];
-    if (!ref || !ref.driveId || !ref.id) return { erro: 'planilha .xlsx não localizada', candidatos: itens.filter((f) => /\.xlsx?$/i.test(f.name)).map((f) => `${f.path}/${f.name}`).slice(0, 15) };
-    const { linhas } = await this.onedrive.lerPlanilhaXlsx(conn.id, ref.driveId, ref.id, { maxRows });
-    return { arquivo: `${ref.path}/${ref.name}`, totalLinhas: linhas.length, linhas };
+    const planilhas = itens.filter((f) => /\.xls[xm]?$/i.test(f.name || '') && f.driveId && f.id);
+    // melhor casamento: contém o nome-alvo inteiro; senão a 1ª palavra
+    const ref = planilhas.find((f) => norm(f.name).includes(alvoN.slice(0, 14))) || planilhas.find((f) => norm(f.name).includes(alvoN.split(' ')[0])) || planilhas[0];
+    if (!ref || !ref.driveId || !ref.id) return { erro: 'planilha não localizada', candidatos: itens.filter((f) => /\.xls[xm]?$/i.test(f.name)).map((f) => `${f.path}/${f.name}`).slice(0, 15) };
+    const { linhas, aba: abaLida, abas } = await this.onedrive.lerPlanilhaXlsx(conn.id, ref.driveId, ref.id, { maxRows, aba });
+    return { arquivo: `${ref.path}/${ref.name}`, abas, abaLida, totalLinhas: linhas.length, outrasPlanilhas: planilhas.map((f) => `${f.path}/${f.name}`).slice(0, 8), linhas };
   }
 
   /**

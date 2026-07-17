@@ -214,8 +214,8 @@ class SyncSchedulerController {
   /** Preview da planilha de clientes (.xlsx) — mostra linhas/colunas p/ achar a data de inicio. */
   @Public()
   @Get('preview-planilha')
-  previewPlanilha(@Query('nome') nome?: string, @Query('rows') rows?: string) {
-    return this.service.previewPlanilha(nome, rows ? parseInt(rows, 10) : undefined);
+  previewPlanilha(@Query('nome') nome?: string, @Query('rows') rows?: string, @Query('aba') aba?: string) {
+    return this.service.previewPlanilha(nome, rows ? parseInt(rows, 10) : undefined, aba);
   }
 
   /** Teste publico do explorador (arvore real de pastas do cliente). */
