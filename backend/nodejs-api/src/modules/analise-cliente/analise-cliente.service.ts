@@ -964,6 +964,120 @@ export class AnaliseClienteService {
   }
 
   /**
+   * AUDITORIA DE COBERTURA POR CRAWL — a PROVA de completude. Não usa busca: ENUMERA a árvore
+   * REAL da pasta do cliente (arvoreCompleta), classifica CADA PDF (recibo/declaração/extrato/…),
+   * extrai a competência e cruza com as obrigações do banco. Devolve o censo + a lista dos PDFs
+   * que SÃO recibo e NÃO estão casados (obrigação não entregue) — se vazia, provado: nada ficou pra trás.
+   */
+  async auditarCoberturaCliente(codigo: string, anos: number[] = [2025, 2026]) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'sem conexão OneDrive' };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const company = await this.prisma.company.findFirst({ where: { OR: [{ clienteCodigo: String(codigo) }, { clienteCodigo: String(parseInt(codigo, 10)) }] }, select: { id: true, name: true, taxRegime: true, clienteDesde: true } });
+    if (!company) return { erro: `cliente ${codigo} não encontrado no banco` };
+    // classifica o tipo do documento pelo nome
+    const detectTipo = (n: string): string | null => {
+      if (/dasnsimei|\bdasn\b/.test(n)) return 'DASN-SIMEI';
+      if (/pgdasd|pgdas|pgmei|(^| )das( |$)|simples nacional|sem moviment|recibo de pagamento|extrato mensal|(?:rec\w*|dec\w*|declara\w*|extrato)[\s]+sn( |$)/.test(n)) return 'DAS';
+      if (/dctf/.test(n)) return 'DCTFWeb';
+      if (/reinf/.test(n)) return 'EFD_REINF';
+      if (/\bgia\b|gare|icms/.test(n)) return 'ICMS';
+      if (/\bfgts\b|\bgrf\b/.test(n)) return 'FGTS';
+      if (/darf/.test(n)) return 'DARF';
+      return null;
+    };
+    const extractComp = (s: string): string | null => { for (const y of anos) for (let m = 1; m <= 12; m++) { const mm = String(m).padStart(2, '0'); if (s.includes(`${mm} ${y}`) || s.includes(`${y} ${mm}`) || s.includes(`${mm}${y}`) || s.includes(`${y}${mm}`) || (s.includes(MESES[m - 1]) && s.includes(String(y)))) return `${y}-${mm}`; } return null; };
+    const compDe = (nome: string, path: string): string | null => {
+      let c = extractComp(norm(path)); if (c) return c;
+      const nm = norm(nome);
+      c = extractComp(nm.replace(/vencer?\w*\s*\d{1,2}\s*\d{1,2}\s*\d{4}/g, ' ').replace(/pagar?\s*ate\s*\d{1,2}\s*\d{1,2}\s*\d{4}/g, ' ')); if (c) return c;
+      const mv = nm.match(/(?:vencer?\w*|pagar?\s*ate)\s*(\d{1,2})\s*(\d{1,2})\s*(\d{4})/);
+      if (mv) { const dm = +mv[2], dy = +mv[3]; if (dm >= 1 && dm <= 12 && anos.includes(dm === 1 ? dy - 1 : dy)) return dm === 1 ? `${dy - 1}-12` : `${dy}-${String(dm - 1).padStart(2, '0')}`; }
+      return null;
+    };
+    // 1) RESOLVE a pasta-raiz (código, senão nome)
+    const reCodSeg = new RegExp(`^\\s*${codigo}\\s*[-–]`);
+    const reCod = new RegExp(`(^|/)\\s*${codigo}\\s*[-–]`);
+    const chaveNome = norm(company.name).split(' ').filter((w) => w.length >= 4).slice(0, 2).join(' ');
+    let ref: any = null;
+    for (const q of [`${codigo}`, `${codigo} -`, chaveNome].filter((x) => x && x.trim().length >= 2)) {
+      let arqs: any[] = []; try { arqs = (await this.onedrive.coletaTenant(conn.id, q, { maxItens: 500 })).itens; } catch { continue; }
+      ref = arqs.find((f) => reCod.test(f.path || '') && f.driveId); if (ref) break;
+    }
+    if (!ref) return { codigo, cliente: company.name, erro: 'pasta_nao_localizada' };
+    const driveId = ref.driveId as string;
+    const segs = (ref.path || '').split('/').filter(Boolean);
+    const idx = segs.findIndex((s: string) => reCodSeg.test(s));
+    const raizCaminho = idx >= 0 ? segs.slice(0, idx + 1).join('/') : segs[0];
+    const raiz = await this.onedrive.resolverPastaPorCaminho(conn.id, driveId, raizCaminho);
+    if (!raiz) return { codigo, cliente: company.name, erro: 'raiz_nao_resolvida', raizCaminho };
+    // 2) VARRE a árvore REAL (enumeração, não busca)
+    const arv = await this.onedrive.arvoreCompleta(conn.id, driveId, raiz.id, raiz.name, { maxItens: 9000, maxProfundidade: 8, timeBudgetMs: 70_000 });
+    const arquivos = arv.itens.filter((it) => !it.isFolder);
+    const pdfs = arquivos.filter((it) => /\.pdf$/i.test(it.nome || ''));
+    // 3) obrigações do banco (todos os tipos, anos alvo) → set de "tipo|comp" ENTREGUE e EXISTENTE
+    const anosStr = anos.map(String);
+    const obr = await this.prisma.fiscalCalendarItem.findMany({ where: { companyId: company.id, OR: anosStr.map((a) => ({ competencia: { startsWith: `${a}-` } })) }, select: { tipo: true, competencia: true, status: true } });
+    const entregueSet = new Set<string>(); const existeSet = new Set<string>();
+    for (const o of obr) { existeSet.add(`${o.tipo}|${o.competencia}`); if (['entregue', 'paga', 'isenta'].includes(o.status)) entregueSet.add(`${o.tipo}|${o.competencia}`); }
+    // 4) censo + reconciliação
+    const porTipo: Record<string, number> = {};
+    const recibos: Array<{ tipo: string; comp: string | null; nome: string; caminho: string; casado: boolean; obrigacaoExiste: boolean; abrir?: string }> = [];
+    let semTipo = 0, semComp = 0;
+    for (const f of pdfs) {
+      const n = norm(f.nome);
+      const tipo = detectTipo(n);
+      if (!tipo) { semTipo++; continue; }
+      porTipo[tipo] = (porTipo[tipo] || 0) + 1;
+      const comp = compDe(f.nome, f.caminho);
+      if (!comp) { semComp++; recibos.push({ tipo, comp: null, nome: f.nome, caminho: f.caminho, casado: false, obrigacaoExiste: false, abrir: f.webUrl }); continue; }
+      const key = `${tipo}|${comp}`;
+      recibos.push({ tipo, comp, nome: f.nome, caminho: f.caminho, casado: entregueSet.has(key), obrigacaoExiste: existeSet.has(key), abrir: f.webUrl });
+    }
+    // recibos que são recibo, TÊM competência, mas NÃO estão casados
+    const naoCasados = recibos.filter((r) => r.comp && !r.casado);
+    const naoCasadosComObrigacao = naoCasados.filter((r) => r.obrigacaoExiste); // BUG de leitura/casamento (deveria estar marcado)
+    const naoCasadosSemObrigacao = naoCasados.filter((r) => !r.obrigacaoExiste); // obrigação nem foi gerada no calendário
+    const compsRecibo = [...new Set(recibos.filter((r) => r.comp).map((r) => `${r.tipo}|${r.comp}`))];
+    return {
+      codigo: String(codigo), cliente: company.name, regime: company.taxRegime, clienteDesde: company.clienteDesde ? company.clienteDesde.toISOString().slice(0, 10) : null,
+      raiz: raiz.name, arvoreTruncada: arv.truncado,
+      censo: { totalArquivos: arquivos.length, totalPdfs: pdfs.length, pdfSemTipo: semTipo, recibosClassificados: recibos.length, recibosSemCompetencia: semComp, porTipo },
+      reconciliacao: {
+        recibosUnicos: compsRecibo.length,
+        casados: recibos.filter((r) => r.comp && r.casado).length,
+        naoCasados_BUG: naoCasadosComObrigacao.length,       // recibo existe + obrigação existe + não entregue = FALHA de casamento
+        naoCasados_semObrigacao: naoCasadosSemObrigacao.length, // recibo existe mas obrigação não foi gerada
+      },
+      // a PROVA: se naoCasados_BUG = 0, nada que deveria ser casado ficou pra trás
+      amostraNaoCasadosBUG: naoCasadosComObrigacao.slice(0, 20).map((r) => `${r.tipo}|${r.comp}: ${r.nome}`),
+      amostraSemObrigacao: naoCasadosSemObrigacao.slice(0, 10).map((r) => `${r.tipo}|${r.comp}: ${r.nome}`),
+      amostraSemCompetencia: recibos.filter((r) => !r.comp).slice(0, 10).map((r) => r.nome),
+    };
+  }
+
+  /** AUDITORIA DE COBERTURA em LOTE — N clientes ativos, para provar a cobertura na carteira. */
+  async auditarCoberturaLote(limit = 10, anos: number[] = [2025, 2026], offset = 0) {
+    const companies = await this.prisma.company.findMany({ where: { active: true, clienteCodigo: { not: null } }, select: { clienteCodigo: true }, orderBy: { clienteCodigo: 'asc' } });
+    const codigos = companies.map((c) => String(c.clienteCodigo)).filter((c) => /^\d+$/.test(c)).sort((a, b) => +a - +b).slice(offset, offset + limit);
+    const out: any[] = [];
+    for (const cod of codigos) { try { out.push(await this.auditarCoberturaCliente(cod, anos)); } catch (e: any) { out.push({ codigo: cod, erro: e?.message ?? String(e) }); } }
+    const agg = out.filter((o) => o.censo);
+    const resumo = {
+      clientesAuditados: agg.length,
+      totalPdfs: agg.reduce((s, o) => s + o.censo.totalPdfs, 0),
+      totalRecibosClassificados: agg.reduce((s, o) => s + o.censo.recibosClassificados, 0),
+      totalCasados: agg.reduce((s, o) => s + o.reconciliacao.casados, 0),
+      totalNaoCasados_BUG: agg.reduce((s, o) => s + o.reconciliacao.naoCasados_BUG, 0),
+      totalNaoCasados_semObrigacao: agg.reduce((s, o) => s + o.reconciliacao.naoCasados_semObrigacao, 0),
+      totalSemCompetencia: agg.reduce((s, o) => s + o.censo.recibosSemCompetencia, 0),
+      naoLocalizados: out.filter((o) => o.erro).length,
+    };
+    return { anos, offset, limit, resumo, clientes: out };
+  }
+
+  /**
    * DIAGNÓSTICO Camada 3: pega um cliente e BAIXA os PDFs de 2026 da pasta dele, lendo o texto
    * (pdf-parse). Mostra se cada PDF é NATIVO (tem texto → busca por conteúdo acha) ou ESCANEADO
    * (texto vazio → precisa OCR). Responde: os recibos que faltam são escaneados ou não existem?

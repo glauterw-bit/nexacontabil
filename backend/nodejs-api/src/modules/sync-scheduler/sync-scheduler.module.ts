@@ -190,6 +190,22 @@ class SyncSchedulerController {
     return this.service.limparNaoClientes({ dryRun: !(dry === '0' || dry === 'false') });
   }
 
+  /** AUDITORIA DE COBERTURA por CRAWL (prova de completude) — 1 cliente. */
+  @Public()
+  @Get('auditar-cobertura')
+  auditarCobertura(@Query('codigo') codigo: string, @Query('anos') anos?: string) {
+    const lista = anos ? anos.split(',').map((a) => parseInt(a, 10)).filter(Boolean) : undefined;
+    return this.service.auditarCoberturaCliente(codigo, lista);
+  }
+
+  /** AUDITORIA DE COBERTURA em LOTE (N clientes ativos). */
+  @Public()
+  @Get('auditar-cobertura-lote')
+  auditarCoberturaLote(@Query('limit') limit?: string, @Query('anos') anos?: string, @Query('offset') offset?: string) {
+    const lista = anos ? anos.split(',').map((a) => parseInt(a, 10)).filter(Boolean) : undefined;
+    return this.service.auditarCoberturaLote(limit ? parseInt(limit, 10) : undefined, lista, offset ? parseInt(offset, 10) : undefined);
+  }
+
   /** Diagnóstico de cobertura via permissão de APLICAÇÃO (sites+drives que o app enxerga). */
   @Public()
   @Get('enumerar-sites')
