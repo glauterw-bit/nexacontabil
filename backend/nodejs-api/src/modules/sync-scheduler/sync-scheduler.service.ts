@@ -398,12 +398,13 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     const JUNK = /^(gerencia|agencia|agencias|anexo|anexos|controle|diversos|documentos|docs|modelo|modelos|arquivo|arquivos|backup|lixeira|teste|temp|pasta|fechamento|planilha|obrigacoes|encargos|folha|dp|departamento)\b/;
     const SUFIXO = /\b(ltda|eireli|epp|mei|sa|s\/a|me|ss|associacao|igreja|congregacao|condominio|instituto|fundacao|sociedade|servicos|comercio|distribuidora|industria|transportes|construcoes|consultoria)\b/;
     const empresas = await this.prisma.company.findMany({ select: { id: true, name: true, clienteCodigo: true, cnpj: true, active: true } });
-    const alvos = empresas.filter((c) => {
+    const comNomeJunk = empresas.filter((c) => JUNK.test(norm(c.name)) && !SUFIXO.test(norm(c.name)));
+    const alvos = comNomeJunk.filter((c) => {
       const semCod = !c.clienteCodigo || !String(c.clienteCodigo).trim();
       const cnpjOk = (c.cnpj || '').replace(/\D/g, '').length === 14 && !/^0+$/.test((c.cnpj || '').replace(/\D/g, ''));
-      const n = norm(c.name);
-      return semCod && !cnpjOk && JUNK.test(n) && !SUFIXO.test(n);
+      return semCod && !cnpjOk;
     });
+    const excluidos = comNomeJunk.filter((c) => !alvos.includes(c)).map((c) => ({ nome: c.name, codigo: c.clienteCodigo || null, cnpj: c.cnpj || null, motivo: (c.clienteCodigo && String(c.clienteCodigo).trim()) ? 'tem-codigo' : 'tem-cnpj' }));
     let obrigApagadas = 0, empresasDeletadas = 0, soInativadas = 0; const removidos: any[] = [];
     for (const c of alvos) {
       const nObr = await this.prisma.fiscalCalendarItem.count({ where: { companyId: c.id } });
@@ -416,7 +417,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       }
       removidos.push({ nome: c.name, codigo: c.clienteCodigo || null, obrigacoes: nObr, deletado: deletou });
     }
-    return { dryRun: dry, candidatos: alvos.length, obrigApagadas, empresasDeletadas, soInativadas, removidos };
+    return { dryRun: dry, candidatos: alvos.length, obrigApagadas, empresasDeletadas, soInativadas, removidos, comNomeJunkMasPreservados: excluidos };
   }
 
   /** Diagnóstico do casamento (por tipo: competência errada × doc ausente × folderPath). */
