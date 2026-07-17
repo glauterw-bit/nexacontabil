@@ -172,8 +172,15 @@ class SyncSchedulerController {
   /** Resumo REAL das obrigações por tipo/status/mês num ano (verifica a reconciliação). */
   @Public()
   @Get('resumo-obrigacoes')
-  resumoObrigacoes(@Query('ano') ano?: string) {
-    return this.service.resumoObrigacoes(ano ? parseInt(ano, 10) : undefined);
+  resumoObrigacoes(@Query('ano') ano?: string, @Query('incluirInativos') inc?: string) {
+    return this.service.resumoObrigacoes(ano ? parseInt(ano, 10) : undefined, inc === '1' || inc === 'true');
+  }
+
+  /** IDENTIFICA os clientes INATIVOS com obrigações em aberto (excluídos da taxa). */
+  @Public()
+  @Get('inativos-com-obrigacao')
+  inativosComObrigacao(@Query('ano') ano?: string) {
+    return this.service.clientesInativosComObrigacao(ano ? parseInt(ano, 10) : undefined);
   }
 
   /** Diagnóstico de cobertura via permissão de APLICAÇÃO (sites+drives que o app enxerga). */

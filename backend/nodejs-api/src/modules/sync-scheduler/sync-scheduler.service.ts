@@ -341,10 +341,13 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   }
 
   /** Resumo REAL das obrigações por tipo e status (entregue/vencida/pendente) num ano. */
-  async resumoObrigacoes(ano = new Date().getFullYear()) {
+  async resumoObrigacoes(ano = new Date().getFullYear(), incluirInativos = false) {
+    // SÓ conta obrigações de clientes ATIVOS (inativo não pesa na taxa) — salvo incluirInativos.
+    const ativos = incluirInativos ? null : (await this.prisma.company.findMany({ where: { active: true }, select: { id: true } })).map((c) => c.id);
+    const whereAtivo = ativos ? { companyId: { in: ativos } } : {};
     const rows = await this.prisma.fiscalCalendarItem.groupBy({
       by: ['tipo', 'status'],
-      where: { competencia: { startsWith: String(ano) } },
+      where: { competencia: { startsWith: String(ano) }, ...whereAtivo },
       _count: { id: true },
     });
     const porTipo: Record<string, Record<string, number>> = {};
@@ -358,12 +361,28 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     // por competência (mês) — quantas entregues vs total, p/ ver evolução do ano
     const porComp = await this.prisma.fiscalCalendarItem.groupBy({
       by: ['competencia', 'status'],
-      where: { competencia: { startsWith: `${ano}-` } },
+      where: { competencia: { startsWith: `${ano}-` }, ...whereAtivo },
       _count: { id: true },
     });
     const meses: Record<string, { entregue: number; total: number }> = {};
     for (const r of porComp) { const m = (meses[r.competencia] ??= { entregue: 0, total: 0 }); m.total += r._count.id; if (r.status === 'entregue' || r.status === 'paga') m.entregue += r._count.id; }
-    return { ano, total, totalStatus, porTipo, meses };
+    return { ano, apenasAtivos: !incluirInativos, total, totalStatus, porTipo, meses };
+  }
+
+  /** IDENTIFICA os clientes INATIVOS que ainda têm obrigações pendentes/vencidas (fora da taxa). */
+  async clientesInativosComObrigacao(ano?: number) {
+    const inativas = await this.prisma.company.findMany({ where: { active: false }, select: { id: true, name: true, clienteCodigo: true, taxRegime: true, clienteDesde: true } });
+    if (!inativas.length) return { total: 0, clientes: [] };
+    const ids = inativas.map((c) => c.id);
+    const where: any = { companyId: { in: ids }, status: { in: ['pendente', 'vencida'] } };
+    if (ano) where.competencia = { startsWith: `${ano}-` };
+    const grp = await this.prisma.fiscalCalendarItem.groupBy({ by: ['companyId'], where, _count: { id: true } });
+    const cnt = new Map(grp.map((g) => [g.companyId, g._count.id]));
+    const clientes = inativas
+      .map((c) => ({ codigo: c.clienteCodigo, nome: c.name, regime: c.taxRegime, clienteDesde: c.clienteDesde ? c.clienteDesde.toISOString().slice(0, 10) : null, obrigacoesEmAberto: cnt.get(c.id) || 0 }))
+      .filter((c) => c.obrigacoesEmAberto > 0)
+      .sort((a, b) => b.obrigacoesEmAberto - a.obrigacoesEmAberto);
+    return { total: clientes.length, totalObrigacoesForaDaTaxa: clientes.reduce((s, c) => s + c.obrigacoesEmAberto, 0), clientes };
   }
 
   /** Diagnóstico do casamento (por tipo: competência errada × doc ausente × folderPath). */
