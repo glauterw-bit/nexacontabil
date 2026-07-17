@@ -385,6 +385,40 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return { total: clientes.length, totalObrigacoesForaDaTaxa: clientes.reduce((s, c) => s + c.obrigacoesEmAberto, 0), clientes };
   }
 
+  /**
+   * LIMPA registros que NÃO são empresas reais (pastas de controle importadas como "empresa":
+   * GERÊNCIA, AGÊNCIAS, Anexos, DIVERSOS, DOCS...). CRITÉRIO CONSERVADOR: sem clienteCodigo E
+   * nome de pasta-controle E sem sufixo societário (ltda/eireli/me/epp/mei/sa) e sem CNPJ válido.
+   * dryRun só lista. Ao aplicar: apaga as obrigações e tenta deletar a empresa (se FK travar,
+   * deixa inativa e sem obrigações — some da taxa e do painel).
+   */
+  async limparNaoClientes(opts?: { dryRun?: boolean }) {
+    const dry = opts?.dryRun !== false; // default: só lista (seguro)
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    const JUNK = /^(gerencia|agencia|agencias|anexo|anexos|controle|diversos|documentos|docs|modelo|modelos|arquivo|arquivos|backup|lixeira|teste|temp|pasta|fechamento|planilha|obrigacoes|encargos|folha|dp|departamento)\b/;
+    const SUFIXO = /\b(ltda|eireli|epp|mei|sa|s\/a|me|ss|associacao|igreja|congregacao|condominio|instituto|fundacao|sociedade|servicos|comercio|distribuidora|industria|transportes|construcoes|consultoria)\b/;
+    const empresas = await this.prisma.company.findMany({ select: { id: true, name: true, clienteCodigo: true, cnpj: true, active: true } });
+    const alvos = empresas.filter((c) => {
+      const semCod = !c.clienteCodigo || !String(c.clienteCodigo).trim();
+      const cnpjOk = (c.cnpj || '').replace(/\D/g, '').length === 14 && !/^0+$/.test((c.cnpj || '').replace(/\D/g, ''));
+      const n = norm(c.name);
+      return semCod && !cnpjOk && JUNK.test(n) && !SUFIXO.test(n);
+    });
+    let obrigApagadas = 0, empresasDeletadas = 0, soInativadas = 0; const removidos: any[] = [];
+    for (const c of alvos) {
+      const nObr = await this.prisma.fiscalCalendarItem.count({ where: { companyId: c.id } });
+      let deletou = false;
+      if (!dry) {
+        await this.prisma.fiscalCalendarItem.deleteMany({ where: { companyId: c.id } }).catch(() => undefined);
+        obrigApagadas += nObr;
+        try { await this.prisma.company.delete({ where: { id: c.id } }); deletou = true; empresasDeletadas++; }
+        catch { await this.prisma.company.update({ where: { id: c.id }, data: { active: false } }).catch(() => undefined); soInativadas++; }
+      }
+      removidos.push({ nome: c.name, codigo: c.clienteCodigo || null, obrigacoes: nObr, deletado: deletou });
+    }
+    return { dryRun: dry, candidatos: alvos.length, obrigApagadas, empresasDeletadas, soInativadas, removidos };
+  }
+
   /** Diagnóstico do casamento (por tipo: competência errada × doc ausente × folderPath). */
   async diagnosticarReconciliacao(ano = new Date().getFullYear() - 1) {
     return this.fiscalCalendar.diagnosticarReconciliacao(ano);

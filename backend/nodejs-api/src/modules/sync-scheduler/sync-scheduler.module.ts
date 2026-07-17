@@ -183,6 +183,13 @@ class SyncSchedulerController {
     return this.service.clientesInativosComObrigacao(ano ? parseInt(ano, 10) : undefined);
   }
 
+  /** LIMPA registros que não são empresas reais (pastas de controle). dry=1 só lista. */
+  @Public()
+  @Get('limpar-nao-clientes')
+  limparNaoClientes(@Query('dry') dry?: string) {
+    return this.service.limparNaoClientes({ dryRun: !(dry === '0' || dry === 'false') });
+  }
+
   /** Diagnóstico de cobertura via permissão de APLICAÇÃO (sites+drives que o app enxerga). */
   @Public()
   @Get('enumerar-sites')
