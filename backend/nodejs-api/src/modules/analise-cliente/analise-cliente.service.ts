@@ -969,7 +969,7 @@ export class AnaliseClienteService {
    * extrai a competência e cruza com as obrigações do banco. Devolve o censo + a lista dos PDFs
    * que SÃO recibo e NÃO estão casados (obrigação não entregue) — se vazia, provado: nada ficou pra trás.
    */
-  async auditarCoberturaCliente(codigo: string, anos: number[] = [2025, 2026]) {
+  async auditarCoberturaCliente(codigo: string, anos: number[] = [2025, 2026], opts?: { aplicar?: boolean; timeBudgetMs?: number }) {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
     if (!conn) return { erro: 'sem conexão OneDrive' };
     const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -1013,14 +1013,14 @@ export class AnaliseClienteService {
     const raiz = await this.onedrive.resolverPastaPorCaminho(conn.id, driveId, raizCaminho);
     if (!raiz) return { codigo, cliente: company.name, erro: 'raiz_nao_resolvida', raizCaminho };
     // 2) VARRE a árvore REAL (enumeração, não busca)
-    const arv = await this.onedrive.arvoreCompleta(conn.id, driveId, raiz.id, raiz.name, { maxItens: 9000, maxProfundidade: 8, timeBudgetMs: 70_000 });
+    const arv = await this.onedrive.arvoreCompleta(conn.id, driveId, raiz.id, raiz.name, { maxItens: 9000, maxProfundidade: 8, timeBudgetMs: opts?.timeBudgetMs ?? 70_000 });
     const arquivos = arv.itens.filter((it) => !it.isFolder);
     const pdfs = arquivos.filter((it) => /\.pdf$/i.test(it.nome || ''));
-    // 3) obrigações do banco (todos os tipos, anos alvo) → set de "tipo|comp" ENTREGUE e EXISTENTE
+    // 3) obrigações do banco (todos os tipos, anos alvo) → mapa "tipo|comp" → {status, ids}
     const anosStr = anos.map(String);
-    const obr = await this.prisma.fiscalCalendarItem.findMany({ where: { companyId: company.id, OR: anosStr.map((a) => ({ competencia: { startsWith: `${a}-` } })) }, select: { tipo: true, competencia: true, status: true } });
-    const entregueSet = new Set<string>(); const existeSet = new Set<string>();
-    for (const o of obr) { existeSet.add(`${o.tipo}|${o.competencia}`); if (['entregue', 'paga', 'isenta'].includes(o.status)) entregueSet.add(`${o.tipo}|${o.competencia}`); }
+    const obr = await this.prisma.fiscalCalendarItem.findMany({ where: { companyId: company.id, OR: anosStr.map((a) => ({ competencia: { startsWith: `${a}-` } })) }, select: { id: true, tipo: true, competencia: true, status: true } });
+    const entregueSet = new Set<string>(); const existeSet = new Set<string>(); const idsPorKey = new Map<string, string[]>();
+    for (const o of obr) { const k = `${o.tipo}|${o.competencia}`; existeSet.add(k); (idsPorKey.get(k) ?? idsPorKey.set(k, []).get(k)!).push(o.id); if (['entregue', 'paga', 'isenta'].includes(o.status)) entregueSet.add(k); }
     // 4) censo + reconciliação
     const porTipo: Record<string, number> = {};
     const recibos: Array<{ tipo: string; comp: string | null; nome: string; caminho: string; casado: boolean; obrigacaoExiste: boolean; abrir?: string }> = [];
@@ -1040,6 +1040,16 @@ export class AnaliseClienteService {
     const naoCasadosComObrigacao = naoCasados.filter((r) => r.obrigacaoExiste); // BUG de leitura/casamento (deveria estar marcado)
     const naoCasadosSemObrigacao = naoCasados.filter((r) => !r.obrigacaoExiste); // obrigação nem foi gerada no calendário
     const compsRecibo = [...new Set(recibos.filter((r) => r.comp).map((r) => `${r.tipo}|${r.comp}`))];
+    // APLICAR: marca ENTREGUE as obrigações cujo recibo o crawl PROVOU existir (com link)
+    let corrigidas = 0;
+    if (opts?.aplicar) {
+      const jaFeito = new Set<string>();
+      for (const r of naoCasadosComObrigacao) {
+        const key = `${r.tipo}|${r.comp}`; if (jaFeito.has(key)) continue; jaFeito.add(key);
+        if (this._compFutura(r.comp!)) continue; // nunca marca competência futura
+        for (const id of (idsPorKey.get(key) ?? [])) { await this.prisma.fiscalCalendarItem.update({ where: { id }, data: { status: 'entregue', comprovanteUrl: r.abrir || undefined } }).catch(() => undefined); corrigidas++; }
+      }
+    }
     return {
       codigo: String(codigo), cliente: company.name, regime: company.taxRegime, clienteDesde: company.clienteDesde ? company.clienteDesde.toISOString().slice(0, 10) : null,
       raiz: raiz.name, arvoreTruncada: arv.truncado,
@@ -1049,6 +1059,7 @@ export class AnaliseClienteService {
         casados: recibos.filter((r) => r.comp && r.casado).length,
         naoCasados_BUG: naoCasadosComObrigacao.length,       // recibo existe + obrigação existe + não entregue = FALHA de casamento
         naoCasados_semObrigacao: naoCasadosSemObrigacao.length, // recibo existe mas obrigação não foi gerada
+        corrigidasAgora: corrigidas,
       },
       // a PROVA: se naoCasados_BUG = 0, nada que deveria ser casado ficou pra trás
       amostraNaoCasadosBUG: naoCasadosComObrigacao.slice(0, 20).map((r) => `${r.tipo}|${r.comp}: ${r.nome}`),

@@ -316,6 +316,34 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.auditarCoberturaLote(limit, anos, offset);
   }
 
+  private reconCrawl: any = null;
+  /** RECONCILIAÇÃO POR CRAWL — background: enumera a árvore de CADA cliente ativo e marca ENTREGUE
+   *  os recibos provadamente presentes (naoCasados_BUG). Fecha o que a busca perdeu. Pesado (lento). */
+  reconciliarCrawlGlobal(anos = [new Date().getFullYear(), new Date().getFullYear() - 1]) {
+    if (this.reconCrawl?.status === 'rodando') return { status: 'rodando', desde: this.reconCrawl.em, progresso: this.reconCrawl.progresso };
+    this.reconCrawl = { status: 'rodando', em: new Date().toISOString(), anos, progresso: { feitos: 0, total: 0, corrigidas: 0, bugRestante: 0, semObrigacao: 0, naoLocalizados: 0 } };
+    (async () => {
+      const companies = await this.analiseProxyListaAtivos();
+      this.reconCrawl.progresso.total = companies.length;
+      for (const cod of companies) {
+        try {
+          const r: any = await this.analise.auditarCoberturaCliente(cod, anos, { aplicar: true, timeBudgetMs: 30_000 });
+          if (r?.reconciliacao) { this.reconCrawl.progresso.corrigidas += r.reconciliacao.corrigidasAgora || 0; this.reconCrawl.progresso.bugRestante += r.reconciliacao.naoCasados_BUG || 0; this.reconCrawl.progresso.semObrigacao += r.reconciliacao.naoCasados_semObrigacao || 0; }
+          else if (r?.erro) this.reconCrawl.progresso.naoLocalizados++;
+        } catch { this.reconCrawl.progresso.naoLocalizados++; }
+        this.reconCrawl.progresso.feitos++;
+      }
+      await this.fiscalCalendar.markOverdue().catch(() => undefined);
+      this.reconCrawl = { ...this.reconCrawl, status: 'concluido', em: new Date().toISOString() };
+    })().catch((e) => { this.reconCrawl = { ...this.reconCrawl, status: 'erro', msg: e?.message ?? String(e) }; });
+    return { status: 'disparado', anos, dica: 'consulte /sync-drive/reconciliar-crawl-status' };
+  }
+  reconciliarCrawlStatus() { return this.reconCrawl ?? { status: 'nunca_rodou' }; }
+  private async analiseProxyListaAtivos(): Promise<string[]> {
+    const cs = await this.prisma.company.findMany({ where: { active: true, clienteCodigo: { not: null } }, select: { clienteCodigo: true } });
+    return cs.map((c) => String(c.clienteCodigo)).filter((c) => /^\d+$/.test(c)).sort((a, b) => +a - +b);
+  }
+
   /** Link de consentimento de admin (Azure) — 1 clique libera as permissões de aplicação. */
   adminConsentUrl() {
     return this.analise.adminConsentUrl();

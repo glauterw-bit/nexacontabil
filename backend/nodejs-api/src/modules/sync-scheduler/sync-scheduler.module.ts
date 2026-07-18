@@ -206,6 +206,19 @@ class SyncSchedulerController {
     return this.service.auditarCoberturaLote(limit ? parseInt(limit, 10) : undefined, lista, offset ? parseInt(offset, 10) : undefined);
   }
 
+  /** RECONCILIAÇÃO POR CRAWL (background) — enumera cada cliente ativo e marca entregue os recibos provados. */
+  @Public()
+  @Get('reconciliar-crawl')
+  reconciliarCrawl(@Query('anos') anos?: string) {
+    const lista = anos ? anos.split(',').map((a) => parseInt(a, 10)).filter(Boolean) : undefined;
+    return this.service.reconciliarCrawlGlobal(lista);
+  }
+  @Public()
+  @Get('reconciliar-crawl-status')
+  reconciliarCrawlStatus() {
+    return this.service.reconciliarCrawlStatus();
+  }
+
   /** Diagnóstico de cobertura via permissão de APLICAÇÃO (sites+drives que o app enxerga). */
   @Public()
   @Get('enumerar-sites')
