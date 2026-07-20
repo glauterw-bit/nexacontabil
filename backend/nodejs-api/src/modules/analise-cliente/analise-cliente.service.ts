@@ -974,7 +974,7 @@ export class AnaliseClienteService {
     if (!conn) return { erro: 'sem conexão OneDrive' };
     const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     const MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-    const company = await this.prisma.company.findFirst({ where: { OR: [{ clienteCodigo: String(codigo) }, { clienteCodigo: String(parseInt(codigo, 10)) }] }, select: { id: true, name: true, taxRegime: true, clienteDesde: true } });
+    const company = await this.prisma.company.findFirst({ where: { OR: [{ clienteCodigo: String(codigo) }, { clienteCodigo: String(parseInt(codigo, 10)) }] }, select: { id: true, name: true, taxRegime: true, clienteDesde: true, cnpj: true } });
     if (!company) return { erro: `cliente ${codigo} não encontrado no banco` };
     // classifica o tipo do documento pelo nome
     const detectTipo = (n: string): string | null => {
@@ -996,20 +996,29 @@ export class AnaliseClienteService {
       if (mv) { const dm = +mv[2], dy = +mv[3]; if (dm >= 1 && dm <= 12 && anos.includes(dm === 1 ? dy - 1 : dy)) return dm === 1 ? `${dy - 1}-12` : `${dy}-${String(dm - 1).padStart(2, '0')}`; }
       return null;
     };
-    // 1) RESOLVE a pasta-raiz (código, senão nome)
+    // 1) RESOLVE a pasta-raiz — código, senão NOME completo, senão CNPJ (garante achar TODOS)
     const reCodSeg = new RegExp(`^\\s*${codigo}\\s*[-–]`);
     const reCod = new RegExp(`(^|/)\\s*${codigo}\\s*[-–]`);
-    const chaveNome = norm(company.name).split(' ').filter((w) => w.length >= 4).slice(0, 2).join(' ');
-    let ref: any = null;
-    for (const q of [`${codigo}`, `${codigo} -`, chaveNome].filter((x) => x && x.trim().length >= 2)) {
+    const nomeLimpo = norm((company as any).name).replace(/\b(ltda|eireli|epp|mei|me|sa|ss|comercio|servicos|de|do|da|dos|das|e)\b/g, ' ').replace(/\s+/g, ' ').trim();
+    const chaveNome = norm((company as any).name).split(' ').filter((w) => w.length >= 4).slice(0, 2).join(' ');
+    const cnpjRaiz = ((company as any).cnpj || '').replace(/\D/g, '').slice(0, 8);
+    // um segmento IDENTIFICA o cliente se tem o prefixo do código OU contém o nome completo limpo
+    const segIdentifica = (seg: string) => reCodSeg.test(seg) || (nomeLimpo.length >= 10 && norm(seg).includes(nomeLimpo));
+    let ref: any = null; let idxSeg = -1;
+    for (const q of [`${codigo}`, `${codigo} -`, `"${(company as any).name}"`, chaveNome, cnpjRaiz].filter((x) => x && String(x).trim().length >= 3)) {
       let arqs: any[] = []; try { arqs = (await this.onedrive.coletaTenant(conn.id, q, { maxItens: 500 })).itens; } catch { continue; }
-      ref = arqs.find((f) => reCod.test(f.path || '') && f.driveId); if (ref) break;
+      for (const f of arqs) {
+        if (!f.driveId) continue;
+        const segs = (f.path || '').split('/').filter(Boolean);
+        const i = segs.findIndex((s: string) => segIdentifica(s));
+        if (i >= 0) { ref = f; idxSeg = i; break; }
+      }
+      if (ref) break;
     }
     if (!ref) return { codigo, cliente: company.name, erro: 'pasta_nao_localizada' };
     const driveId = ref.driveId as string;
     const segs = (ref.path || '').split('/').filter(Boolean);
-    const idx = segs.findIndex((s: string) => reCodSeg.test(s));
-    const raizCaminho = idx >= 0 ? segs.slice(0, idx + 1).join('/') : segs[0];
+    const raizCaminho = idxSeg >= 0 ? segs.slice(0, idxSeg + 1).join('/') : segs[0];
     const raiz = await this.onedrive.resolverPastaPorCaminho(conn.id, driveId, raizCaminho);
     if (!raiz) return { codigo, cliente: company.name, erro: 'raiz_nao_resolvida', raizCaminho };
     // 2) VARRE a árvore REAL (enumeração, não busca)
@@ -1041,13 +1050,25 @@ export class AnaliseClienteService {
     const naoCasadosSemObrigacao = naoCasados.filter((r) => !r.obrigacaoExiste); // obrigação nem foi gerada no calendário
     const compsRecibo = [...new Set(recibos.filter((r) => r.comp).map((r) => `${r.tipo}|${r.comp}`))];
     // APLICAR: marca ENTREGUE as obrigações cujo recibo o crawl PROVOU existir (com link)
-    let corrigidas = 0;
+    let corrigidas = 0, criadas = 0;
     if (opts?.aplicar) {
       const jaFeito = new Set<string>();
       for (const r of naoCasadosComObrigacao) {
         const key = `${r.tipo}|${r.comp}`; if (jaFeito.has(key)) continue; jaFeito.add(key);
         if (this._compFutura(r.comp!)) continue; // nunca marca competência futura
         for (const id of (idsPorKey.get(key) ?? [])) { await this.prisma.fiscalCalendarItem.update({ where: { id }, data: { status: 'entregue', comprovanteUrl: r.abrir || undefined } }).catch(() => undefined); corrigidas++; }
+      }
+      // CRIA a obrigação faltante a partir do recibo (o recibo é prova de que era devida E entregue)
+      const inicio = company.clienteDesde ? `${company.clienteDesde.getUTCFullYear()}-${String(company.clienteDesde.getUTCMonth() + 1).padStart(2, '0')}` : null;
+      const jaCriado = new Set<string>();
+      for (const r of naoCasadosSemObrigacao) {
+        const key = `${r.tipo}|${r.comp}`; if (jaCriado.has(key)) continue; jaCriado.add(key);
+        if (this._compFutura(r.comp!)) continue;               // não cria competência futura
+        if (inicio && r.comp! < inicio) continue;              // não cria antes de o cliente existir
+        const [cy, cm] = r.comp!.split('-').map(Number);
+        const vy = cm === 12 ? cy + 1 : cy, vm = cm === 12 ? 1 : cm + 1; // vence no mês seguinte
+        await this.prisma.fiscalCalendarItem.create({ data: { companyId: company.id, tipo: r.tipo, descricao: `${r.tipo} - gerado a partir do recibo no OneDrive (${r.comp})`, competencia: r.comp!, dataVencimento: new Date(Date.UTC(vy, vm - 1, 20)), status: 'entregue', comprovanteUrl: r.abrir || undefined, recorrencia: 'mensal', observacoes: 'obrigacao criada pela auditoria de cobertura (crawl)' } }).catch(() => undefined);
+        criadas++;
       }
     }
     return {
@@ -1060,6 +1081,7 @@ export class AnaliseClienteService {
         naoCasados_BUG: naoCasadosComObrigacao.length,       // recibo existe + obrigação existe + não entregue = FALHA de casamento
         naoCasados_semObrigacao: naoCasadosSemObrigacao.length, // recibo existe mas obrigação não foi gerada
         corrigidasAgora: corrigidas,
+        criadasAgora: criadas,
       },
       // a PROVA: se naoCasados_BUG = 0, nada que deveria ser casado ficou pra trás
       amostraNaoCasadosBUG: naoCasadosComObrigacao.slice(0, 20).map((r) => `${r.tipo}|${r.comp}: ${r.nome}`),

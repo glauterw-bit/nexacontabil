@@ -321,15 +321,15 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
    *  os recibos provadamente presentes (naoCasados_BUG). Fecha o que a busca perdeu. Pesado (lento). */
   reconciliarCrawlGlobal(anos = [new Date().getFullYear(), new Date().getFullYear() - 1]) {
     if (this.reconCrawl?.status === 'rodando') return { status: 'rodando', desde: this.reconCrawl.em, progresso: this.reconCrawl.progresso };
-    this.reconCrawl = { status: 'rodando', em: new Date().toISOString(), anos, progresso: { feitos: 0, total: 0, corrigidas: 0, bugRestante: 0, semObrigacao: 0, naoLocalizados: 0 } };
+    this.reconCrawl = { status: 'rodando', em: new Date().toISOString(), anos, progresso: { feitos: 0, total: 0, corrigidas: 0, criadas: 0, bugRestante: 0, semObrigacao: 0, naoLocalizados: 0 }, naoLocalizadosLista: [] as string[] };
     (async () => {
       const companies = await this.analiseProxyListaAtivos();
       this.reconCrawl.progresso.total = companies.length;
       for (const cod of companies) {
         try {
           const r: any = await this.analise.auditarCoberturaCliente(cod, anos, { aplicar: true, timeBudgetMs: 30_000 });
-          if (r?.reconciliacao) { this.reconCrawl.progresso.corrigidas += r.reconciliacao.corrigidasAgora || 0; this.reconCrawl.progresso.bugRestante += r.reconciliacao.naoCasados_BUG || 0; this.reconCrawl.progresso.semObrigacao += r.reconciliacao.naoCasados_semObrigacao || 0; }
-          else if (r?.erro) this.reconCrawl.progresso.naoLocalizados++;
+          if (r?.reconciliacao) { this.reconCrawl.progresso.corrigidas += r.reconciliacao.corrigidasAgora || 0; this.reconCrawl.progresso.criadas += r.reconciliacao.criadasAgora || 0; this.reconCrawl.progresso.bugRestante += r.reconciliacao.naoCasados_BUG || 0; this.reconCrawl.progresso.semObrigacao += r.reconciliacao.naoCasados_semObrigacao || 0; }
+          else if (r?.erro) { this.reconCrawl.progresso.naoLocalizados++; if (this.reconCrawl.naoLocalizadosLista.length < 60) this.reconCrawl.naoLocalizadosLista.push(`${cod} ${r.cliente || ''} (${r.erro})`); }
         } catch { this.reconCrawl.progresso.naoLocalizados++; }
         this.reconCrawl.progresso.feitos++;
       }
