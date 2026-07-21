@@ -35,6 +35,7 @@ interface NavGroup { label: string; items: NavItem[] }
 
 const VISAO: NavItem[] = [
   { href: '/central-entregas', icon: CalendarClock, label: 'Central de Entregas' },
+  { href: '/cobertura', icon: ShieldCheck, label: 'Cobertura (prova)' },
   { href: '/explorador', icon: FolderTree, label: 'Explorador de Pastas' },
   { href: '/painel',    icon: LayoutDashboard, label: 'Painel do Escritório' },
   { href: '/consultor', icon: Sparkles,        label: 'Consultor de IA' },

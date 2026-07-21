@@ -58,6 +58,12 @@ export class PaineisController {
     return this.service.calendarioEntregas(ano ? parseInt(ano, 10) : undefined);
   }
 
+  /** Painel de COBERTURA (cliente × mês × status provado — recibo com link). */
+  @Get('cobertura')
+  cobertura(@Query('ano') ano?: string) {
+    return this.service.coberturaGrid(ano ? parseInt(ano, 10) : undefined);
+  }
+
   @Get('calendario-cliente')
   calendarioCliente(@Query('companyId') companyId: string, @Query('ano') ano?: string) {
     return this.service.calendarioClienteDetalhe(companyId, ano ? parseInt(ano, 10) : undefined);

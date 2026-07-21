@@ -1710,6 +1710,65 @@ export class PaineisService {
    * Simples/MEI, DCTFWeb pro Lucro). Objetivo: a equipe ver de relance quem não subiu o recibo
    * de cada competência, pra cobrar. FGTS/eSocial ficam de fora (controle no portal).
    */
+  /**
+   * PAINEL DE COBERTURA (prova por enumeração) — cliente × 12 meses, cada célula com o status
+   * PROVADO: 'prova' (entregue COM link de recibo no OneDrive = comprovanteUrl), 'ok' (entregue
+   * sem link), 'falta' (venceu e não entregue), 'isenta', 'na' (a vencer/sem obrigação).
+   * Só clientes ATIVOS. Portal (FGTS/eSocial/DARF) fora. Rápido (lê do banco, sem crawl).
+   */
+  async coberturaGrid(ano = new Date().getFullYear()) {
+    const now = new Date();
+    const PORTAL = new Set(['FGTS', 'ESOCIAL', 'DARF']);
+    const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    const companies = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true, clienteCodigo: true, taxRegime: true, responsavel: true, clienteDesde: true } });
+    const ids = companies.map((c) => c.id);
+    const itens = await this.prisma.fiscalCalendarItem.findMany({
+      where: { companyId: { in: ids }, competencia: { startsWith: `${ano}-` } },
+      select: { companyId: true, tipo: true, competencia: true, status: true, dataVencimento: true, comprovanteUrl: true, observacoes: true },
+    });
+    type Cell = { tot: number; ent: number; comProva: number; falta: number; isenta: number; criadas: number };
+    const mapa = new Map<string, Cell[]>();
+    for (const c of companies) mapa.set(c.id, Array.from({ length: 12 }, () => ({ tot: 0, ent: 0, comProva: 0, falta: 0, isenta: 0, criadas: 0 })));
+    for (const it of itens) {
+      if (PORTAL.has(it.tipo)) continue;
+      const mm = parseInt(it.competencia.split('-')[1] ?? '0', 10); if (!mm) continue;
+      const cell = mapa.get(it.companyId)?.[mm - 1]; if (!cell) continue;
+      if (it.status === 'isenta') { cell.isenta++; continue; } // isenta fora do total (neutro) — mas registra
+      cell.tot++;
+      if (ENTREGUE.has(it.status)) { cell.ent++; if (it.comprovanteUrl) cell.comProva++; }
+      else if (new Date(it.dataVencimento) < now) cell.falta++;
+      if (it.observacoes && String(it.observacoes).includes('crawl')) cell.criadas++;
+    }
+    const statusCell = (c: Cell): 'prova' | 'ok' | 'falta' | 'parcial' | 'isenta' | 'na' => {
+      if (c.tot === 0) return c.isenta > 0 ? 'isenta' : 'na';
+      if (c.ent === c.tot) return c.comProva === c.tot ? 'prova' : (c.comProva > 0 ? 'ok' : 'ok');
+      if (c.falta === 0) return 'na';               // ainda no prazo
+      if (c.ent === 0) return 'falta';
+      return 'parcial';
+    };
+    let totProva = 0, totEnt = 0, totFalta = 0, totCriadas = 0;
+    const clientes = companies.map((c) => {
+      const cells = mapa.get(c.id)!;
+      const meses = cells.map((cell, m) => ({ mes: m + 1, status: statusCell(cell), ent: cell.ent, tot: cell.tot, comProva: cell.comProva, criadas: cell.criadas }));
+      let prova = 0, ent = 0, falta = 0, criadas = 0;
+      for (const cell of cells) { prova += cell.comProva; ent += cell.ent; falta += cell.falta; criadas += cell.criadas; }
+      totProva += prova; totEnt += ent; totFalta += falta; totCriadas += criadas;
+      const pend = meses.filter((x) => x.status === 'falta').length * 2 + meses.filter((x) => x.status === 'parcial').length;
+      return { companyId: c.id, nome: c.name, codigo: c.clienteCodigo, regime: c.taxRegime, responsavel: c.responsavel, clienteDesde: c.clienteDesde ? c.clienteDesde.toISOString().slice(0, 10) : null, meses, prova, entregues: ent, faltam: falta, criadas, pend };
+    }).sort((a, b) => b.faltam - a.faltam || b.pend - a.pend || String(a.nome).localeCompare(String(b.nome)));
+    const devidas = totEnt + totFalta;
+    return {
+      ano,
+      resumo: {
+        totalClientes: clientes.length,
+        obEntregues: totEnt, comProva: totProva, obFaltam: totFalta, criadasPeloCrawl: totCriadas,
+        taxaEntrega: devidas ? Math.round((totEnt / devidas) * 100) : 0,
+        taxaProva: totEnt ? Math.round((totProva / totEnt) * 100) : 0, // % dos entregues que têm o recibo linkado (provados)
+      },
+      clientes,
+    };
+  }
+
   async recibosFaltantes(ano = new Date().getFullYear(), tipoFiltro?: string) {
     const now = new Date();
     const anoAtual = now.getFullYear();
