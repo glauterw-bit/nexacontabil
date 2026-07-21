@@ -343,6 +343,23 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     const cs = await this.prisma.company.findMany({ where: { active: true, clienteCodigo: { not: null } }, select: { clienteCodigo: true } });
     return cs.map((c) => String(c.clienteCodigo)).filter((c) => /^\d+$/.test(c)).sort((a, b) => +a - +b);
   }
+  private crawlOffset = 0;
+  /** LOTE ROTATIVO do crawl de cobertura — N clientes/ciclo (aplica), cobrindo a carteira por
+   *  ENUMERAÇÃO ao longo de vários ciclos sem pico. Mantém o painel fechado conforme sobem recibos. */
+  private async crawlLoteRotativo(n = 8) {
+    const anos = [new Date().getFullYear(), new Date().getFullYear() - 1];
+    const codigos = await this.analiseProxyListaAtivos();
+    if (!codigos.length) return { lote: 0 };
+    if (this.crawlOffset >= codigos.length) this.crawlOffset = 0;
+    const lote = codigos.slice(this.crawlOffset, this.crawlOffset + n);
+    this.crawlOffset += n;
+    let corrigidas = 0, criadas = 0, erros = 0;
+    for (const cod of lote) {
+      try { const r: any = await this.analise.auditarCoberturaCliente(cod, anos, { aplicar: true, timeBudgetMs: 25_000 }); if (r?.reconciliacao) { corrigidas += r.reconciliacao.corrigidasAgora || 0; criadas += r.reconciliacao.criadasAgora || 0; } }
+      catch { erros++; }
+    }
+    return { lote: lote.length, offsetAtual: this.crawlOffset, deTotal: codigos.length, corrigidas, criadas, erros };
+  }
 
   /** Link de consentimento de admin (Azure) — 1 clique libera as permissões de aplicação. */
   adminConsentUrl() {
@@ -694,6 +711,10 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         //     Fora do ciclo: é pesado (varre ~460k arquivos) e a busca tenant-wide do passo 3 já
         //     cobre as entregas de forma eficiente. O scan completo confirmou que cobertura não é
         //     o gargalo (DAS/DARF faltantes = recibos não subidos, não falha de leitura).
+        // 3d. CRAWL DE COBERTURA (lote rotativo, 8 clientes/ciclo) — ENUMERA a árvore real e
+        //     marca entregue / CRIA as obrigações provadas pelos recibos. Pega o que a busca
+        //     perde; cobre a carteira toda a cada ~6h sem pico. Prova de completude contínua.
+        await passo('crawlCobertura', () => this.crawlLoteRotativo(8));
         // 4. recibo genérico (fallback) p/ quem não casou por documento específico
         await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 6));
         // 5. marca vencidas o que sobrou pendente e já passou do prazo
