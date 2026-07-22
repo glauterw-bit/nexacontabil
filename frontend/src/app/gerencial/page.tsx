@@ -1,137 +1,102 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import { LayoutDashboard, AlertTriangle, Users, Inbox, ArrowRight } from 'lucide-react';
-import { PageHeader, Kpi, Card, SectionTitle, COLORS, tint, Spinner, EmptyState } from '@/components/ui/kit';
-import { useCompetencia, fmtCompetencia } from '@/contexts/CompetenciaContext';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://backend-production-9eeec.up.railway.app';
 function authHeaders(): Record<string, string> {
   const t = typeof window !== 'undefined' ? localStorage.getItem('aura_token') : null;
-  return t ? { Authorization: `Bearer ${t}` } : {};
+  return { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) };
 }
-const BRL = (n: number) => (n ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+type Analista = { responsavel: string; clientes: number; entregues: number; devidas: number; taxa: number; atrasados: number };
+type Dados = { ano: number; analistas: Analista[] };
 
-/** Painel Gerencial — objetivo: como está a carteira e como vai cada analista. */
-export default function GerencialPage() {
-  const [d, setD] = useState<any>(null);      // /paineis/gerencial (kpis + topClientesErro)
-  const [ca, setCa] = useState<any>(null);    // /paineis/carteira-analistas (equipe)
+function tone(taxa: number) { return taxa >= 90 ? '#2E7D5B' : taxa >= 70 ? '#B7791F' : '#C0362C'; }
+function Bar({ taxa }: { taxa: number }) {
+  return <div className="gp-bar"><span style={{ width: `${taxa}%`, background: tone(taxa) }} /></div>;
+}
+
+export default function Gerencial() {
+  const [d, setD] = useState<Dados | null>(null);
   const [loading, setLoading] = useState(true);
-  const { competencia } = useCompetencia();
+  const [ano, setAno] = useState(new Date().getFullYear());
 
-  const load = useCallback(async () => {
+  const carregar = useCallback(() => {
     setLoading(true);
-    try {
-      const [rg, rc] = await Promise.all([
-        fetch(`${API}/api/v1/paineis/gerencial`, { headers: authHeaders() }),
-        fetch(`${API}/api/v1/paineis/carteira-analistas`, { headers: authHeaders() }),
-      ]);
-      setD(rg.ok ? await rg.json() : null);
-      setCa(rc.ok ? await rc.json() : null);
-    } catch {} finally { setLoading(false); }
-  }, [competencia]);
-  useEffect(() => { load(); }, [load]);
+    fetch(`${API}/api/v1/paineis/desempenho-analistas?ano=${ano}`, { headers: authHeaders() })
+      .then((r) => r.json()).then(setD).catch(() => setD(null)).finally(() => setLoading(false));
+  }, [ano]);
+  useEffect(() => { carregar(); }, [carregar]);
 
-  if (loading) return <Spinner />;
-  if (!d && !ca) return <EmptyState icon={<Inbox size={32} />} title="Sem dados do escritório" sub="Verifique seu login." />;
-
-  const k = d?.kpis ?? {};
-  const t = ca?.totais ?? {};
-  const analistas: any[] = ca?.analistas ?? [];
-  const topErro: any[] = d?.topClientesErro ?? [];
+  const tot = d?.analistas.reduce((a, x) => ({ cli: a.cli + x.clientes, ent: a.ent + x.entregues, dev: a.dev + x.devidas, atr: a.atr + x.atrasados }), { cli: 0, ent: 0, dev: 0, atr: 0 });
+  const taxaGeral = tot && tot.dev ? Math.round((tot.ent / tot.dev) * 100) : 0;
 
   return (
-    <div style={{ padding: 24, maxWidth: 1180, margin: '0 auto' }}>
-      <PageHeader
-        icon={<LayoutDashboard size={20} color={COLORS.acao} />}
-        title="Painel Gerencial"
-        subtitle={`Desempenho da equipe e da carteira — ${fmtCompetencia(ca?.competencia)}`}
-        action={<Link href="/painel" className="btn-ghost" style={{ fontSize: 13, textDecoration: 'none' }}>Ver Painel do Escritório →</Link>}
-      />
-
-      {/* KPIs objetivos do escritório */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 22 }}>
-        <Kpi label="Obrigações vencidas" value={(t.obrigVencidas ?? 0).toLocaleString('pt-BR')} cor={(t.obrigVencidas ?? 0) ? COLORS.erro : COLORS.ok} sub="da carteira toda" />
-        <Kpi label="Obrigações pendentes" value={(t.obrigPendentes ?? 0).toLocaleString('pt-BR')} cor={(t.obrigPendentes ?? 0) ? COLORS.atencao : COLORS.ok} sub="a entregar" />
-        <Kpi label="Notas com erro" value={(k.notasErro ?? 0).toLocaleString('pt-BR')} cor={(k.notasErro ?? 0) ? COLORS.erro : COLORS.ok} sub={`${k.clientesComErro ?? 0} clientes · ${BRL(k.valorEnvolvido)}`} />
-        <Kpi label="Documentos processados" value={(k.docs ?? 0).toLocaleString('pt-BR')} sub={`${t.clientes ?? 0} clientes`} />
-        {(t.clientesSemResponsavel ?? 0) > 0 && <Kpi label="Sem responsável" value={t.clientesSemResponsavel} cor={COLORS.info} sub="atribuir analista" />}
-      </div>
-
-      {/* Desempenho por analista — o valor único deste painel */}
-      <SectionTitle><Users size={15} color={COLORS.acao} /> Desempenho por analista</SectionTitle>
-      {analistas.length === 0 ? (
-        <EmptyState title="Sem analistas com carteira" sub="Atribua clientes aos analistas em Gestão de Carteira." />
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12, marginBottom: 24 }}>
-          {analistas.map((a: any) => {
-            const atencao = a.clientesAtencao ?? 0;
-            const acento = a.obrigVencidas > 0 ? COLORS.erro : atencao > 0 ? COLORS.atencao : COLORS.ok;
-            return (
-              <Link key={a.responsavel} href={`/painel-analista?responsavel=${encodeURIComponent(a.responsavel)}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <Card accent={acento} style={{ height: '100%' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: tint(COLORS.acao, 12), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, color: COLORS.acao, fontSize: 14 }}>
-                      {(a.responsavel || '?').split(' ').map((p: string) => p[0]).slice(0, 2).join('')}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, color: COLORS.strong, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.responsavel}</div>
-                      <div style={{ fontSize: 11.5, color: COLORS.faint }}>{a.clientes} clientes · {(a.docs ?? 0).toLocaleString('pt-BR')} docs</div>
-                    </div>
-                    {atencao > 0 && (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: COLORS.erro, background: tint(COLORS.dotErro, 10), border: `1px solid ${tint(COLORS.dotErro, 25)}`, borderRadius: 999, padding: '3px 8px', whiteSpace: 'nowrap' }}>
-                        <AlertTriangle size={11} /> {atencao}
-                      </span>
-                    )}
-                  </div>
-                  <BarraProg label="Entregas" pct={a.pctEntrega} legenda={`${a.obrigEntregues}/${a.obrigTotal}`} />
-                  <BarraProg label="Pontualidade" pct={a.pontualidade} legenda={a.obrigVencidas > 0 ? `${a.obrigVencidas} vencida(s)` : 'no prazo'} />
-                  <BarraProg label="Precisão" pct={a.precisao} legenda={a.clientesComErro > 0 ? `${a.clientesComErro} c/ erro` : 'sem erro'} />
-                </Card>
-              </Link>
-            );
-          })}
+    <div className="gp-wrap">
+      <header className="gp-head">
+        <div>
+          <h1>Desempenho da equipe</h1>
+          <p>Taxa REAL de entrega da carteira de cada analista (obrigações entregues ÷ devidas no ano). Ordenado por quem mais precisa de atenção.</p>
         </div>
-      )}
+        <select value={ano} onChange={(e) => setAno(parseInt(e.target.value, 10))} className="gp-year">
+          {[new Date().getFullYear(), new Date().getFullYear() - 1].map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </header>
 
-      {/* Clientes que mais precisam de atenção — lista curta e clara */}
-      {topErro.length > 0 && (
+      {loading ? <div className="gp-load">Carregando…</div> : !d ? <div className="gp-load">Sem dados.</div> : (
         <>
-          <SectionTitle><AlertTriangle size={15} color={COLORS.atencao} /> Clientes que mais precisam de atenção</SectionTitle>
-          <Card style={{ padding: 0, overflow: 'hidden' }}>
-            {topErro.slice(0, 8).map((c: any, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderTop: i ? `1px solid ${COLORS.borderSoft}` : 'none' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, color: COLORS.strong, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.cliente}</div>
-                  <div style={{ fontSize: 11.5, color: COLORS.faint }}>{c.responsavel ?? 'sem responsável'}</div>
-                </div>
-                <span style={{ color: COLORS.erro, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>{c.erros} nota(s) · {BRL(c.valor)}</span>
-              </div>
-            ))}
-          </Card>
+          <section className="gp-kpis">
+            <div className="gp-kpi"><div className="n" style={{ color: tone(taxaGeral) }}>{taxaGeral}%</div><div className="l">Taxa geral do escritório</div></div>
+            <div className="gp-kpi"><div className="n">{tot?.cli}</div><div className="l">Clientes ativos</div></div>
+            <div className="gp-kpi"><div className="n">{d.analistas.length}</div><div className="l">Responsáveis</div></div>
+            <div className="gp-kpi"><div className="n" style={{ color: '#C0362C' }}>{tot?.atr}</div><div className="l">Clientes atrasados</div></div>
+          </section>
+
+          <div className="gp-tablewrap">
+            <table className="gp-table">
+              <thead><tr><th className="l">Responsável</th><th>Clientes</th><th>Atrasados</th><th className="w">Taxa de entrega</th><th>Entregues / Devidas</th></tr></thead>
+              <tbody>
+                {d.analistas.map((a) => (
+                  <tr key={a.responsavel}>
+                    <td className="l"><b>{a.responsavel}</b></td>
+                    <td>{a.clientes}</td>
+                    <td className={a.atrasados ? 'gp-atr' : ''}>{a.atrasados || '—'}</td>
+                    <td className="w"><div className="gp-taxa"><span style={{ color: tone(a.taxa), fontWeight: 700 }}>{a.taxa}%</span><Bar taxa={a.taxa} /></div></td>
+                    <td className="gp-num">{a.entregues} / {a.devidas}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="gp-note">A taxa exclui FGTS/eSocial/DARF (controle no portal) e meses isentos (antes do cliente entrar). Verde ≥90% · âmbar 70-89% · vermelho &lt;70%.</p>
         </>
       )}
 
-      <div style={{ marginTop: 16, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-        <Link href="/operacao" style={{ fontSize: 13, color: COLORS.acao, textDecoration: 'none', display: 'inline-flex', gap: 4, alignItems: 'center' }}>Carteira detalhada por cliente <ArrowRight size={13} /></Link>
-        <Link href="/atribuir-responsavel" style={{ fontSize: 13, color: COLORS.acao, textDecoration: 'none', display: 'inline-flex', gap: 4, alignItems: 'center' }}>Gestão de carteira <ArrowRight size={13} /></Link>
-      </div>
-    </div>
-  );
-}
-
-function BarraProg({ label, pct, legenda }: { label: string; pct: number; legenda?: string }) {
-  const p = Math.max(0, Math.min(100, pct ?? 0));
-  const cor = p >= 90 ? COLORS.ok : p >= 70 ? COLORS.atencao : COLORS.erro;
-  return (
-    <div style={{ marginBottom: 9 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, marginBottom: 3 }}>
-        <span style={{ color: COLORS.muted }}>{label}</span>
-        <span style={{ fontWeight: 700, color: cor, fontVariantNumeric: 'tabular-nums' }}>{p}%{legenda ? <span style={{ color: COLORS.faint, fontWeight: 400 }}> · {legenda}</span> : ''}</span>
-      </div>
-      <div style={{ height: 7, background: COLORS.surface2, borderRadius: 4, overflow: 'hidden' }}>
-        <div style={{ width: `${p}%`, height: '100%', background: cor, transition: 'width .3s' }} />
-      </div>
+      <style jsx global>{`
+.gp-wrap{--s:#fff;--s2:#F5F5F4;--b:#E7E5E4;--tx:#1C1917;--tx2:#57534E;--tx3:#8A857E;max-width:1000px;margin:0 auto;padding:22px 22px 80px;color:var(--tx);font-size:14px}
+.gp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:20px}
+.gp-head h1{font-size:22px;font-weight:650;letter-spacing:-.01em}
+.gp-head p{color:var(--tx2);margin-top:6px;max-width:680px;line-height:1.5}
+.gp-year{border:1px solid var(--b);border-radius:10px;padding:8px 12px;font-size:14px;background:var(--s)}
+.gp-load{padding:60px;text-align:center;color:var(--tx3)}
+.gp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.gp-kpi{background:var(--s);border:1px solid var(--b);border-radius:16px;padding:16px 18px;box-shadow:0 1px 2px rgba(28,25,23,.05)}
+.gp-kpi .n{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+.gp-kpi .l{color:var(--tx2);font-size:13px;margin-top:2px}
+.gp-tablewrap{border:1px solid var(--b);border-radius:14px;background:var(--s);overflow:hidden}
+.gp-table{border-collapse:collapse;width:100%}
+.gp-table thead th{background:var(--s2);font-size:11px;font-weight:600;color:var(--tx2);padding:11px 12px;text-align:center;border-bottom:1px solid var(--b)}
+.gp-table th.l,.gp-table td.l{text-align:left}
+.gp-table th.w{width:34%}
+.gp-table td{padding:12px;border-bottom:1px solid #F0EEEC;text-align:center;font-variant-numeric:tabular-nums}
+.gp-table tr:last-child td{border-bottom:none}
+.gp-table td.l b{font-weight:600}
+.gp-atr{color:#C0362C;font-weight:600}
+.gp-taxa{display:flex;align-items:center;gap:10px}
+.gp-bar{flex:1;height:8px;background:var(--s2);border-radius:99px;overflow:hidden}
+.gp-bar span{display:block;height:100%;border-radius:99px}
+.gp-num{color:var(--tx3);font-size:13px}
+.gp-note{color:var(--tx3);font-size:12px;margin-top:12px;line-height:1.5}
+@media(max-width:640px){.gp-kpis{grid-template-columns:1fr 1fr}.gp-table th.w{width:auto}}
+      `}</style>
     </div>
   );
 }

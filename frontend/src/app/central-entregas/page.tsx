@@ -32,6 +32,9 @@ export default function CentralEntregas() {
   const [det, setDet] = useState<any>(null);
   const [dataInicio, setDataInicio] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [cob, setCob] = useState<any>(null);
+  const [cobLoad, setCobLoad] = useState(false);
+  const [copiado, setCopiado] = useState(false);
 
   const carregar = useCallback(() => {
     setLoading(true);
@@ -41,11 +44,21 @@ export default function CentralEntregas() {
   useEffect(() => { carregar(); }, [carregar]);
 
   useEffect(() => {
-    if (!sel) { setDet(null); return; }
-    setDet(null); setDataInicio(sel.clienteDesde || '');
+    if (!sel) { setDet(null); setCob(null); return; }
+    setDet(null); setCob(null); setCopiado(false); setDataInicio(sel.clienteDesde || '');
     fetch(`${API}/api/v1/paineis/calendario-cliente?companyId=${sel.companyId}&ano=${ano}`, { headers: authHeaders() })
       .then((r) => r.json()).then(setDet).catch(() => setDet(null));
   }, [sel, ano]);
+
+  const gerarCobranca = async () => {
+    if (!sel) return;
+    setCobLoad(true); setCopiado(false);
+    try {
+      const r = await fetch(`${API}/api/v1/paineis/cobranca-cliente?companyId=${sel.companyId}&ano=${ano}`, { headers: authHeaders() });
+      setCob(await r.json());
+    } catch { setCob({ erro: 'falhou' }); } finally { setCobLoad(false); }
+  };
+  const copiarMsg = async () => { if (cob?.mensagem) { try { await navigator.clipboard.writeText(cob.mensagem); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch {} } };
 
   const salvarInicio = async () => {
     if (!sel || !dataInicio) return;
@@ -175,6 +188,21 @@ export default function CentralEntregas() {
                 </div>
                 {sel.clienteDesde ? <div className="ce-novo-cur">Início atual: {sel.clienteDesde.slice(8, 10)}/{sel.clienteDesde.slice(5, 7)}/{sel.clienteDesde.slice(0, 4)}</div> : null}
               </div>
+              <div className="ce-cobrar">
+                {!cob ? (
+                  <button className="ce-cobrar-btn" onClick={gerarCobranca} disabled={cobLoad}>{cobLoad ? 'Gerando…' : '💬 Gerar cobrança do que falta'}</button>
+                ) : cob.erro ? <div className="ce-load sm">Não consegui gerar.</div> : (
+                  <div className="ce-cobrar-box">
+                    <div className="ce-cobrar-h">{cob.totalFaltam ? `${cob.totalFaltam} pendência(s) — mensagem pronta:` : 'Cliente 100% em dia 🎉'}</div>
+                    <textarea className="ce-cobrar-msg" readOnly value={cob.mensagem} rows={cob.totalFaltam ? 6 : 2} />
+                    <div className="ce-cobrar-acts">
+                      {cob.whatsapp ? <a className="ce-wa" href={cob.whatsapp} target="_blank" rel="noopener">Abrir no WhatsApp ↗</a> : <span className="ce-wa off" title="Cliente sem WhatsApp cadastrado">sem WhatsApp</span>}
+                      <button className="ce-copy" onClick={copiarMsg}>{copiado ? '✓ copiado' : 'Copiar'}</button>
+                      {cob.email ? <a className="ce-copy" href={`mailto:${cob.email}?subject=${encodeURIComponent('Documentos pendentes')}&body=${encodeURIComponent(cob.mensagem)}`}>E-mail</a> : null}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="ce-dbody">
               {!det ? <div className="ce-load sm">Carregando…</div> : (
@@ -295,6 +323,16 @@ const CSS = `
 .ce-novo-r input{flex:1;border:1px solid var(--ce-border);border-radius:8px;padding:7px 9px;font-size:13px;font-family:inherit}
 .ce-novo-r button{border:none;background:var(--ce-accent);color:#fff;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}
 .ce-novo-r button:disabled{opacity:.5;cursor:default}
+.ce-cobrar{margin-top:10px}
+.ce-cobrar-btn{width:100%;border:1px solid var(--ce-accent);background:var(--ce-accent-soft);color:var(--ce-accent);border-radius:10px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer}
+.ce-cobrar-btn:disabled{opacity:.5;cursor:default}
+.ce-cobrar-box{background:var(--ce-surface2);border:1px solid var(--ce-border);border-radius:10px;padding:11px 12px}
+.ce-cobrar-h{font-size:12px;font-weight:600;color:var(--ce-tx2);margin-bottom:8px}
+.ce-cobrar-msg{width:100%;border:1px solid var(--ce-border);border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;line-height:1.45;resize:vertical;color:var(--ce-tx);background:var(--ce-surface)}
+.ce-cobrar-acts{display:flex;gap:8px;margin-top:8px;align-items:center}
+.ce-wa{background:#25D366;color:#fff;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;text-decoration:none}
+.ce-wa.off{background:var(--ce-na);color:var(--ce-tx3);cursor:default}
+.ce-copy{border:1px solid var(--ce-border);background:var(--ce-surface);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ce-tx2);text-decoration:none}
 .ce-novo-cur{font-size:11.5px;color:var(--ce-tx3);margin-top:7px}
 .ce-dbody{overflow-y:auto;padding:6px 0 30px}
 .ce-mo{border-bottom:1px solid var(--ce-border-soft)}

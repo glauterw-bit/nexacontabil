@@ -106,9 +106,9 @@ const MODULOS: NavGroup[] = [
 
 // ── ANALISTA — foco total na PRÓPRIA carteira (painéis escopados no back-end pelo nome do login) ──
 const VISAO_ANALISTA: NavItem[] = [
+  { href: '/meu-dia',           icon: Activity,      label: 'Meu Dia' },
   { href: '/central-entregas',  icon: CalendarClock, label: 'Minha Central' },
   { href: '/cobertura',         icon: ShieldCheck,   label: 'Minha Cobertura' },
-  { href: '/recibos-faltantes', icon: CalendarClock, label: 'Cobrar (meus)' },
 ];
 const CAMINHO_ANALISTA: Step[] = [
   { n: 1, label: 'Receber',  cor: '#6cb2ff', items: [{ href: '/captura-xml', icon: Inbox, label: 'Captura de XMLs' }] },

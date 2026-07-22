@@ -1769,7 +1769,65 @@ export class PaineisService {
     };
   }
 
-  async recibosFaltantes(ano = new Date().getFullYear(), tipoFiltro?: string) {
+  /**
+   * DESEMPENHO POR ANALISTA — taxa REAL de entrega da carteira de cada um (entregues ÷ devidas),
+   * nº de clientes e quantos estão atrasados. Alimenta a gestão de equipe com dado, não vaidade.
+   */
+  async desempenhoAnalistas(ano = new Date().getFullYear()) {
+    const now = new Date();
+    const PORTAL = new Set(['FGTS', 'ESOCIAL', 'DARF']);
+    const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    const companies = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, responsavel: true } });
+    const ids = companies.map((c) => c.id);
+    const itens = await this.prisma.fiscalCalendarItem.findMany({ where: { companyId: { in: ids }, competencia: { startsWith: `${ano}-` } }, select: { companyId: true, tipo: true, status: true, dataVencimento: true } });
+    const porCli = new Map<string, { ent: number; dev: number }>();
+    for (const c of companies) porCli.set(c.id, { ent: 0, dev: 0 });
+    for (const it of itens) {
+      if (PORTAL.has(it.tipo) || it.status === 'isenta') continue;
+      const r = porCli.get(it.companyId); if (!r) continue;
+      if (ENTREGUE.has(it.status)) { r.ent++; r.dev++; }
+      else if (new Date(it.dataVencimento) < now) r.dev++;
+    }
+    const agg = new Map<string, { clientes: number; ent: number; dev: number; atrasados: number }>();
+    for (const c of companies) {
+      const resp = (c.responsavel || '').trim() || '— sem responsável —';
+      const a = agg.get(resp) ?? { clientes: 0, ent: 0, dev: 0, atrasados: 0 };
+      const r = porCli.get(c.id)!;
+      a.clientes++; a.ent += r.ent; a.dev += r.dev; if (r.dev > r.ent) a.atrasados++;
+      agg.set(resp, a);
+    }
+    const analistas = [...agg.entries()].map(([responsavel, a]) => ({
+      responsavel, clientes: a.clientes, entregues: a.ent, devidas: a.dev,
+      taxa: a.dev ? Math.round((a.ent / a.dev) * 100) : 100, atrasados: a.atrasados,
+    })).sort((x, y) => x.taxa - y.taxa || y.atrasados - x.atrasados);
+    return { ano, analistas };
+  }
+
+  /**
+   * COBRANÇA de um cliente — monta a lista do que falta e uma MENSAGEM pronta (WhatsApp/e-mail)
+   * pro cliente subir os documentos. Fecha o loop receber→cobrar direto do painel.
+   */
+  async cobrancaCliente(companyId: string, ano = new Date().getFullYear()) {
+    const now = new Date();
+    const MESL = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const PORTAL = new Set(['FGTS', 'ESOCIAL', 'DARF']);
+    const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    const c = await this.prisma.company.findUnique({ where: { id: companyId }, select: { name: true, whatsappNumber: true, email: true, responsavel: true } });
+    if (!c) return { erro: 'cliente não encontrado' };
+    const itens = await this.prisma.fiscalCalendarItem.findMany({ where: { companyId, competencia: { startsWith: `${ano}-` } }, select: { tipo: true, competencia: true, status: true, dataVencimento: true }, orderBy: { competencia: 'asc' } });
+    const faltam = itens.filter((it) => !PORTAL.has(it.tipo) && !ENTREGUE.has(it.status) && new Date(it.dataVencimento) < now)
+      .map((it) => { const [, m] = it.competencia.split('-'); return { tipo: it.tipo, comp: it.competencia, rotulo: `${it.tipo} — ${MESL[parseInt(m, 10) - 1]}/${ano}` }; });
+    const lista = faltam.map((f) => `• ${f.rotulo}`).join('\n');
+    const primeiroNome = (c.name || 'cliente').split(' ')[0];
+    const mensagem = faltam.length
+      ? `Olá, ${primeiroNome}! Tudo bem? 😊\n\nEstamos organizando a documentação de *${c.name}* e ainda faltam estes comprovantes:\n\n${lista}\n\nPode nos enviar quando possível? Assim mantemos suas obrigações 100% em dia. Qualquer dúvida, é só chamar!`
+      : `Olá, ${primeiroNome}! A documentação de *${c.name}* está 100% em dia. Obrigado! 🎉`;
+    const fone = (c.whatsappNumber || '').replace(/\D/g, '');
+    const whatsapp = fone ? `https://wa.me/${fone.length <= 11 ? '55' + fone : fone}?text=${encodeURIComponent(mensagem)}` : null;
+    return { cliente: c.name, responsavel: c.responsavel, email: c.email, totalFaltam: faltam.length, faltam, mensagem, whatsapp };
+  }
+
+  async recibosFaltantes(ano = new Date().getFullYear(), tipoFiltro?: string, responsavel?: string) {
     const now = new Date();
     const anoAtual = now.getFullYear();
     const mesLimite = ano < anoAtual ? 12 : (ano > anoAtual ? 0 : now.getMonth() + 1); // até que mês cobrar
@@ -1781,7 +1839,7 @@ export class PaineisService {
       return 'DAS';
     };
     const companies = await this.prisma.company.findMany({
-      where: { active: true },
+      where: { active: true, ...(responsavel ? { responsavel } : {}) },
       select: { id: true, name: true, clienteCodigo: true, taxRegime: true, responsavel: true },
       orderBy: { name: 'asc' },
     });

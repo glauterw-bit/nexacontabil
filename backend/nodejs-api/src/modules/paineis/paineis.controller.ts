@@ -49,8 +49,20 @@ export class PaineisController {
   }
 
   @Get('recibos-faltantes')
-  recibosFaltantes(@Query('ano') ano?: string, @Query('tipo') tipo?: string) {
-    return this.service.recibosFaltantes(ano ? parseInt(ano, 10) : undefined, tipo);
+  recibosFaltantes(@Query('ano') ano?: string, @Query('tipo') tipo?: string, @Query('responsavel') responsavel?: string, @Req() req?: any) {
+    return this.service.recibosFaltantes(ano ? parseInt(ano, 10) : undefined, tipo, escopo(req, responsavel));
+  }
+
+  /** DESEMPENHO por analista — taxa real da carteira de cada um. */
+  @Get('desempenho-analistas')
+  desempenhoAnalistas(@Query('ano') ano?: string) {
+    return this.service.desempenhoAnalistas(ano ? parseInt(ano, 10) : undefined);
+  }
+
+  /** COBRANÇA — lista o que falta do cliente + mensagem pronta (WhatsApp/e-mail). */
+  @Get('cobranca-cliente')
+  cobrancaCliente(@Query('companyId') companyId: string, @Query('ano') ano?: string) {
+    return this.service.cobrancaCliente(companyId, ano ? parseInt(ano, 10) : undefined);
   }
 
   @Get('calendario-entregas')
