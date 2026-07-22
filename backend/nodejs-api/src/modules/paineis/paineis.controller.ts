@@ -54,14 +54,14 @@ export class PaineisController {
   }
 
   @Get('calendario-entregas')
-  calendarioEntregas(@Query('ano') ano?: string) {
-    return this.service.calendarioEntregas(ano ? parseInt(ano, 10) : undefined);
+  calendarioEntregas(@Query('ano') ano?: string, @Query('responsavel') responsavel?: string, @Req() req?: any) {
+    return this.service.calendarioEntregas(ano ? parseInt(ano, 10) : undefined, escopo(req, responsavel));
   }
 
   /** Painel de COBERTURA (cliente × mês × status provado — recibo com link). */
   @Get('cobertura')
-  cobertura(@Query('ano') ano?: string) {
-    return this.service.coberturaGrid(ano ? parseInt(ano, 10) : undefined);
+  cobertura(@Query('ano') ano?: string, @Query('responsavel') responsavel?: string, @Req() req?: any) {
+    return this.service.coberturaGrid(ano ? parseInt(ano, 10) : undefined, escopo(req, responsavel));
   }
 
   @Get('calendario-cliente')

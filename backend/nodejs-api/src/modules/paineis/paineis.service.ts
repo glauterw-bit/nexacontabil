@@ -1603,14 +1603,14 @@ export class PaineisService {
    * ok (tudo entregue) · warn (parcial) · late (venceu e falta) · na (a vencer/sem obrigação).
    * Alimenta o painel Central de Entregas (grade estilo calendário).
    */
-  async calendarioEntregas(ano = new Date().getFullYear()) {
+  async calendarioEntregas(ano = new Date().getFullYear(), responsavel?: string) {
     const now = new Date();
     const anoAtual = now.getFullYear();
     const mesAtual = ano < anoAtual ? 12 : (ano > anoAtual ? 0 : now.getMonth() + 1);
     const PORTAL = new Set(['FGTS', 'ESOCIAL', 'DARF']);
     const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
     const companies = await this.prisma.company.findMany({
-      where: { active: true },
+      where: { active: true, ...(responsavel ? { responsavel } : {}) },
       select: { id: true, name: true, clienteCodigo: true, taxRegime: true, responsavel: true, clienteDesde: true },
     });
     const ids = companies.map((c) => c.id);
@@ -1716,11 +1716,11 @@ export class PaineisService {
    * sem link), 'falta' (venceu e não entregue), 'isenta', 'na' (a vencer/sem obrigação).
    * Só clientes ATIVOS. Portal (FGTS/eSocial/DARF) fora. Rápido (lê do banco, sem crawl).
    */
-  async coberturaGrid(ano = new Date().getFullYear()) {
+  async coberturaGrid(ano = new Date().getFullYear(), responsavel?: string) {
     const now = new Date();
     const PORTAL = new Set(['FGTS', 'ESOCIAL', 'DARF']);
     const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
-    const companies = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true, clienteCodigo: true, taxRegime: true, responsavel: true, clienteDesde: true } });
+    const companies = await this.prisma.company.findMany({ where: { active: true, ...(responsavel ? { responsavel } : {}) }, select: { id: true, name: true, clienteCodigo: true, taxRegime: true, responsavel: true, clienteDesde: true } });
     const ids = companies.map((c) => c.id);
     const itens = await this.prisma.fiscalCalendarItem.findMany({
       where: { companyId: { in: ids }, competencia: { startsWith: `${ano}-` } },

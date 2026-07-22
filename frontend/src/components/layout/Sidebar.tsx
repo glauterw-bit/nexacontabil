@@ -5,13 +5,9 @@ import { useQuery } from '@apollo/client';
 import { gql } from '@apollo/client';
 import { useEffect, useState } from 'react';
 import {
-  Activity, Lightbulb, Sun, Briefcase, CalendarClock, MessageCircle,
-  LayoutDashboard, Building2, ChevronDown, ChevronRight, Plus, LogOut, Zap,
-  Settings, ShieldCheck, Users, Receipt, BarChart3, TrendingUp, Target,
-  Banknote, ClipboardList, Landmark, Scale, Package, FileCode, FileText,
-  UserCheck, Award, Globe, DollarSign, Megaphone, Store, Bot,
-  Workflow, Boxes, FileDown, Inbox, Search, ArrowLeftRight, Hash, FolderTree,
-  ClipboardCheck, Coins, Sparkles,
+  Activity, Briefcase, CalendarClock, LayoutDashboard, ChevronDown, ChevronRight,
+  Plus, LogOut, Zap, Settings, ShieldCheck, Receipt, ClipboardList, Landmark,
+  FileText, UserCheck, Globe, FileDown, Inbox, Search, FolderTree,
 } from 'lucide-react';
 import { useCompany, Company } from '@/contexts/CompanyContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,18 +29,15 @@ interface NavGroup { label: string; items: NavItem[] }
    (receber → processar → apurar → entregar → comunicar),
    clientes, e módulos avançados recolhidos. ── */
 
+/* ── NÚCLEO (a base provada: leitura por enumeração + reconciliação com prova).
+   Navegação enxuta e orientada ao FLUXO REAL do escritório. Telas do modelo antigo
+   (mock/estáticas/redundantes) saem do menu — rotas preservadas, reversível via git. ── */
+
+// ADMIN / GESTOR — visão macro da carteira
 const VISAO: NavItem[] = [
   { href: '/central-entregas', icon: CalendarClock, label: 'Central de Entregas' },
-  { href: '/cobertura', icon: ShieldCheck, label: 'Cobertura (prova)' },
-  { href: '/explorador', icon: FolderTree, label: 'Explorador de Pastas' },
-  { href: '/painel',    icon: LayoutDashboard, label: 'Painel do Escritório' },
-  { href: '/consultor', icon: Sparkles,        label: 'Consultor de IA' },
-  { href: '/meu-dia',   icon: Sun,             label: 'Meu Dia' },
-  { href: '/farois',    icon: Lightbulb,       label: 'Faróis' },
-  { href: '/operacao',  icon: Activity,        label: 'Operação (detalhe)' },
-  { href: '/gerencial', icon: Activity,        label: 'Desempenho da equipe' },
-  { href: '/verificacao-final', icon: ShieldCheck, label: 'Verificação Final' },
-  { href: '/implantacao', icon: ClipboardCheck, label: 'Saúde da Implantação' },
+  { href: '/cobertura',        icon: ShieldCheck,   label: 'Cobertura (prova)' },
+  { href: '/gerencial',        icon: Activity,      label: 'Desempenho da equipe' },
 ];
 
 const CAMINHO: Step[] = [
@@ -56,146 +49,81 @@ const CAMINHO: Step[] = [
     ],
   },
   {
-    n: 2, label: 'Processar', cor: '#a78bfa',
+    n: 2, label: 'Conferir', cor: '#a78bfa',
     items: [
-      { href: '/esteira-fiscal',  icon: Workflow, label: 'Esteira Fiscal' },
-      { href: '/buscar-docs',     icon: Search,   label: 'Buscar Documentos' },
-      { href: '/ncm-inteligente', icon: Boxes,    label: 'Banco de NCM' },
-      { href: '/matriz-tributaria', icon: Boxes,  label: 'Matriz Tributária' },
+      { href: '/explorador',  icon: FolderTree, label: 'Explorador de Pastas' },
+      { href: '/buscar-docs', icon: Search,     label: 'Buscar Documentos' },
     ],
   },
   {
-    n: 3, label: 'Apurar', cor: '#ffc247',
+    n: 3, label: 'Cobrar', cor: '#ffc247',
     items: [
-      { href: '/apuracao',        icon: ClipboardList, label: 'Apuração de Impostos' },
-      { href: '/inconsistencias', icon: ShieldCheck,   label: 'Inconsistências (malha)' },
+      { href: '/recibos-faltantes', icon: CalendarClock, label: 'Recibos Faltantes' },
     ],
   },
   {
     n: 4, label: 'Entregar', cor: '#3ee0a0',
     items: [
-      { href: '/fluxo',            icon: Workflow,      label: 'Quadro & Recibos' },
-      { href: '/recibos-faltantes', icon: CalendarClock, label: 'Recibos Faltantes' },
-      { href: '/checklist',        icon: ClipboardCheck, label: 'Checklists' },
-      { href: '/prazos',           icon: CalendarClock, label: 'Prazos & SLA' },
-      { href: '/exportar-dominio', icon: FileDown,      label: 'Exportar p/ Domínio' },
-    ],
-  },
-  {
-    n: 5, label: 'Comunicar', cor: '#f8719d',
-    items: [
-      { href: '/atendimentos', icon: MessageCircle, label: 'Central de Atendimento' },
-      { href: '/whatsapp',     icon: MessageCircle, label: 'WhatsApp IA' },
+      { href: '/exportar-dominio', icon: FileDown, label: 'Exportar p/ Domínio' },
     ],
   },
 ];
 
 const CLIENTES: NavItem[] = [
-  { href: '/carteira',           icon: Briefcase,  label: 'Carteira de Clientes' },
-  { href: '/organizacao',        icon: FolderTree, label: 'Organização de Docs' },
-  { href: '/onboarding-cliente', icon: Plus,       label: 'Novo Cliente' },
+  { href: '/carteira',           icon: Briefcase, label: 'Carteira de Clientes' },
+  { href: '/atribuir-responsavel', icon: UserCheck, label: 'Gestão de Carteira' },
+  { href: '/onboarding-cliente', icon: Plus,      label: 'Novo Cliente' },
 ];
 
 const MODULOS: NavGroup[] = [
   {
-    label: 'Gestão avançada',
+    label: 'Fiscal (apoio à base)',
     items: [
-      { href: '/painel-analista',      icon: UserCheck, label: 'Painel do Analista' },
-      { href: '/produtividade',        icon: Users,     label: 'Produtividade' },
-      { href: '/atribuir-responsavel', icon: UserCheck, label: 'Gestão de Carteira' },
-      { href: '/gestao-equipe',        icon: Users,     label: 'Gestão de Equipe' },
-      { href: '/dashboard',            icon: Building2, label: 'Painel do Cliente' },
-      { href: '/insights',             icon: Boxes,     label: 'Insights de IA' },
+      { href: '/sefaz',     icon: Landmark,    label: 'Buscar no SEFAZ' },
+      { href: '/certidoes', icon: ShieldCheck, label: 'Certidões' },
+      { href: '/fiscal',    icon: Receipt,     label: 'NF-e / NFS-e' },
     ],
   },
   {
-    label: 'Fiscal avançado',
+    label: 'Fonte & Setup',
     items: [
-      { href: '/sefaz',                  icon: Landmark, label: 'Buscar no SEFAZ' },
-      { href: '/oportunidade-monofasica', icon: Coins,   label: 'Oportunidade Monofásica' },
-      { href: '/simples-nacional', icon: Award,       label: 'Simples Nacional' },
-      { href: '/sped',             icon: FileCode,    label: 'SPED / EFD' },
-      { href: '/fiscal',           icon: Receipt,     label: 'NF-e / NFS-e' },
-      { href: '/certidoes',        icon: ShieldCheck, label: 'Certidões' },
-      { href: '/onvio',            icon: Building2,   label: 'Onvio · Domínio' },
-      { href: '/mei',              icon: Award,       label: 'MEI — DAS / DASN' },
+      { href: '/drive-conectado',   icon: Globe,      label: 'Drives Conectados' },
+      { href: '/verificacao-final', icon: ShieldCheck, label: 'Verificação Final' },
+      { href: '/integracoes',       icon: Settings,   label: 'Integrações' },
+      { href: '/guia',              icon: FileText,   label: 'Guia de Uso' },
     ],
   },
   {
-    label: 'Contábil',
+    label: 'Legado (em revisão)',
     items: [
-      { href: '/relatorios/dre', icon: BarChart3,      label: 'DRE' },
-      { href: '/balanco',        icon: Scale,          label: 'Balanço Patrimonial' },
-      { href: '/transactions',   icon: ArrowLeftRight, label: 'Lançamentos' },
-      { href: '/cashflow',       icon: TrendingUp,     label: 'Fluxo de Caixa' },
-      { href: '/patrimonio',     icon: Package,        label: 'Patrimônio' },
-      { href: '/fechamento',     icon: ShieldCheck,    label: 'Fechamento Mensal' },
-    ],
-  },
-  {
-    label: 'Folha & RH',
-    items: [
-      { href: '/folha',           icon: Users,     label: 'Folha de Pagamento' },
-      { href: '/ferias-rescisao', icon: UserCheck, label: 'Férias / Rescisão' },
-      { href: '/esocial',         icon: Briefcase, label: 'eSocial' },
-    ],
-  },
-  {
-    label: 'Financeiro',
-    items: [
-      { href: '/boletos',    icon: Banknote,   label: 'Boletos' },
-      { href: '/honorarios', icon: DollarSign, label: 'Honorários' },
-      { href: '/banking',    icon: Landmark,   label: 'Open Finance' },
-    ],
-  },
-  {
-    label: 'Consultoria & Relacionamento',
-    items: [
-      { href: '/tributario',         icon: Scale,         label: 'Plan. Tributário' },
-      { href: '/reforma-tributaria', icon: Scale,         label: 'Reforma Tributária' },
-      { href: '/benchmark',          icon: Target,        label: 'Benchmark Setorial' },
-      { href: '/copilot',            icon: Bot,           label: 'Copilot IA' },
-      { href: '/comunicados',        icon: Megaphone,     label: 'Comunicados' },
-      { href: '/crm',                icon: Users,         label: 'CRM / Pipeline' },
-      { href: '/portal-cliente',     icon: Globe,         label: 'Portal do Cliente' },
-    ],
-  },
-  {
-    label: 'Setup & Administração',
-    items: [
-      { href: '/drive-conectado',  icon: Globe,          label: 'Drives Conectados' },
-      { href: '/integracoes',      icon: Settings,       label: 'Integrações' },
-      { href: '/migracao',         icon: ArrowLeftRight, label: 'Migração em Massa' },
-      { href: '/abertura-empresa', icon: Store,          label: 'Abertura de Empresa' },
-      { href: '/audit',            icon: Hash,           label: 'Auditoria' },
-      { href: '/guia',             icon: FileText,       label: 'Guia de Uso' },
+      { href: '/painel',   icon: LayoutDashboard, label: 'Painel antigo' },
+      { href: '/operacao', icon: Activity,        label: 'Operação (detalhe)' },
+      { href: '/apuracao', icon: ClipboardList,   label: 'Apuração' },
+      { href: '/inconsistencias', icon: ShieldCheck, label: 'Inconsistências' },
     ],
   },
 ];
 
-// ── Analista: mesmo caminho, enxuto ──
+// ── ANALISTA — foco total na PRÓPRIA carteira (painéis escopados no back-end pelo nome do login) ──
 const VISAO_ANALISTA: NavItem[] = [
-  { href: '/meu-dia', icon: Sun,           label: 'Meu Dia' },
-  { href: '/prazos',  icon: CalendarClock, label: 'Meus Prazos' },
+  { href: '/central-entregas',  icon: CalendarClock, label: 'Minha Central' },
+  { href: '/cobertura',         icon: ShieldCheck,   label: 'Minha Cobertura' },
+  { href: '/recibos-faltantes', icon: CalendarClock, label: 'Cobrar (meus)' },
 ];
 const CAMINHO_ANALISTA: Step[] = [
-  { n: 1, label: 'Receber',   cor: '#6cb2ff', items: [{ href: '/captura-xml', icon: Inbox, label: 'Captura de XMLs' }] },
-  { n: 2, label: 'Processar', cor: '#a78bfa', items: [
-    { href: '/esteira-fiscal',  icon: Workflow, label: 'Esteira Fiscal' },
-    { href: '/buscar-docs',     icon: Search,   label: 'Buscar Documentos' },
-    { href: '/ncm-inteligente', icon: Boxes,    label: 'Banco de NCM' },
+  { n: 1, label: 'Receber',  cor: '#6cb2ff', items: [{ href: '/captura-xml', icon: Inbox, label: 'Captura de XMLs' }] },
+  { n: 2, label: 'Conferir', cor: '#a78bfa', items: [
+    { href: '/explorador',  icon: FolderTree, label: 'Explorador de Pastas' },
+    { href: '/buscar-docs', icon: Search,     label: 'Buscar Documentos' },
   ] },
-  { n: 3, label: 'Apurar',    cor: '#ffc247', items: [{ href: '/inconsistencias', icon: ShieldCheck, label: 'Inconsistências' }] },
-  { n: 4, label: 'Entregar',  cor: '#3ee0a0', items: [{ href: '/exportar-dominio', icon: FileDown, label: 'Exportar p/ Domínio' }] },
-  { n: 5, label: 'Comunicar', cor: '#f8719d', items: [{ href: '/atendimentos', icon: MessageCircle, label: 'Atendimentos' }] },
+  { n: 3, label: 'Entregar', cor: '#3ee0a0', items: [{ href: '/exportar-dominio', icon: FileDown, label: 'Exportar p/ Domínio' }] },
 ];
 const MODULOS_ANALISTA: NavGroup[] = [
   {
     label: 'Apoio',
     items: [
-      { href: '/dashboard', icon: Building2, label: 'Painel do Cliente' },
-      { href: '/copilot',   icon: Bot,       label: 'Copilot IA' },
-      { href: '/guia',      icon: FileText,  label: 'Guia de Uso' },
+      { href: '/carteira', icon: Briefcase, label: 'Meus Clientes' },
+      { href: '/guia',     icon: FileText,  label: 'Guia de Uso' },
     ],
   },
 ];
