@@ -880,6 +880,44 @@ export class OneDriveService {
     return { itens: achados, total, erros };
   }
 
+  /** Cria uma SUBSCRIPTION (webhook) do Graph p/ mudanças na raiz de um drive — leitura em tempo real. */
+  async criarSubscription(connectionId: string, driveId: string, notificationUrl: string, clientState: string, expiraISO: string): Promise<{ ok: boolean; id?: string; expiration?: string; erro?: string; status?: number }> {
+    const token = await this.getValidToken(connectionId);
+    const res: any = await fetch(`${GRAPH_BASE}/subscriptions`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ changeType: 'updated', notificationUrl, resource: `/drives/${driveId}/root`, expirationDateTime: expiraISO, clientState, latestSupportedTlsVersion: 'v1_2' }),
+    });
+    const j: any = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, erro: j?.error?.message || `HTTP ${res.status}`, status: res.status };
+    return { ok: true, id: j.id, expiration: j.expirationDateTime };
+  }
+
+  /** Renova (PATCH) a expiração de uma subscription. */
+  async renovarSubscription(connectionId: string, subscriptionId: string, expiraISO: string): Promise<boolean> {
+    const token = await this.getValidToken(connectionId);
+    const res: any = await fetch(`${GRAPH_BASE}/subscriptions/${subscriptionId}`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expirationDateTime: expiraISO }),
+    });
+    return res.ok;
+  }
+
+  /** Remove uma subscription. */
+  async removerSubscription(connectionId: string, subscriptionId: string): Promise<boolean> {
+    const token = await this.getValidToken(connectionId);
+    const res: any = await fetch(`${GRAPH_BASE}/subscriptions/${subscriptionId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    return res.ok || res.status === 404;
+  }
+
+  /** Lista as subscriptions ativas do app no Graph (p/ diagnóstico). */
+  async listarSubscriptions(connectionId: string): Promise<any[]> {
+    const token = await this.getValidToken(connectionId);
+    const res: any = await fetch(`${GRAPH_BASE}/subscriptions`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return [];
+    const j: any = await res.json().catch(() => ({}));
+    return j.value ?? [];
+  }
+
   async buscaTenant(connectionId: string, query: string, opts?: { maxItens?: number }) {
     const { itens: achados, total, erros } = await this.coletaTenant(connectionId, query, opts);
     const de = (re: RegExp) => achados.filter((a) => re.test(a.path) || re.test(a.name));

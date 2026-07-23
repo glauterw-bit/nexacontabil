@@ -1090,6 +1090,18 @@ model Comunicado {
   @@map("comunicados")
 }
 
+// ─── Graph change notifications (webhooks) — leitura em tempo real do OneDrive ───
+model GraphSubscription {
+  id             String   @id @default(uuid())
+  subscriptionId String   @unique
+  driveId        String
+  expiration     DateTime
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+
+  @@map("graph_subscriptions")
+}
+
 // ─── Log de cobrança (documentos pendentes cobrados do cliente) ───
 model CobrancaLog {
   id           String   @id @default(uuid())

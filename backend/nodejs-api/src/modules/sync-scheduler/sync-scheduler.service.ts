@@ -7,6 +7,7 @@ import { NcmInteligenteService } from '../ncm-inteligente/ncm-inteligente.servic
 import { SefazDistribuicaoService } from '../sefaz/sefaz-distribuicao.service';
 import { VerificacaoFinalService } from '../verificacao-final/verificacao-final.service';
 import { SeedDemoService } from '../torre-controle/seed-demo.service';
+import { OneDriveService } from '../cloud/onedrive.service';
 import { PrismaService } from '../../database/prisma.service';
 
 /**
@@ -48,6 +49,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     private readonly sefaz: SefazDistribuicaoService,
     private readonly verificacao: VerificacaoFinalService,
     private readonly seedDemo: SeedDemoService,
+    private readonly onedrive: OneDriveService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -341,6 +343,78 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return { status: 'disparado', dica: 'consulte /sync-drive/enriquecer-contatos-status' };
   }
   enriquecerContatosStatus() { return this.enrichState ?? { status: 'nunca_rodou' }; }
+
+  // ─── WEBHOOKS DO GRAPH (leitura em TEMPO REAL) ───────────────────────────
+  private readonly WEBHOOK_SECRET = process.env.GRAPH_WEBHOOK_SECRET || 'nexa-domo-webhook-2026';
+  private webhookTimer: any = null;
+  private webhookHits = 0;
+  private ultimaNotificacao: string | null = null;
+
+  private notificationUrl(): string {
+    const base = (process.env.PUBLIC_BACKEND_URL || 'https://backend-production-9eeec.up.railway.app').replace(/\/$/, '');
+    return `${base}/api/v1/sync-drive/graph-webhook`;
+  }
+
+  /** ATIVA os webhooks: descobre os drives com documentos e cria uma subscription na raiz de cada. */
+  async ativarWebhooks() {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'sem conexão OneDrive' };
+    const url = this.notificationUrl();
+    // descobre os drives distintos que guardam recibos
+    let drives: string[] = [];
+    try { drives = [...new Set((await this.onedrive.coletaTenant(conn.id, 'PGDASD', { maxItens: 600 })).itens.map((i: any) => i.driveId).filter(Boolean) as string[])]; } catch { /* */ }
+    drives = drives.slice(0, 25);
+    const expira = new Date(Date.now() + 2 * 86400000).toISOString(); // 2 dias (renova no ciclo)
+    const resultado: any[] = [];
+    for (const d of drives) {
+      const r: any = await this.onedrive.criarSubscription(conn.id, d, url, this.WEBHOOK_SECRET, expira).catch((e) => ({ ok: false, erro: e?.message }));
+      if (r.ok && r.id) {
+        await this.prisma.graphSubscription.upsert({ where: { subscriptionId: r.id }, create: { subscriptionId: r.id, driveId: d, expiration: new Date(r.expiration!) }, update: { expiration: new Date(r.expiration!) } }).catch(() => undefined);
+      }
+      resultado.push({ driveId: d, ...r });
+    }
+    const ok = resultado.filter((x) => x.ok).length;
+    return { notificationUrl: url, drivesTentados: drives.length, subscriptionsCriadas: ok, resultado };
+  }
+
+  /** Recebe a notificação do Graph (chamada pelo controller). Debounce → reconciliação leve. */
+  onGraphNotification(body: any): void {
+    const changes = (body?.value ?? []) as any[];
+    const valido = changes.some((c) => c.clientState === this.WEBHOOK_SECRET);
+    if (!valido) return;
+    this.webhookHits += changes.length;
+    this.ultimaNotificacao = new Date().toISOString();
+    if (this.webhookTimer) clearTimeout(this.webhookTimer);
+    // agrupa rajadas: 25s após a última notificação, roda 1 reconciliação leve (últimos 2 meses)
+    this.webhookTimer = setTimeout(() => {
+      this.webhookTimer = null;
+      const ano = new Date().getFullYear();
+      (async () => {
+        await this.analise.reconciliarGlobalPorTipo({ anos: [ano], ultimosMeses: 2 }).catch(() => undefined);
+        await this.fiscalCalendar.markOverdue().catch(() => undefined);
+      })();
+    }, 25000);
+  }
+
+  /** Renova as subscriptions que expiram em < 1 dia (chamado no ciclo). Reativa se não houver nenhuma. */
+  async renovarWebhooks() {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { ok: false };
+    const subs = await this.prisma.graphSubscription.findMany();
+    if (!subs.length) return { criadas: (await this.ativarWebhooks()).subscriptionsCriadas ?? 0 };
+    const limite = Date.now() + 26 * 3600000; // renova se expira em < 26h
+    const expira = new Date(Date.now() + 2 * 86400000).toISOString();
+    let renovadas = 0, removidas = 0;
+    for (const s of subs) {
+      if (s.expiration.getTime() > limite) continue;
+      const ok = await this.onedrive.renovarSubscription(conn.id, s.subscriptionId, expira).catch(() => false);
+      if (ok) { await this.prisma.graphSubscription.update({ where: { id: s.id }, data: { expiration: new Date(expira) } }).catch(() => undefined); renovadas++; }
+      else { await this.prisma.graphSubscription.delete({ where: { id: s.id } }).catch(() => undefined); removidas++; }
+    }
+    return { total: subs.length, renovadas, removidas };
+  }
+
+  webhooksStatus() { return { secret: this.WEBHOOK_SECRET ? 'definido' : 'ausente', notificationUrl: this.notificationUrl(), hits: this.webhookHits, ultimaNotificacao: this.ultimaNotificacao, debouncePendente: !!this.webhookTimer }; }
 
   async previewPlanilha(nome?: string, maxRows?: number, aba?: string) {
     return this.analise.previewPlanilha(nome, maxRows, aba);
@@ -760,6 +834,9 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 6));
         // 5. marca vencidas o que sobrou pendente e já passou do prazo
         await passo('obrigacoesVencidas', () => this.fiscalCalendar.markOverdue());
+        // 6. WEBHOOKS: renova as subscriptions do Graph (e ATIVA no 1º ciclo se não houver) —
+        //    leitura em TEMPO REAL: a Microsoft avisa quando um arquivo muda, sem esperar o ciclo.
+        await passo('renovarWebhooks', () => this.renovarWebhooks());
       })();
       const cadeiaSefaz = (async () => {
         // 5a-00. CADASTRO OFICIAL (planilha 2026): CNPJ, regime e Ativa/Inativa — fonte

@@ -1,4 +1,4 @@
-import { Module, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Module, Controller, Get, Post, Query, Body, Req, Res, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../../common/public.decorator';
 import { PrismaService } from '../../database/prisma.service';
@@ -11,6 +11,7 @@ import { NcmInteligenteModule } from '../ncm-inteligente/ncm-inteligente.module'
 import { SefazModule } from '../sefaz/sefaz.module';
 import { VerificacaoFinalModule } from '../verificacao-final/verificacao-final.module';
 import { TorreControleModule } from '../torre-controle/torre-controle.module';
+import { CloudModule } from '../cloud/cloud.module';
 
 @Controller('sync-drive')
 @UseGuards(JwtAuthGuard)
@@ -254,6 +255,27 @@ class SyncSchedulerController {
     return this.service.sondarClientePastas(codigo);
   }
 
+  /** WEBHOOK do Graph — validação (echo do validationToken) + notificação de mudança (tempo real). */
+  @Public()
+  @Post('graph-webhook')
+  graphWebhook(@Query('validationToken') vt: string, @Body() body: any, @Res() res: any) {
+    if (vt) { res.set('Content-Type', 'text/plain').status(200).send(vt); return; }
+    res.status(202).send(); // acusa rápido; processa em background
+    try { this.service.onGraphNotification(body); } catch { /* nunca derruba o webhook */ }
+  }
+
+  /** Ativa os webhooks (cria subscriptions nos drives). */
+  @Public()
+  @Get('ativar-webhooks')
+  ativarWebhooks() {
+    return this.service.ativarWebhooks();
+  }
+  @Public()
+  @Get('webhooks-status')
+  webhooksStatus() {
+    return this.service.webhooksStatus();
+  }
+
   /** ENRIQUECE contatos (WhatsApp/e-mail) dos clientes via BrasilAPI — background. */
   @Public()
   @Get('enriquecer-contatos')
@@ -345,7 +367,7 @@ class SyncSchedulerController {
 }
 
 @Module({
-  imports: [FluxoModule, AnaliseClienteModule, FiscalCalendarModule, SolicitacoesModule, NcmInteligenteModule, SefazModule, VerificacaoFinalModule, TorreControleModule],
+  imports: [FluxoModule, AnaliseClienteModule, FiscalCalendarModule, SolicitacoesModule, NcmInteligenteModule, SefazModule, VerificacaoFinalModule, TorreControleModule, CloudModule],
   controllers: [SyncSchedulerController],
   providers: [SyncSchedulerService, PrismaService],
 })
