@@ -33,7 +33,13 @@ export default function MeuDia() {
       setCob((p) => ({ ...p, [companyId]: j }));
     } catch { setCob((p) => ({ ...p, [companyId]: { erro: true } })); }
   };
-  const copiar = async (id: string, msg: string) => { try { await navigator.clipboard.writeText(msg); setCopiado(id); setTimeout(() => setCopiado(''), 1800); } catch {} };
+  const copiar = async (id: string, msg: string) => { try { await navigator.clipboard.writeText(msg); setCopiado(id); setTimeout(() => setCopiado(''), 1800); registrar(id, 'copiar'); } catch {} };
+  const registrar = (companyId: string, canal: string) => {
+    const cb = cob[companyId]; if (!cb?.totalFaltam) return;
+    const comps = (cb.faltam || []).map((f: any) => f.rotulo).join(', ');
+    fetch(`${API}/api/v1/paineis/registrar-cobranca`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ companyId, canal, competencias: comps, quantidade: cb.totalFaltam }) })
+      .then(() => setCob((p) => ({ ...p, [companyId]: { ...p[companyId], ultimaCobranca: { canal, diasAtras: 0 } } }))).catch(() => {});
+  };
 
   const comFalta = (d?.clientes ?? []).filter((c) => c.faltam > 0);
   const totFalta = comFalta.reduce((s, c) => s + c.faltam, 0);
@@ -73,11 +79,12 @@ export default function MeuDia() {
                     </div>
                     {cb && !cb.loading && !cb.erro && (
                       <div className="md-cob">
+                        {cb.ultimaCobranca ? <div className="md-ja">já cobrado {cb.ultimaCobranca.diasAtras === 0 ? 'hoje' : `há ${cb.ultimaCobranca.diasAtras}d`}</div> : null}
                         <textarea readOnly value={cb.mensagem} rows={5} />
                         <div className="md-acts">
-                          {cb.whatsapp ? <a className="md-wa" href={cb.whatsapp} target="_blank" rel="noopener">WhatsApp ↗</a> : <span className="md-wa off">sem WhatsApp</span>}
+                          {cb.whatsapp ? <a className="md-wa" href={cb.whatsapp} target="_blank" rel="noopener" onClick={() => registrar(c.companyId, 'whatsapp')}>WhatsApp ↗</a> : <span className="md-wa off">sem WhatsApp</span>}
                           <button className="md-copy" onClick={() => copiar(c.companyId, cb.mensagem)}>{copiado === c.companyId ? '✓ copiado' : 'Copiar'}</button>
-                          {cb.email ? <a className="md-copy" href={`mailto:${cb.email}?subject=${encodeURIComponent('Documentos pendentes')}&body=${encodeURIComponent(cb.mensagem)}`}>E-mail</a> : null}
+                          {cb.email ? <a className="md-copy" href={`mailto:${cb.email}?subject=${encodeURIComponent('Documentos pendentes')}&body=${encodeURIComponent(cb.mensagem)}`} onClick={() => registrar(c.companyId, 'email')}>E-mail</a> : null}
                         </div>
                       </div>
                     )}
@@ -112,6 +119,7 @@ export default function MeuDia() {
 .md-cobrar{border:none;background:var(--ac);color:#fff;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .md-cob{border-top:1px solid var(--b);padding:12px 16px;background:var(--s2)}
 .md-cob.sm{color:var(--tx3);font-size:13px}
+.md-ja{color:#B7791F;font-weight:600;font-size:12px;margin-bottom:6px}
 .md-cob textarea{width:100%;border:1px solid var(--b);border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;line-height:1.45;resize:vertical;background:var(--s)}
 .md-acts{display:flex;gap:8px;margin-top:8px}
 .md-wa{background:#25D366;color:#fff;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:600;text-decoration:none}

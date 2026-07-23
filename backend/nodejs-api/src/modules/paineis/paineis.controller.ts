@@ -65,6 +65,19 @@ export class PaineisController {
     return this.service.cobrancaCliente(companyId, ano ? parseInt(ano, 10) : undefined);
   }
 
+  /** Registra que a cobrança foi enviada (histórico). */
+  @Post('registrar-cobranca')
+  registrarCobranca(@Body() body: { companyId: string; canal?: string; competencias?: string; quantidade?: number }, @Req() req?: any) {
+    return this.service.registrarCobranca(body.companyId, { ...body, por: req?.user?.name });
+  }
+
+  /** Diagnóstico: cobertura de responsável/WhatsApp na carteira ativa. */
+  @Public()
+  @Get('cobertura-contatos')
+  coberturaContatos() {
+    return this.service.coberturaContatos();
+  }
+
   @Get('calendario-entregas')
   calendarioEntregas(@Query('ano') ano?: string, @Query('responsavel') responsavel?: string, @Req() req?: any) {
     return this.service.calendarioEntregas(ano ? parseInt(ano, 10) : undefined, escopo(req, responsavel));

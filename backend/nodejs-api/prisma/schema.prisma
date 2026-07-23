@@ -84,6 +84,7 @@ model Company {
   sefazUltMotivo       String?   // xMotivo da última consulta (diagnóstico)
 
   honorarios           Honorario[]
+  cobrancaLogs         CobrancaLog[]
   crmClientes          CrmCliente[]
   tarefas              Tarefa[]
   meiApuracoes         MeiApuracao[]
@@ -1087,6 +1088,21 @@ model Comunicado {
   updatedAt       DateTime @updatedAt
 
   @@map("comunicados")
+}
+
+// ─── Log de cobrança (documentos pendentes cobrados do cliente) ───
+model CobrancaLog {
+  id           String   @id @default(uuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+  canal        String   // whatsapp|email|manual
+  competencias String?  // "DAS mar/2026, DCTFWeb abr/2026"
+  quantidade   Int      @default(0)
+  por          String?  // quem cobrou (nome do login)
+  criadoEm     DateTime @default(now())
+
+  @@index([companyId, criadoEm])
+  @@map("cobranca_logs")
 }
 
 // ─── Radar E-CAC / Situação Fiscal ───────────────────────────

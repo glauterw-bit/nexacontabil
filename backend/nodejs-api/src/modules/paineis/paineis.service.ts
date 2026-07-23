@@ -1824,7 +1824,36 @@ export class PaineisService {
       : `Olá, ${primeiroNome}! A documentação de *${c.name}* está 100% em dia. Obrigado! 🎉`;
     const fone = (c.whatsappNumber || '').replace(/\D/g, '');
     const whatsapp = fone ? `https://wa.me/${fone.length <= 11 ? '55' + fone : fone}?text=${encodeURIComponent(mensagem)}` : null;
-    return { cliente: c.name, responsavel: c.responsavel, email: c.email, totalFaltam: faltam.length, faltam, mensagem, whatsapp };
+    // última cobrança registrada (pra UI mostrar "já cobrado há X dias")
+    const ult = await this.prisma.cobrancaLog.findFirst({ where: { companyId }, orderBy: { criadoEm: 'desc' }, select: { canal: true, criadoEm: true, por: true } }).catch(() => null);
+    const ultimaCobranca = ult ? { canal: ult.canal, por: ult.por, em: ult.criadoEm.toISOString(), diasAtras: Math.floor((Date.now() - ult.criadoEm.getTime()) / 86400000) } : null;
+    return { cliente: c.name, responsavel: c.responsavel, email: c.email, totalFaltam: faltam.length, faltam, mensagem, whatsapp, ultimaCobranca };
+  }
+
+  /** Registra que uma cobrança foi enviada (histórico + evita cobrar 2x sem controle). */
+  async registrarCobranca(companyId: string, opts: { canal?: string; competencias?: string; quantidade?: number; por?: string }) {
+    if (!companyId) return { erro: 'companyId obrigatório' };
+    const log = await this.prisma.cobrancaLog.create({ data: { companyId, canal: opts.canal || 'manual', competencias: opts.competencias || null, quantidade: opts.quantidade || 0, por: opts.por || null } }).catch(() => null);
+    return { ok: !!log, em: log?.criadoEm?.toISOString() };
+  }
+
+  /** DIAGNÓSTICO de contatos/carteira — quantos clientes ativos têm responsável e WhatsApp
+   *  (mede se as telas de analista/cobrança vão nascer cheias ou vazias). */
+  async coberturaContatos() {
+    const cs = await this.prisma.company.findMany({ where: { active: true }, select: { responsavel: true, whatsappNumber: true, email: true } });
+    const ativos = cs.length;
+    const comResp = cs.filter((c) => (c.responsavel || '').trim()).length;
+    const comWpp = cs.filter((c) => (c.whatsappNumber || '').replace(/\D/g, '').length >= 10).length;
+    const comEmail = cs.filter((c) => (c.email || '').includes('@')).length;
+    const porResp = new Map<string, number>();
+    for (const c of cs) { const r = (c.responsavel || '').trim() || '— sem responsável —'; porResp.set(r, (porResp.get(r) || 0) + 1); }
+    return {
+      ativos,
+      responsavel: { com: comResp, sem: ativos - comResp, pct: ativos ? Math.round((comResp / ativos) * 100) : 0 },
+      whatsapp: { com: comWpp, sem: ativos - comWpp, pct: ativos ? Math.round((comWpp / ativos) * 100) : 0 },
+      email: { com: comEmail, pct: ativos ? Math.round((comEmail / ativos) * 100) : 0 },
+      porResponsavel: [...porResp.entries()].sort((a, b) => b[1] - a[1]).map(([nome, n]) => `${n}× ${nome}`),
+    };
   }
 
   async recibosFaltantes(ano = new Date().getFullYear(), tipoFiltro?: string, responsavel?: string) {

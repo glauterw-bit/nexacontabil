@@ -27,6 +27,7 @@ interface Step1 {
   email: string;
   phone: string;
   address: string;
+  clienteDesde?: string;
 }
 
 interface Step2 {
@@ -146,6 +147,15 @@ export default function OnboardingClientePage() {
         body: JSON.stringify({ companyId, ano: year }),
       });
 
+      if (s1.clienteDesde) {
+        setProgress((p) => [...p, 'Marcando início do cliente (isentando meses anteriores)…']);
+        await fetch(`${API}/api/v1/paineis/cliente-inicio`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ companyId, data: s1.clienteDesde }),
+        });
+      }
+
       if (s4.bancos.length > 0) {
         setProgress((p) => [...p, `Conectando ${s4.bancos.length} banco(s)…`]);
         for (const bc of s4.bancos) {
@@ -258,6 +268,15 @@ export default function OnboardingClientePage() {
                 onChange={(e) => setS1({ ...s1, address: e.target.value })}
                 className="w-full input-aura"
               />
+            </Field>
+            <Field label="Cliente desde (entrada no escritório)">
+              <input
+                type="date"
+                value={s1.clienteDesde ?? ''}
+                onChange={(e) => setS1({ ...s1, clienteDesde: e.target.value })}
+                className="w-full input-aura"
+              />
+              <p className="text-xs text-tx-muted mt-1">As obrigações de competências anteriores a esta data viram “isentas” — não entram como pendência.</p>
             </Field>
           </>
         )}

@@ -58,7 +58,13 @@ export default function CentralEntregas() {
       setCob(await r.json());
     } catch { setCob({ erro: 'falhou' }); } finally { setCobLoad(false); }
   };
-  const copiarMsg = async () => { if (cob?.mensagem) { try { await navigator.clipboard.writeText(cob.mensagem); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch {} } };
+  const copiarMsg = async () => { if (cob?.mensagem) { try { await navigator.clipboard.writeText(cob.mensagem); setCopiado(true); setTimeout(() => setCopiado(false), 2000); registrarCobranca('copiar'); } catch {} } };
+  const registrarCobranca = (canal: string) => {
+    if (!sel || !cob?.totalFaltam) return;
+    const comps = (cob.faltam || []).map((f: any) => f.rotulo).join(', ');
+    fetch(`${API}/api/v1/paineis/registrar-cobranca`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ companyId: sel.companyId, canal, competencias: comps, quantidade: cob.totalFaltam }) })
+      .then(() => setCob((c: any) => c ? { ...c, ultimaCobranca: { canal, diasAtras: 0, em: new Date().toISOString() } } : c)).catch(() => {});
+  };
 
   const salvarInicio = async () => {
     if (!sel || !dataInicio) return;
@@ -193,13 +199,13 @@ export default function CentralEntregas() {
                   <button className="ce-cobrar-btn" onClick={gerarCobranca} disabled={cobLoad}>{cobLoad ? 'Gerando…' : '💬 Gerar cobrança do que falta'}</button>
                 ) : cob.erro ? <div className="ce-load sm">Não consegui gerar.</div> : (
                   <div className="ce-cobrar-box">
-                    <div className="ce-cobrar-h">{cob.totalFaltam ? `${cob.totalFaltam} pendência(s) — mensagem pronta:` : 'Cliente 100% em dia 🎉'}</div>
+                    <div className="ce-cobrar-h">{cob.totalFaltam ? `${cob.totalFaltam} pendência(s) — mensagem pronta:` : 'Cliente 100% em dia 🎉'}{cob.ultimaCobranca ? <span className="ce-cob-ja">· já cobrado {cob.ultimaCobranca.diasAtras === 0 ? 'hoje' : `há ${cob.ultimaCobranca.diasAtras}d`}</span> : null}</div>
                     <textarea className="ce-cobrar-msg" readOnly value={cob.mensagem} rows={cob.totalFaltam ? 6 : 2} />
-                    <div className="ce-cobrar-acts">
-                      {cob.whatsapp ? <a className="ce-wa" href={cob.whatsapp} target="_blank" rel="noopener">Abrir no WhatsApp ↗</a> : <span className="ce-wa off" title="Cliente sem WhatsApp cadastrado">sem WhatsApp</span>}
+                    {cob.totalFaltam ? <div className="ce-cobrar-acts">
+                      {cob.whatsapp ? <a className="ce-wa" href={cob.whatsapp} target="_blank" rel="noopener" onClick={() => registrarCobranca('whatsapp')}>Abrir no WhatsApp ↗</a> : <span className="ce-wa off" title="Cliente sem WhatsApp cadastrado">sem WhatsApp</span>}
                       <button className="ce-copy" onClick={copiarMsg}>{copiado ? '✓ copiado' : 'Copiar'}</button>
-                      {cob.email ? <a className="ce-copy" href={`mailto:${cob.email}?subject=${encodeURIComponent('Documentos pendentes')}&body=${encodeURIComponent(cob.mensagem)}`}>E-mail</a> : null}
-                    </div>
+                      {cob.email ? <a className="ce-copy" href={`mailto:${cob.email}?subject=${encodeURIComponent('Documentos pendentes')}&body=${encodeURIComponent(cob.mensagem)}`} onClick={() => registrarCobranca('email')}>E-mail</a> : null}
+                    </div> : null}
                   </div>
                 )}
               </div>
@@ -333,6 +339,7 @@ const CSS = `
 .ce-wa{background:#25D366;color:#fff;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;text-decoration:none}
 .ce-wa.off{background:var(--ce-na);color:var(--ce-tx3);cursor:default}
 .ce-copy{border:1px solid var(--ce-border);background:var(--ce-surface);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ce-tx2);text-decoration:none}
+.ce-cob-ja{color:var(--ce-warn);font-weight:600;margin-left:6px}
 .ce-novo-cur{font-size:11.5px;color:var(--ce-tx3);margin-top:7px}
 .ce-dbody{overflow-y:auto;padding:6px 0 30px}
 .ce-mo{border-bottom:1px solid var(--ce-border-soft)}
