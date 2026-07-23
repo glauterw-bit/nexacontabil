@@ -839,7 +839,8 @@ export class AnaliseClienteService {
       if (nn.length >= 8) for (const [n, id] of porNome) if (n.length >= 8 && (nn.includes(n) || n.includes(nn))) return id;
       return null;
     };
-    let linhasComEmail = 0, casados = 0, preenchidos = 0, jaTinha = 0, semMatch = 0; const amostraSemMatch: string[] = [];
+    const nomeById = new Map(companies.map((c) => [c.id, c.name]));
+    let linhasComEmail = 0, casados = 0, preenchidos = 0, jaTinha = 0, semMatch = 0; const amostraSemMatch: string[] = []; const amostraCasados: string[] = [];
     for (let i = hdr + 1; i < linhas.length; i++) {
       const row = linhas[i];
       const nomeCel = row[colNome] || '';
@@ -850,12 +851,13 @@ export class AnaliseClienteService {
       const id = resolve(nomeCel);
       if (!id) { semMatch++; if (amostraSemMatch.length < 30) amostraSemMatch.push(`${nomeCel} → ${email}`); continue; }
       casados++;
+      if (amostraCasados.length < 40) amostraCasados.push(`"${nomeCel}" → ${email}  [DB: ${nomeById.get(id)}]`);
       const comp = companies.find((c) => c.id === id);
       if (comp && (comp.email || '').includes('@')) { jaTinha++; continue; }
       if (!dry) await this.prisma.company.update({ where: { id }, data: { email } }).catch(() => undefined);
       preenchidos++;
     }
-    return { dryRun: dry, arquivo: ref.name, aba, colunas: { nome: colNome, email: colEmail }, linhasComEmail, casados, preenchidos, jaTinha, semMatch, amostraSemMatch };
+    return { dryRun: dry, arquivo: ref.name, aba, colunas: { nome: colNome, email: colEmail }, linhasComEmail, casados, preenchidos, jaTinha, semMatch, amostraCasados, amostraSemMatch };
   }
 
   /** Acha a planilha (por nome) no tenant e devolve o driveId/id + as N primeiras linhas p/ inspeção. */
