@@ -346,6 +346,10 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.previewPlanilha(nome, maxRows, aba);
   }
 
+  async importarContatosPlanilha(dryRun?: boolean) {
+    return this.analise.importarContatosPlanilha({ dryRun });
+  }
+
   async auditarCoberturaCliente(codigo: string, anos?: number[]) {
     return this.analise.auditarCoberturaCliente(codigo, anos);
   }

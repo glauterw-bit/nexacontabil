@@ -273,6 +273,13 @@ class SyncSchedulerController {
     return this.service.previewPlanilha(nome, rows ? parseInt(rows, 10) : undefined, aba);
   }
 
+  /** Importa e-mails da planilha do Fabiano -> company.email. dry=1 so conta. */
+  @Public()
+  @Get('importar-contatos-planilha')
+  importarContatosPlanilha(@Query('dry') dry?: string) {
+    return this.service.importarContatosPlanilha(!(dry === '0' || dry === 'false'));
+  }
+
   /** Teste publico do explorador (arvore real de pastas do cliente). */
   @Public()
   @Get('explorar')

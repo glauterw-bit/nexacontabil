@@ -804,6 +804,60 @@ export class AnaliseClienteService {
     return { ano, clientesAuditados: out.length, resumo: { vencidasTotal: somaVenc, recibExisteMasNaoCasou: somaAchou, viaConteudoPdf: somaConteudo, faltamDeVerdade: somaFalta }, resultado: out };
   }
 
+  /**
+   * IMPORTA E-MAILS da planilha oficial de clientes (RELAÇÃO CLIENTES DOMO ATUAL_FABIANO.xlsx,
+   * coluna E-MAIL) → preenche company.email (casa por código no fim do nome ou por nome). Só
+   * preenche quem está sem e-mail (não sobrescreve). dryRun só conta. Habilita a cobrança por e-mail.
+   */
+  async importarContatosPlanilha(opts?: { dryRun?: boolean }) {
+    const dry = !!opts?.dryRun;
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'sem conexão OneDrive' };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    // acha a planilha do Fabiano
+    let itens: Array<{ id?: string; name: string; path: string; driveId?: string }> = [];
+    try { itens = (await this.onedrive.coletaTenant(conn.id, 'RELAÇÃO CLIENTES DOMO', { maxItens: 100 })).itens; } catch { /* */ }
+    const ref = itens.find((f) => /\.xlsx$/i.test(f.name || '') && f.driveId && f.id && norm(f.name).includes('atual')) || itens.find((f) => /\.xlsx$/i.test(f.name || '') && f.driveId && f.id && norm(f.name).includes('relacao clientes domo'));
+    if (!ref || !ref.driveId || !ref.id) return { erro: 'planilha do Fabiano não localizada', candidatos: itens.filter((f) => /\.xlsx?$/i.test(f.name)).map((f) => f.name).slice(0, 10) };
+    const { linhas, aba } = await this.onedrive.lerPlanilhaXlsx(conn.id, ref.driveId, ref.id, { maxRows: 2000 });
+    // acha a linha de cabeçalho e as colunas CLIENTES / E-MAIL
+    let hdr = linhas.findIndex((r) => r.some((c) => /e.?mail/i.test(c)) && r.some((c) => /cliente/i.test(c)));
+    if (hdr < 0) hdr = 0;
+    const head = linhas[hdr].map((c) => norm(c));
+    const colNome = head.findIndex((c) => c.includes('cliente'));
+    const colEmail = head.findIndex((c) => c.includes('mail'));
+    if (colNome < 0 || colEmail < 0) return { erro: 'colunas CLIENTES/E-MAIL não encontradas', cabecalho: linhas[hdr] };
+    // carrega empresas
+    const companies = await this.prisma.company.findMany({ select: { id: true, name: true, clienteCodigo: true, email: true } });
+    const porCod = new Map<string, string>(); const porNome = new Map<string, string>();
+    for (const c of companies) { if (c.clienteCodigo) porCod.set(String(c.clienteCodigo).trim(), c.id); const n = norm(c.name); if (n.length >= 5) porNome.set(n, c.id); }
+    const resolve = (nomeCel: string): string | null => {
+      const codM = (nomeCel || '').match(/[-–]\s*(\d{1,4})\s*$/);
+      if (codM && porCod.has(codM[1])) return porCod.get(codM[1])!;
+      const nn = norm((nomeCel || '').replace(/[-–]\s*\d{1,4}\s*$/, ''));
+      if (nn.length >= 5 && porNome.has(nn)) return porNome.get(nn)!;
+      if (nn.length >= 8) for (const [n, id] of porNome) if (n.length >= 8 && (nn.includes(n) || n.includes(nn))) return id;
+      return null;
+    };
+    let linhasComEmail = 0, casados = 0, preenchidos = 0, jaTinha = 0, semMatch = 0; const amostraSemMatch: string[] = [];
+    for (let i = hdr + 1; i < linhas.length; i++) {
+      const row = linhas[i];
+      const nomeCel = row[colNome] || '';
+      const emailM = (row[colEmail] || '').match(/[\w.+-]+@[\w.-]+\.\w{2,}/);
+      if (!emailM) continue;
+      linhasComEmail++;
+      const email = emailM[0].toLowerCase();
+      const id = resolve(nomeCel);
+      if (!id) { semMatch++; if (amostraSemMatch.length < 30) amostraSemMatch.push(`${nomeCel} → ${email}`); continue; }
+      casados++;
+      const comp = companies.find((c) => c.id === id);
+      if (comp && (comp.email || '').includes('@')) { jaTinha++; continue; }
+      if (!dry) await this.prisma.company.update({ where: { id }, data: { email } }).catch(() => undefined);
+      preenchidos++;
+    }
+    return { dryRun: dry, arquivo: ref.name, aba, colunas: { nome: colNome, email: colEmail }, linhasComEmail, casados, preenchidos, jaTinha, semMatch, amostraSemMatch };
+  }
+
   /** Acha a planilha (por nome) no tenant e devolve o driveId/id + as N primeiras linhas p/ inspeção. */
   async previewPlanilha(nome = 'Relação de Regime de Empresas', maxRows = 20, aba?: string) {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
