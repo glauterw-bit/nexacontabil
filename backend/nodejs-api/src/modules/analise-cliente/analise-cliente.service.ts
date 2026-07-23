@@ -840,7 +840,15 @@ export class AnaliseClienteService {
       return null;
     };
     const nomeById = new Map(companies.map((c) => [c.id, c.name]));
-    let linhasComEmail = 0, casados = 0, preenchidos = 0, jaTinha = 0, semMatch = 0; const amostraSemMatch: string[] = []; const amostraCasados: string[] = [];
+    // FILTRO DE CONFIANÇA: a planilha tem a coluna e-mail DESALINHADA em várias linhas. Só
+    // preenchemos quando o e-mail contém um "pedaço" do nome do cliente (prova de que é dele).
+    const STOP = new Set(['ltda', 'eireli', 'epp', 'mei', 'auto', 'pecas', 'comercio', 'servicos', 'servico', 'distribuidora', 'industria', 'transportes', 'ltd', 'sa', 'me', 'de', 'do', 'da', 'dos', 'das', 'sob', 'medida', 'holding', 'patrimonial', 'comercial', 'import', 'imports', 'digital', 'digitais', 'negocios', 'geral', 'grupo', 'matriz', 'consolidada', 'filiais', 'com', 'gmail', 'hotmail', 'yahoo', 'outlook', 'uol', 'terra']);
+    const emailBate = (nome: string, email: string): boolean => {
+      const emailN = norm(email).replace(/ /g, '');
+      const tokens = norm(nome).split(' ').filter((t) => t.length >= 4 && !STOP.has(t));
+      return tokens.some((t) => emailN.includes(t));
+    };
+    let linhasComEmail = 0, casados = 0, preenchidos = 0, jaTinha = 0, semMatch = 0, descartadosDesalinhado = 0; const amostraSemMatch: string[] = []; const amostraCasados: string[] = []; const amostraDescartados: string[] = [];
     for (let i = hdr + 1; i < linhas.length; i++) {
       const row = linhas[i];
       const nomeCel = row[colNome] || '';
@@ -851,13 +859,16 @@ export class AnaliseClienteService {
       const id = resolve(nomeCel);
       if (!id) { semMatch++; if (amostraSemMatch.length < 30) amostraSemMatch.push(`${nomeCel} → ${email}`); continue; }
       casados++;
-      if (amostraCasados.length < 40) amostraCasados.push(`"${nomeCel}" → ${email}  [DB: ${nomeById.get(id)}]`);
+      const empresaNome = nomeById.get(id) || '';
+      // descarta se o e-mail NÃO bate com o nome (linha desalinhada na planilha)
+      if (!emailBate(empresaNome, email) && !emailBate(nomeCel, email)) { descartadosDesalinhado++; if (amostraDescartados.length < 20) amostraDescartados.push(`${empresaNome} ✗ ${email}`); continue; }
+      if (amostraCasados.length < 40) amostraCasados.push(`${empresaNome} ✓ ${email}`);
       const comp = companies.find((c) => c.id === id);
       if (comp && (comp.email || '').includes('@')) { jaTinha++; continue; }
       if (!dry) await this.prisma.company.update({ where: { id }, data: { email } }).catch(() => undefined);
       preenchidos++;
     }
-    return { dryRun: dry, arquivo: ref.name, aba, colunas: { nome: colNome, email: colEmail }, linhasComEmail, casados, preenchidos, jaTinha, semMatch, amostraCasados, amostraSemMatch };
+    return { dryRun: dry, arquivo: ref.name, aba, linhasComEmail, casados, confiaveisPreenchidos: preenchidos, jaTinha, descartadosDesalinhado, semMatch, amostraCasados, amostraDescartados };
   }
 
   /** Acha a planilha (por nome) no tenant e devolve o driveId/id + as N primeiras linhas p/ inspeção. */
