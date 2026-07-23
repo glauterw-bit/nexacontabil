@@ -52,7 +52,7 @@ export default function Gerencial() {
 
           <div className="gp-tablewrap">
             <table className="gp-table">
-              <thead><tr><th className="l">Responsável</th><th>Clientes</th><th>Atrasados</th><th className="w">Taxa de entrega</th><th>Entregues / Devidas</th></tr></thead>
+              <thead><tr><th className="l">Responsável</th><th>Clientes</th><th>Atrasados</th><th className="w">Taxa de entrega</th><th>Entregues / Devidas</th><th></th></tr></thead>
               <tbody>
                 {d.analistas.map((a) => (
                   <tr key={a.responsavel}>
@@ -61,6 +61,7 @@ export default function Gerencial() {
                     <td className={a.atrasados ? 'gp-atr' : ''}>{a.atrasados || '—'}</td>
                     <td className="w"><div className="gp-taxa"><span style={{ color: tone(a.taxa), fontWeight: 700 }}>{a.taxa}%</span><Bar taxa={a.taxa} /></div></td>
                     <td className="gp-num">{a.entregues} / {a.devidas}</td>
+                    <td><a className="gp-ver" href={`/central-entregas?responsavel=${encodeURIComponent(a.responsavel)}`}>Ver painel →</a></td>
                   </tr>
                 ))}
               </tbody>
@@ -94,6 +95,8 @@ export default function Gerencial() {
 .gp-bar{flex:1;height:8px;background:var(--s2);border-radius:99px;overflow:hidden}
 .gp-bar span{display:block;height:100%;border-radius:99px}
 .gp-num{color:var(--tx3);font-size:13px}
+.gp-ver{display:inline-block;border:1px solid #0F766E;color:#0F766E;background:#E6F1EF;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
+.gp-ver:hover{background:#0F766E;color:#fff}
 .gp-note{color:var(--tx3);font-size:12px;margin-top:12px;line-height:1.5}
 @media(max-width:640px){.gp-kpis{grid-template-columns:1fr 1fr}.gp-table th.w{width:auto}}
       `}</style>

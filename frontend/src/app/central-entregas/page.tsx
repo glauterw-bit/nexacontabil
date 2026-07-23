@@ -37,6 +37,7 @@ export default function CentralEntregas() {
   const [copiado, setCopiado] = useState(false);
 
   const [todosResp, setTodosResp] = useState<string[]>([]);
+  useEffect(() => { const p = new URLSearchParams(window.location.search).get('responsavel'); if (p) setResp(p); }, []);
   const carregar = useCallback(() => {
     setLoading(true);
     const u = `${API}/api/v1/paineis/calendario-entregas?ano=${ano}${resp ? `&responsavel=${encodeURIComponent(resp)}` : ''}`;
