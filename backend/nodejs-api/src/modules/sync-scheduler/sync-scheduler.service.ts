@@ -305,6 +305,43 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.sondarClientePastas(codigo);
   }
 
+  private enrichState: any = null;
+  /** ENRIQUECE contatos (WhatsApp/e-mail) dos clientes ativos via BrasilAPI (por CNPJ) — background,
+   *  respeitando o rate-limit. Sem isso, a cobrança por WhatsApp/e-mail fica inativa (0% hoje). */
+  enriquecerContatos() {
+    if (this.enrichState?.status === 'rodando') return { status: 'rodando', progresso: this.enrichState.progresso };
+    this.enrichState = { status: 'rodando', em: new Date().toISOString(), progresso: { feitos: 0, total: 0, comWpp: 0, comEmail: 0, erros: 0 } };
+    (async () => {
+      const cs = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, cnpj: true, whatsappNumber: true, email: true } });
+      const alvo = cs.filter((c) => (c.cnpj || '').replace(/\D/g, '').length === 14 && (!(c.whatsappNumber || '').replace(/\D/g, '') || !(c.email || '').includes('@')));
+      this.enrichState.progresso.total = alvo.length;
+      for (const c of alvo) {
+        const cnpj = (c.cnpj || '').replace(/\D/g, '');
+        try {
+          const r: any = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+          if (r.ok) {
+            const d: any = await r.json();
+            const fone = String(d.ddd_telefone_1 || '').replace(/\D/g, '');
+            const email = String(d.email || '').trim().toLowerCase();
+            const data: any = {};
+            if (fone.length >= 10 && !(c.whatsappNumber || '').replace(/\D/g, '')) data.whatsappNumber = fone;
+            if (email.includes('@') && !(c.email || '').includes('@')) data.email = email;
+            if (Object.keys(data).length) {
+              await this.prisma.company.update({ where: { id: c.id }, data }).catch(() => undefined);
+              if (data.whatsappNumber) this.enrichState.progresso.comWpp++;
+              if (data.email) this.enrichState.progresso.comEmail++;
+            }
+          } else if (r.status === 429) { await new Promise((rs) => setTimeout(rs, 8000)); }
+        } catch { this.enrichState.progresso.erros++; }
+        this.enrichState.progresso.feitos++;
+        await new Promise((rs) => setTimeout(rs, 1100)); // rate-limit BrasilAPI
+      }
+      this.enrichState = { ...this.enrichState, status: 'concluido', em: new Date().toISOString() };
+    })().catch((e) => { this.enrichState = { ...this.enrichState, status: 'erro', msg: e?.message ?? String(e) }; });
+    return { status: 'disparado', dica: 'consulte /sync-drive/enriquecer-contatos-status' };
+  }
+  enriquecerContatosStatus() { return this.enrichState ?? { status: 'nunca_rodou' }; }
+
   async previewPlanilha(nome?: string, maxRows?: number, aba?: string) {
     return this.analise.previewPlanilha(nome, maxRows, aba);
   }

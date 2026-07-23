@@ -254,6 +254,18 @@ class SyncSchedulerController {
     return this.service.sondarClientePastas(codigo);
   }
 
+  /** ENRIQUECE contatos (WhatsApp/e-mail) dos clientes via BrasilAPI — background. */
+  @Public()
+  @Get('enriquecer-contatos')
+  enriquecerContatos() {
+    return this.service.enriquecerContatos();
+  }
+  @Public()
+  @Get('enriquecer-contatos-status')
+  enriquecerContatosStatus() {
+    return this.service.enriquecerContatosStatus();
+  }
+
   /** Preview da planilha de clientes (.xlsx) — mostra linhas/colunas p/ achar a data de inicio. */
   @Public()
   @Get('preview-planilha')
