@@ -842,7 +842,7 @@ export class AnaliseClienteService {
     const nomeById = new Map(companies.map((c) => [c.id, c.name]));
     // FILTRO DE CONFIANÇA: a planilha tem a coluna e-mail DESALINHADA em várias linhas. Só
     // preenchemos quando o e-mail contém um "pedaço" do nome do cliente (prova de que é dele).
-    const STOP = new Set(['ltda', 'eireli', 'epp', 'mei', 'auto', 'pecas', 'comercio', 'servicos', 'servico', 'distribuidora', 'industria', 'transportes', 'ltd', 'sa', 'me', 'de', 'do', 'da', 'dos', 'das', 'sob', 'medida', 'holding', 'patrimonial', 'comercial', 'import', 'imports', 'digital', 'digitais', 'negocios', 'geral', 'grupo', 'matriz', 'consolidada', 'filiais', 'com', 'gmail', 'hotmail', 'yahoo', 'outlook', 'uol', 'terra']);
+    const STOP = new Set(['ltda', 'eireli', 'epp', 'mei', 'auto', 'pecas', 'comercio', 'servicos', 'servico', 'distribuidora', 'industria', 'transportes', 'ltd', 'sa', 'me', 'de', 'do', 'da', 'dos', 'das', 'sob', 'medida', 'holding', 'patrimonial', 'comercial', 'import', 'imports', 'digital', 'digitais', 'negocios', 'geral', 'grupo', 'matriz', 'consolidada', 'filiais', 'com', 'gmail', 'hotmail', 'yahoo', 'outlook', 'uol', 'terra', 'moto', 'motos', 'carro', 'carros', 'loja', 'casa', 'prime', 'nacional', 'express', 'brasil', 'center', 'parts', 'motors', 'shop', 'store']);
     const emailBate = (nome: string, email: string): boolean => {
       const emailN = norm(email).replace(/ /g, '');
       const tokens = norm(nome).split(' ').filter((t) => t.length >= 4 && !STOP.has(t));
