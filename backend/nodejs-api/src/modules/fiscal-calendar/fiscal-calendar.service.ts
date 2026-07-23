@@ -327,6 +327,24 @@ export class FiscalCalendarService {
     return { updated: result.count, revertidosPortal: rev.count, futurosRevertidos: futuros };
   }
 
+  /**
+   * MANTÉM a isenção do início — p/ toda empresa com clienteDesde, isenta as obrigações
+   * pendentes/vencidas de competências ANTERIORES à data de entrada no escritório. Idempotente,
+   * roda no ciclo: obrigações são (re)geradas continuamente e precisam ser re-isentadas.
+   */
+  async manterIsencaoInicio() {
+    const companies = await this.prisma.company.findMany({ where: { clienteDesde: { not: null } }, select: { id: true, clienteDesde: true } });
+    let isentadas = 0, empresas = 0;
+    for (const c of companies) {
+      const dt = c.clienteDesde!;
+      const compInicio = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}`;
+      const itens = await this.prisma.fiscalCalendarItem.findMany({ where: { companyId: c.id, status: { in: ['pendente', 'vencida'] }, competencia: { lt: compInicio } }, select: { id: true, competencia: true } });
+      const ids = itens.filter((it) => /^\d{4}-\d{2}$/.test(it.competencia)).map((it) => it.id);
+      if (ids.length) { const r = await this.prisma.fiscalCalendarItem.updateMany({ where: { id: { in: ids } }, data: { status: 'isenta' } }); isentadas += r.count; empresas++; }
+    }
+    return { empresasAjustadas: empresas, obrigacoesIsentadas: isentadas };
+  }
+
   // ── RECONCILIAÇÃO POR EVIDÊNCIA ────────────────────────────────────────────
   // Lê os DOCUMENTOS já capturados (comprovantes/recibos nas pastas, ex.: "DAS Maio
   // 2026.pdf") e decide o status REAL de cada obrigação: entregue (achou o comprovante

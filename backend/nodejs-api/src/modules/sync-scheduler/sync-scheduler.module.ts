@@ -276,6 +276,13 @@ class SyncSchedulerController {
     return this.service.webhooksStatus();
   }
 
+  /** Re-isenta os meses anteriores à data de entrada (clienteDesde) de todos os clientes. */
+  @Public()
+  @Get('manter-isencao-inicio')
+  manterIsencaoInicio() {
+    return this.service.manterIsencaoInicio();
+  }
+
   /** ENRIQUECE contatos (WhatsApp/e-mail) dos clientes via BrasilAPI — background. */
   @Public()
   @Get('enriquecer-contatos')

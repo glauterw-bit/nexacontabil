@@ -416,6 +416,8 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
 
   webhooksStatus() { return { secret: this.WEBHOOK_SECRET ? 'definido' : 'ausente', notificationUrl: this.notificationUrl(), hits: this.webhookHits, ultimaNotificacao: this.ultimaNotificacao, debouncePendente: !!this.webhookTimer }; }
 
+  async manterIsencaoInicio() { return this.fiscalCalendar.manterIsencaoInicio(); }
+
   async previewPlanilha(nome?: string, maxRows?: number, aba?: string) {
     return this.analise.previewPlanilha(nome, maxRows, aba);
   }
@@ -834,6 +836,9 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
         await passo('recibosNovos', () => this.fluxo.verificarRecibosLote(competencia, 6));
         // 5. marca vencidas o que sobrou pendente e já passou do prazo
         await passo('obrigacoesVencidas', () => this.fiscalCalendar.markOverdue());
+        // 5b. MANTÉM a isenção do início: obrigações de meses ANTES da entrada do cliente viram
+        //     'isenta' (não cobram). Roda sempre pq garantirAno/crawl (re)geram obrigações.
+        await passo('manterIsencaoInicio', () => this.fiscalCalendar.manterIsencaoInicio());
         // 6. WEBHOOKS: renova as subscriptions do Graph (e ATIVA no 1º ciclo se não houver) —
         //    leitura em TEMPO REAL: a Microsoft avisa quando um arquivo muda, sem esperar o ciclo.
         await passo('renovarWebhooks', () => this.renovarWebhooks());
