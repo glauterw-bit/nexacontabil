@@ -36,11 +36,13 @@ export default function CentralEntregas() {
   const [cobLoad, setCobLoad] = useState(false);
   const [copiado, setCopiado] = useState(false);
 
+  const [todosResp, setTodosResp] = useState<string[]>([]);
   const carregar = useCallback(() => {
     setLoading(true);
-    fetch(`${API}/api/v1/paineis/calendario-entregas?ano=${ano}`, { headers: authHeaders() })
-      .then((r) => r.json()).then(setD).catch(() => setD(null)).finally(() => setLoading(false));
-  }, [ano]);
+    const u = `${API}/api/v1/paineis/calendario-entregas?ano=${ano}${resp ? `&responsavel=${encodeURIComponent(resp)}` : ''}`;
+    fetch(u, { headers: authHeaders() })
+      .then((r) => r.json()).then((j) => { setD(j); if (!resp && Array.isArray(j?.responsaveis)) setTodosResp(j.responsaveis); }).catch(() => setD(null)).finally(() => setLoading(false));
+  }, [ano, resp]);
   useEffect(() => { carregar(); }, [carregar]);
 
   useEffect(() => {
@@ -103,6 +105,7 @@ export default function CentralEntregas() {
       </header>
 
       {loading ? <div className="ce-load">Carregando…</div> : !d ? <div className="ce-load">Não foi possível carregar.</div> : (<>
+        {resp ? <div className="ce-vercomo">👤 Vendo como <b>{resp}</b> — carteira e taxa deste analista <button onClick={() => setResp('')}>voltar à visão do escritório ✕</button></div> : null}
         <section className="ce-summary">
           <div className="ce-ringwrap">
             <div className="ce-ring" style={{ ['--p' as any]: r?.pct ?? 0 }}><b className="tnum">{r?.pct ?? 0}%</b></div>
@@ -127,9 +130,9 @@ export default function CentralEntregas() {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente ou código…" />
           </div>
-          <select className="ce-flt" value={resp} onChange={(e) => setResp(e.target.value)}>
+          <select className="ce-flt" value={resp} onChange={(e) => setResp(e.target.value)} title="Ver a carteira de um analista (a taxa reflete só ele)">
             <option value="">Todos os responsáveis</option>
-            {(d.responsaveis ?? []).map((x) => <option key={x} value={x}>{x}</option>)}
+            {(todosResp.length ? todosResp : d.responsaveis ?? []).map((x) => <option key={x} value={x}>👤 Ver como {x}</option>)}
           </select>
           <select className="ce-flt" value={regime} onChange={(e) => setRegime(e.target.value)}>
             <option value="">Todos os regimes</option><option value="SIMPLES">Simples</option><option value="MEI">MEI</option><option value="PRESUMIDO">Presumido</option><option value="REAL">Real</option>
@@ -285,6 +288,9 @@ const CSS = `
 .ce-search input:focus{outline:2px solid var(--ce-accent-soft);border-color:var(--ce-accent)}
 .ce-search svg{position:absolute;left:11px;top:9.5px;color:var(--ce-tx3)}
 .ce-flt{border:1px solid var(--ce-border);background:var(--ce-surface);border-radius:10px;padding:9px 12px;font-size:13.5px;color:var(--ce-tx2);font-family:inherit;cursor:pointer}
+.ce-vercomo{display:flex;align-items:center;gap:8px;background:var(--ce-accent-soft);border:1px solid var(--ce-accent);color:var(--ce-accent);border-radius:12px;padding:10px 16px;margin-bottom:14px;font-size:13.5px}
+.ce-vercomo b{font-weight:700}
+.ce-vercomo button{margin-left:auto;border:none;background:var(--ce-accent);color:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
 .ce-legend{display:flex;gap:13px;margin-left:auto;font-size:12px;color:var(--ce-tx2);align-items:center;flex-wrap:wrap}
 .ce-legend span{display:inline-flex;align-items:center;gap:6px}.ce-legend .sw{width:13px;height:13px;border-radius:4px}
 .ce-board{background:var(--ce-surface);border:1px solid var(--ce-border);border-radius:16px;box-shadow:0 1px 2px rgba(28,25,23,.05);overflow:hidden}

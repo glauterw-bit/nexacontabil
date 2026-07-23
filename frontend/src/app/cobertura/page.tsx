@@ -34,11 +34,14 @@ export default function Cobertura() {
   const [busca, setBusca] = useState('');
   const [soFalta, setSoFalta] = useState(false);
 
+  const [resp, setResp] = useState('');
+  const [todosResp, setTodosResp] = useState<string[]>([]);
   const carregar = useCallback(() => {
     setLoading(true);
-    fetch(`${API}/api/v1/paineis/cobertura?ano=${ano}`, { headers: authHeaders() })
-      .then((r) => r.json()).then(setD).catch(() => setD(null)).finally(() => setLoading(false));
-  }, [ano]);
+    const u = `${API}/api/v1/paineis/cobertura?ano=${ano}${resp ? `&responsavel=${encodeURIComponent(resp)}` : ''}`;
+    fetch(u, { headers: authHeaders() })
+      .then((r) => r.json()).then((j) => { setD(j); if (!resp && j?.clientes) setTodosResp([...new Set(j.clientes.map((c: any) => c.responsavel).filter(Boolean))] as string[]); }).catch(() => setD(null)).finally(() => setLoading(false));
+  }, [ano, resp]);
   useEffect(() => { carregar(); }, [carregar]);
 
   const r = d?.resumo;
@@ -56,13 +59,20 @@ export default function Cobertura() {
           <h1>Cobertura <span className="cb-badge">prova por enumeração</span></h1>
           <p>Cada mês é comprovado pela leitura da árvore real do OneDrive. <b>✓ verde-forte</b> = recibo no drive com link. O crawl varre a carteira sozinho e fecha o que a busca perde.</p>
         </div>
-        <select value={ano} onChange={(e) => setAno(parseInt(e.target.value, 10))} className="cb-year">
-          {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <select value={resp} onChange={(e) => setResp(e.target.value)} className="cb-year" title="Ver a carteira de um analista">
+            <option value="">Escritório (todos)</option>
+            {(todosResp.length ? todosResp : [...new Set((d?.clientes ?? []).map((c) => c.responsavel).filter(Boolean))]).map((x) => <option key={x} value={x as string}>👤 Ver como {x}</option>)}
+          </select>
+          <select value={ano} onChange={(e) => setAno(parseInt(e.target.value, 10))} className="cb-year">
+            {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
       </header>
 
       {loading ? <div className="cb-load">Carregando cobertura…</div> : !d ? <div className="cb-load">Sem dados.</div> : (
         <>
+          {resp ? <div className="cb-vercomo">👤 Vendo como <b>{resp}</b> — cobertura da carteira deste analista <button onClick={() => setResp('')}>voltar ao escritório ✕</button></div> : null}
           <section className="cb-kpis">
             <Ring pct={r!.taxaEntrega} label="Taxa de entrega" sub={`${r!.obEntregues} de ${r!.obEntregues + r!.obFaltam} devidas`} tone="var(--cb-ok)" />
             <Ring pct={r!.taxaProva} label="Provados por recibo" sub={`${r!.comProva} entregas com link no drive`} tone="var(--cb-accent)" />
@@ -114,6 +124,9 @@ export default function Cobertura() {
 .cb-badge{font-size:11px;font-weight:600;background:var(--cb-accent);color:#fff;padding:3px 9px;border-radius:20px;letter-spacing:.02em}
 .cb-year{border:1px solid var(--cb-border);border-radius:10px;padding:8px 12px;font-size:14px;background:var(--cb-surface)}
 .cb-load{padding:60px;text-align:center;color:var(--cb-tx3)}
+.cb-vercomo{display:flex;align-items:center;gap:8px;background:var(--cb-accent);color:#fff;border-radius:12px;padding:10px 16px;margin-bottom:16px;font-size:13.5px}
+.cb-vercomo b{font-weight:700}
+.cb-vercomo button{margin-left:auto;border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
 .cb-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
 .cb-ring,.cb-stat{background:var(--cb-surface);border:1px solid var(--cb-border);border-radius:16px;padding:16px 18px;box-shadow:0 1px 2px rgba(28,25,23,.05)}
 .cb-ring{display:flex;align-items:center;gap:12px}
