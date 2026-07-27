@@ -77,6 +77,61 @@ export class SefazDistribuicaoService {
     } catch { return null; }
   }
 
+  /**
+   * SAÚDE DO SEFAZ — cliente a cliente: tem certificado válido? está puxando? o que falta?
+   * Transforma os erros da varredura numa lista acionável (renovar cert / subir A1 / procuração).
+   */
+  async saudeSefaz() {
+    const now = Date.now();
+    const companies = await this.prisma.company.findMany({
+      where: { active: true },
+      select: { id: true, name: true, clienteCodigo: true, cnpj: true, uf: true, responsavel: true, sefazUltConsultaEm: true, sefazUltCStat: true, sefazUltMotivo: true },
+      orderBy: { name: 'asc' },
+    });
+    const ids = companies.map((c) => c.id);
+    const certs = await this.prisma.certificadoDigital.findMany({ where: { companyId: { in: ids }, active: true }, select: { companyId: true, dataValidade: true, escritorio: true } });
+    const certBy = new Map<string, { validade: Date; escritorio: boolean }>();
+    for (const c of certs) { const cur = certBy.get(c.companyId); if (!cur || c.dataValidade > cur.validade) certBy.set(c.companyId, { validade: c.dataValidade, escritorio: c.escritorio }); }
+    let docsBy = new Map<string, number>();
+    try { const g = await this.prisma.document.groupBy({ by: ['companyId'], where: { companyId: { in: ids }, fileUrl: { startsWith: 'sefaz' } }, _count: { id: true } }); docsBy = new Map(g.map((x: any) => [x.companyId, x._count.id])); } catch { /* */ }
+
+    const clientes = companies.map((c) => {
+      const cert = certBy.get(c.id);
+      const temCert = !!cert;
+      const vencido = cert ? cert.validade.getTime() < now : false;
+      const diasValidade = cert ? Math.round((cert.validade.getTime() - now) / 86400000) : null;
+      const temUF = !!(c.uf && c.uf.trim());
+      const cStat = c.sefazUltCStat || '';
+      const docs = docsBy.get(c.id) || 0;
+      let status: string, acao: string;
+      if (!temCert) { status = 'sem_cert'; acao = 'Subir o certificado A1 do cliente OU configurar o cert do escritório + procuração e-CAC'; }
+      else if (vencido) { status = 'cert_vencido'; acao = `Renovar o certificado (venceu há ${Math.abs(diasValidade!)} dias)`; }
+      else if (!temUF) { status = 'sem_uf'; acao = 'Preencher a UF do cliente (necessária p/ consultar)'; }
+      else if (cStat === '593') { status = 'sem_procuracao'; acao = 'Falta procuração e-CAC (cStat 593)'; }
+      else if (cStat === '656') { status = 'bloqueado_656'; acao = 'Só aguardar — limite de consumo do SEFAZ (~1h entre consultas)'; }
+      else if (cStat === '138' || cStat === '137' || docs > 0) { status = 'ok'; acao = ''; }
+      else if (cStat) { status = 'erro'; acao = c.sefazUltMotivo || `cStat ${cStat}`; }
+      else { status = 'pronto'; acao = 'Aguardando 1ª consulta (tem cert e UF)'; }
+      return {
+        companyId: c.id, codigo: c.clienteCodigo, nome: c.name, responsavel: c.responsavel,
+        status, acao, temCert, certVenceEmDias: diasValidade, certEscritorio: cert?.escritorio ?? false, temUF: temUF,
+        docsSefaz: docs, ultimaConsulta: c.sefazUltConsultaEm ? c.sefazUltConsultaEm.toISOString() : null, cStat: cStat || null,
+      };
+    });
+    const cont = (s: string) => clientes.filter((c) => c.status === s).length;
+    const resumo = {
+      total: clientes.length,
+      ok: cont('ok') + cont('pronto') + cont('bloqueado_656'), // puxando ou pronto (656 é transitório)
+      semCert: cont('sem_cert'), certVencido: cont('cert_vencido'), semUF: cont('sem_uf'),
+      semProcuracao: cont('sem_procuracao'), comErro: cont('erro'),
+      docsCapturados: [...docsBy.values()].reduce((a, b) => a + b, 0),
+    };
+    // ordena: quem precisa de AÇÃO primeiro
+    const ordem: Record<string, number> = { sem_cert: 0, cert_vencido: 1, sem_procuracao: 2, sem_uf: 3, erro: 4, pronto: 5, bloqueado_656: 6, ok: 7 };
+    clientes.sort((a, b) => (ordem[a.status] ?? 9) - (ordem[b.status] ?? 9) || String(a.nome).localeCompare(String(b.nome)));
+    return { resumo, clientes };
+  }
+
   /** Status/config da integração (sem certificado não busca). */
   async status(companyId?: string) {
     const base = {

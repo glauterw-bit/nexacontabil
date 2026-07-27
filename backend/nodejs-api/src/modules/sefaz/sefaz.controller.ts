@@ -14,6 +14,13 @@ export class SefazController {
     return this.service.status(companyId);
   }
 
+  /** SAÚDE do SEFAZ — cliente a cliente: tem cert válido, está puxando, o que falta. */
+  @Public()
+  @Get('saude')
+  saude() {
+    return this.service.saudeSefaz();
+  }
+
   /** Busca as NF-e do cliente no SEFAZ (DistribuiçãoDFe) desde o último NSU e ingere. */
   @Post('buscar-cliente')
   buscarCliente(@Body() body: { companyId: string; senha?: string; maxIteracoes?: number }) {

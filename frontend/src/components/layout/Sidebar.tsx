@@ -79,6 +79,7 @@ const MODULOS: NavGroup[] = [
   {
     label: 'Fiscal (apoio à base)',
     items: [
+      { href: '/sefaz-saude', icon: Activity,   label: 'Saúde do SEFAZ' },
       { href: '/sefaz',     icon: Landmark,    label: 'Buscar no SEFAZ' },
       { href: '/certidoes', icon: ShieldCheck, label: 'Certidões' },
       { href: '/fiscal',    icon: Receipt,     label: 'NF-e / NFS-e' },
