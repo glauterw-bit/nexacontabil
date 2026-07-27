@@ -283,6 +283,18 @@ class SyncSchedulerController {
     return this.service.manterIsencaoInicio();
   }
 
+  /** Importa TODOS os certificados A1 do OneDrive (senha do nome/senha.txt) — background. */
+  @Public()
+  @Get('importar-certificados-full')
+  importarCertificadosFull(@Query('senha') senha?: string) {
+    return this.service.importarCertificadosFull(senha);
+  }
+  @Public()
+  @Get('importar-certificados-status')
+  importarCertificadosStatus() {
+    return this.service.importarCertificadosStatus();
+  }
+
   /** ENRIQUECE contatos (WhatsApp/e-mail) dos clientes via BrasilAPI — background. */
   @Public()
   @Get('enriquecer-contatos')

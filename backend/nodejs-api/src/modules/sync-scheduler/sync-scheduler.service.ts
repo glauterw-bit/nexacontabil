@@ -418,6 +418,19 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
 
   async manterIsencaoInicio() { return this.fiscalCalendar.manterIsencaoInicio(); }
 
+  private certImportState: any = null;
+  /** Importação COMPLETA dos certificados A1 do OneDrive (background, senha do nome/senha.txt). */
+  importarCertificadosFull(senhaPadrao?: string) {
+    if (this.certImportState?.status === 'rodando') return { status: 'rodando' };
+    this.certImportState = { status: 'rodando', em: new Date().toISOString() };
+    (async () => {
+      const r = await this.analise.importarCertificadosDrive({ senhaPadrao, limit: 1200, timeBudgetMs: 12 * 60_000 });
+      this.certImportState = { status: 'concluido', em: new Date().toISOString(), ...r };
+    })().catch((e) => { this.certImportState = { status: 'erro', msg: e?.message ?? String(e) }; });
+    return { status: 'disparado', dica: 'consulte /sync-drive/importar-certificados-status' };
+  }
+  importarCertificadosStatus() { return this.certImportState ?? { status: 'nunca_rodou' }; }
+
   async previewPlanilha(nome?: string, maxRows?: number, aba?: string) {
     return this.analise.previewPlanilha(nome, maxRows, aba);
   }

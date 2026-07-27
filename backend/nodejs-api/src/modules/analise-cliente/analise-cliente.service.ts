@@ -1945,6 +1945,19 @@ export class AnaliseClienteService {
       const [driveId, fileId] = fileUrl.split('|'); if (!fileId) return '';
       try { const { buffer } = await this.onedrive.downloadFile(conn.id, fileId, driveId); return buffer.toString('utf8').slice(0, 2000); } catch { return ''; }
     };
+    // mapa CNPJ → empresa ATIVA (o certificado declara o próprio dono; casa por ele, não pela pasta)
+    const ativas = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true, cnpj: true } });
+    const porCnpj = new Map<string, { id: string; name: string }>();
+    for (const a of ativas) { const cj = (a.cnpj ?? '').replace(/\D/g, ''); if (cj.length === 14) porCnpj.set(cj, { id: a.id, name: a.name }); }
+    // extrai CANDIDATOS DE SENHA do NOME do arquivo (ex.: "...SENHA. Mecterm2026", "- 123456 -")
+    const senhasDoNome = (nome: string): string[] => {
+      const out: string[] = [];
+      const n = (nome || '').replace(/\.(pfx|p12)$/i, '');
+      const m = n.match(/(?:senha|pwd|pass|pw)[\s.:=_-]*([A-Za-z0-9@#!$%._-]{3,30})/i);
+      if (m) out.push(m[1]);
+      for (const tok of n.split(/[\s_\-]+/)) { const t = tok.trim(); if (/^[A-Za-z0-9@#!$%.]{4,30}$/.test(t) && !/^\d{11,14}$/.test(t) && !/^\d{6,8}\d{4}$/.test(t)) out.push(t); }
+      return out;
+    };
 
     let importados = 0, semSenha = 0, semRef = 0, cnpjDivergente = 0, jaTinha = 0, expirados = 0, falhou = 0;
     const detalhe: any[] = [];
@@ -1963,18 +1976,22 @@ export class AnaliseClienteService {
       try { const { buffer } = await this.onedrive.downloadFile(conn.id, fileId, driveId); b64 = buffer.toString('base64'); }
       catch { falhou++; continue; }
 
-      // candidatos de senha
+      // candidatos de senha — inclui a SENHA EMBUTIDA NO NOME do arquivo (onde muitas estão)
       const cands = new Set<string>();
       if (opts?.senhaPadrao) cands.add(opts.senhaPadrao);
+      for (const s of senhasDoNome(c.originalFilename ?? '')) cands.add(s);
       if (cnpjEmpresa) { cands.add(cnpjEmpresa); cands.add(cnpjEmpresa.slice(0, 8)); }
+      // CNPJ no NOME do arquivo (Forms/ é pasta compartilhada; o dono está no nome)
+      const cnpjNome = (c.originalFilename ?? '').replace(/\D/g, '').match(/\d{14}/)?.[0];
+      if (cnpjNome) { cands.add(cnpjNome); cands.add(cnpjNome.slice(0, 8)); }
       for (const fu of senhaPorEmpresa.get(c.companyId) ?? []) {
         const txt = await baixarTexto(fu);
         for (const tok of (txt.match(/[A-Za-z0-9@#!$%._-]{4,30}/g) ?? []).slice(0, 20)) cands.add(tok);
       }
-      ['1234', '123456'].forEach((s) => cands.add(s));
+      ['1234', '123456', '12345678'].forEach((s) => cands.add(s));
 
       let parsed: any = null, senhaOk = '';
-      for (const s of cands) { try { parsed = parsePfxReal(b64, s); senhaOk = s; break; } catch { /* senha errada */ } }
+      for (const s of cands) { if (!s) continue; try { parsed = parsePfxReal(b64, s); senhaOk = s; break; } catch { /* senha errada */ } }
       if (!parsed) { semSenha++; await this.prisma.document.update({ where: { id: c.id }, data: { status: 'cert_semsenha' } }).catch(() => undefined); continue; }
 
       const cnpjCert = (parsed.cnpjCpf ?? '').replace(/\D/g, '');
@@ -1983,16 +2000,22 @@ export class AnaliseClienteService {
         await this.prisma.document.update({ where: { id: c.id }, data: { status: 'cert_expirado' } }).catch(() => undefined);
         continue;
       }
-      // casa pelo CNPJ (se a empresa tem CNPJ real): evita cadastrar cert de terceiro
-      if (cnpjEmpresa && cnpjEmpresa.length === 14 && cnpjCert && cnpjCert !== cnpjEmpresa) {
-        cnpjDivergente++; detalhe.push({ empresa: company.name, cnpjCert, cnpjEmpresa, motivo: 'CNPJ do certificado difere do cliente' });
+      // DESTINO = a empresa DONA do certificado (pelo CNPJ do próprio cert), não pela pasta.
+      // Assim os certs da pasta compartilhada Forms/ vão pro cliente certo.
+      let alvoId = c.companyId, alvoNome = company.name;
+      if (cnpjCert && cnpjCert.length === 14 && porCnpj.has(cnpjCert)) { const t = porCnpj.get(cnpjCert)!; alvoId = t.id; alvoNome = t.name; }
+      else if (cnpjEmpresa && cnpjEmpresa.length === 14 && cnpjCert && cnpjCert !== cnpjEmpresa) {
+        cnpjDivergente++; detalhe.push({ empresa: company.name, cnpjCert, cnpjEmpresa, motivo: 'CNPJ do cert não bate com nenhum cliente ativo' });
         continue;
       }
+      // já tem cert próprio ativo nessa empresa-alvo? não duplica
+      const alvoJaTem = await this.prisma.certificadoDigital.findFirst({ where: { companyId: alvoId, active: true, escritorio: false }, select: { id: true } });
+      if (alvoJaTem) { jaTinha++; continue; }
       try {
-        await this.certificados.salvarCertificadoA1(c.companyId, b64, senhaOk, c.originalFilename ?? 'certificado.pfx');
+        await this.certificados.salvarCertificadoA1(alvoId, b64, senhaOk, c.originalFilename ?? 'certificado.pfx');
         importados++;
-        detalhe.push({ empresa: company.name, cnpj: cnpjCert, validade: parsed.dataValidade });
-      } catch (e: any) { falhou++; detalhe.push({ empresa: company.name, motivo: (e?.message ?? 'erro ao salvar').slice(0, 80) }); }
+        detalhe.push({ empresa: alvoNome, cnpj: cnpjCert, validade: parsed.dataValidade });
+      } catch (e: any) { falhou++; detalhe.push({ empresa: alvoNome, motivo: (e?.message ?? 'erro ao salvar').slice(0, 80) }); }
     }
     return {
       certificadosEncontrados: certs.length, importados, jaTinham: jaTinha,
