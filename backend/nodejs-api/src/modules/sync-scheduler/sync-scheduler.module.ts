@@ -295,6 +295,18 @@ class SyncSchedulerController {
     return this.service.importarCertificadosStatus();
   }
 
+  /** Varredura SEFAZ completa (background) — puxa NF-e de todos os elegíveis agora. */
+  @Public()
+  @Get('varrer-sefaz')
+  varrerSefaz() {
+    return this.service.varrerSefazFull();
+  }
+  @Public()
+  @Get('varrer-sefaz-status')
+  varrerSefazStatus() {
+    return this.service.varrerSefazStatus();
+  }
+
   /** ENRIQUECE contatos (WhatsApp/e-mail) dos clientes via BrasilAPI — background. */
   @Public()
   @Get('enriquecer-contatos')

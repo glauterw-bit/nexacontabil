@@ -431,6 +431,19 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   }
   importarCertificadosStatus() { return this.certImportState ?? { status: 'nunca_rodou' }; }
 
+  private sefazFullState: any = null;
+  /** Varredura SEFAZ COMPLETA (background) — passa por todos os elegíveis (respeitando o cooldown). */
+  varrerSefazFull() {
+    if (this.sefazFullState?.status === 'rodando') return { status: 'rodando' };
+    this.sefazFullState = { status: 'rodando', em: new Date().toISOString() };
+    (async () => {
+      const r = await this.sefaz.varrerTodos({ timeBudgetMs: 12 * 60_000, maxIteracoesPorCliente: 40 });
+      this.sefazFullState = { status: 'concluido', em: new Date().toISOString(), ...r };
+    })().catch((e) => { this.sefazFullState = { status: 'erro', msg: e?.message ?? String(e) }; });
+    return { status: 'disparado', dica: 'consulte /sync-drive/varrer-sefaz-status' };
+  }
+  varrerSefazStatus() { return this.sefazFullState ?? { status: 'nunca_rodou' }; }
+
   async previewPlanilha(nome?: string, maxRows?: number, aba?: string) {
     return this.analise.previewPlanilha(nome, maxRows, aba);
   }
