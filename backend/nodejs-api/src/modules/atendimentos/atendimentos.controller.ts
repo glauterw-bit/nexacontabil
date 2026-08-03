@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
-import { Public } from '../../common/public.decorator';
+import { Public, Aberto } from '../../common/public.decorator';
 import { AtendimentosService } from './atendimentos.service';
 
 @Controller('atendimentos')
@@ -40,7 +40,7 @@ export class AtendimentosController {
 
   // Webhook de ingestão externa (sistema legado / automações). Público pra
   // poder ser chamado sem login — protegido por token simples no body/header.
-  @Public()
+  @Aberto()
   @Post('ingest')
   ingest(@Body() body: any) {
     return this.service.ingest(body);

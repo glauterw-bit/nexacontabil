@@ -4,7 +4,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { GoogleDriveService } from './google-drive.service';
 import { OneDriveService } from './onedrive.service';
 import { CloudSearchService } from './cloud-search.service';
-import { Public } from '../../common/public.decorator';
+import { Public, Aberto } from '../../common/public.decorator';
 
 @Controller('cloud')
 export class CloudController {
@@ -177,7 +177,7 @@ export class CloudController {
     return { url: this.google.generateAuthUrl(state) };
   }
 
-  @Public()
+  @Aberto()
   @Get('google/callback')
   async googleCallback(@Query('code') code: string, @Query('state') state: string, @Res() res: Response) {
     try {
@@ -200,7 +200,7 @@ export class CloudController {
     return { url };
   }
 
-  @Public()
+  @Aberto()
   @Get('microsoft/callback')
   async microsoftCallback(@Query('code') code: string, @Query('state') state: string, @Res() res: Response) {
     try {

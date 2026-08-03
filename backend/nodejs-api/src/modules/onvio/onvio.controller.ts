@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Delete, Body, Query, Req, Res, Param } from '@nestjs/common';
 import type { Response } from 'express';
 import { OnvioService } from './onvio.service';
-import { Public } from '../../common/public.decorator';
+import { Public, Aberto } from '../../common/public.decorator';
 
 @Controller('onvio')
 export class OnvioController {
@@ -18,7 +18,7 @@ export class OnvioController {
     return { url };
   }
 
-  @Public()
+  @Aberto()
   @Get('callback')
   async callback(@Query('code') code: string, @Query('state') state: string, @Res() res: Response) {
     const frontend = process.env.FRONTEND_BASE_URL || 'https://frontend-production-2825.up.railway.app';

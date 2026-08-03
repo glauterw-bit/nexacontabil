@@ -1,12 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { Public } from '../../common/public.decorator';
+import { Public, Aberto } from '../../common/public.decorator';
 
 @Controller('health')
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
-  @Public()
+  @Aberto()
   @Get()
   async check() {
     const startedAt = Date.now();

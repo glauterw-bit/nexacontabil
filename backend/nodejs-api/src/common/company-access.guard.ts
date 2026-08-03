@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, Injectable, ForbiddenException, BadReque
 import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { PrismaService } from '../database/prisma.service';
-import { IS_PUBLIC_KEY } from './public.decorator';
+import { IS_PUBLIC_KEY, IS_ABERTO_KEY } from './public.decorator';
 
 /**
  * Verifica se o usuario autenticado tem acesso a empresa em questao.
@@ -26,6 +26,11 @@ export class CompanyAccessGuard implements CanActivate {
       ctx.getClass(),
     ]);
     if (isPublic) return true;
+    const isAberto = this.reflector.getAllAndOverride<boolean>(IS_ABERTO_KEY, [
+      ctx.getHandler(),
+      ctx.getClass(),
+    ]);
+    if (isAberto) return true;
 
     // GraphQL: extrai req do contexto Apollo; REST: switchToHttp
     let req: any;

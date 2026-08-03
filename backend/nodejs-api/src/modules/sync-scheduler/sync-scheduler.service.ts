@@ -157,23 +157,19 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.reconciliarViaSearch({ ano, timeBudgetMs: 8 * 60_000 });
   }
 
-  private reconGlobalManual: any = null;
 
   /** Reconciliação GLOBAL por tipo — dispara em BACKGROUND (partição mensal é pesada, ~centenas
    *  de buscas). Consulte /reconciliar-global-status. Gera os calendários antes. */
-  reconciliarGlobal(anos = [2024, 2025, 2026]) {
-    if (this.reconGlobalManual?.status === 'rodando') return { status: 'rodando', desde: this.reconGlobalManual.em };
-    this.reconGlobalManual = { status: 'rodando', em: new Date().toISOString(), anos };
-    (async () => {
+  async reconciliarGlobal(anos = [2024, 2025, 2026]) {
+    const r = await this.runJob('reconciliar-global', async () => {
       for (const a of anos) await this.fiscalCalendar.garantirAno(a).catch(() => undefined);
-      const r = await this.analise.reconciliarGlobalPorTipo({ anos });
-      this.reconGlobalManual = { status: (r as any)?.erro ? 'erro' : 'concluido', em: new Date().toISOString(), ...r };
-    })().catch((e) => { this.reconGlobalManual = { status: 'erro', msg: e?.message ?? String(e) }; });
-    return { status: 'disparado', anos, dica: 'consulte /sync-drive/reconciliar-global-status' };
+      return this.analise.reconciliarGlobalPorTipo({ anos });
+    });
+    return { ...r, anos };
   }
 
   reconciliarGlobalStatus() {
-    return this.reconGlobalManual ?? { status: 'nunca_rodou' };
+    return this.jobStatus('reconciliar-global');
   }
 
   private reconClienteManual: any = null;
@@ -307,16 +303,13 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.sondarClientePastas(codigo);
   }
 
-  private enrichState: any = null;
-  /** ENRIQUECE contatos (WhatsApp/e-mail) dos clientes ativos via BrasilAPI (por CNPJ) — background,
-   *  respeitando o rate-limit. Sem isso, a cobrança por WhatsApp/e-mail fica inativa (0% hoje). */
+  /** ENRIQUECE contatos (WhatsApp/e-mail) dos clientes ativos via BrasilAPI (por CNPJ) — background
+   *  durável, respeitando o rate-limit. Sem isso, a cobrança por WhatsApp/e-mail fica inativa. */
   enriquecerContatos() {
-    if (this.enrichState?.status === 'rodando') return { status: 'rodando', progresso: this.enrichState.progresso };
-    this.enrichState = { status: 'rodando', em: new Date().toISOString(), progresso: { feitos: 0, total: 0, comWpp: 0, comEmail: 0, erros: 0 } };
-    (async () => {
+    return this.runJob('enriquecer-contatos', async (progresso) => {
       const cs = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, cnpj: true, whatsappNumber: true, email: true } });
       const alvo = cs.filter((c) => (c.cnpj || '').replace(/\D/g, '').length === 14 && (!(c.whatsappNumber || '').replace(/\D/g, '') || !(c.email || '').includes('@')));
-      this.enrichState.progresso.total = alvo.length;
+      const p = { feitos: 0, total: alvo.length, comWpp: 0, comEmail: 0, erros: 0 };
       for (const c of alvo) {
         const cnpj = (c.cnpj || '').replace(/\D/g, '');
         try {
@@ -330,19 +323,19 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
             if (email.includes('@') && !(c.email || '').includes('@')) data.email = email;
             if (Object.keys(data).length) {
               await this.prisma.company.update({ where: { id: c.id }, data }).catch(() => undefined);
-              if (data.whatsappNumber) this.enrichState.progresso.comWpp++;
-              if (data.email) this.enrichState.progresso.comEmail++;
+              if (data.whatsappNumber) p.comWpp++;
+              if (data.email) p.comEmail++;
             }
           } else if (r.status === 429) { await new Promise((rs) => setTimeout(rs, 8000)); }
-        } catch { this.enrichState.progresso.erros++; }
-        this.enrichState.progresso.feitos++;
+        } catch { p.erros++; }
+        p.feitos++;
+        progresso(p);
         await new Promise((rs) => setTimeout(rs, 1100)); // rate-limit BrasilAPI
       }
-      this.enrichState = { ...this.enrichState, status: 'concluido', em: new Date().toISOString() };
-    })().catch((e) => { this.enrichState = { ...this.enrichState, status: 'erro', msg: e?.message ?? String(e) }; });
-    return { status: 'disparado', dica: 'consulte /sync-drive/enriquecer-contatos-status' };
+      return { progresso: p };
+    });
   }
-  enriquecerContatosStatus() { return this.enrichState ?? { status: 'nunca_rodou' }; }
+  enriquecerContatosStatus() { return this.jobStatus('enriquecer-contatos'); }
 
   // ─── WEBHOOKS DO GRAPH (leitura em TEMPO REAL) ───────────────────────────
   private readonly WEBHOOK_SECRET = process.env.GRAPH_WEBHOOK_SECRET || 'nexa-domo-webhook-2026';
@@ -418,31 +411,17 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
 
   async manterIsencaoInicio() { return this.fiscalCalendar.manterIsencaoInicio(); }
 
-  private certImportState: any = null;
-  /** Importação COMPLETA dos certificados A1 do OneDrive (background, senha do nome/senha.txt). */
+  /** Importação COMPLETA dos certificados A1 do OneDrive (background durável). */
   importarCertificadosFull(senhaPadrao?: string) {
-    if (this.certImportState?.status === 'rodando') return { status: 'rodando' };
-    this.certImportState = { status: 'rodando', em: new Date().toISOString() };
-    (async () => {
-      const r = await this.analise.importarCertificadosDrive({ senhaPadrao, limit: 1200, timeBudgetMs: 12 * 60_000 });
-      this.certImportState = { status: 'concluido', em: new Date().toISOString(), ...r };
-    })().catch((e) => { this.certImportState = { status: 'erro', msg: e?.message ?? String(e) }; });
-    return { status: 'disparado', dica: 'consulte /sync-drive/importar-certificados-status' };
+    return this.runJob('importar-certificados', () => this.analise.importarCertificadosDrive({ senhaPadrao, limit: 1200, timeBudgetMs: 12 * 60_000 }));
   }
-  importarCertificadosStatus() { return this.certImportState ?? { status: 'nunca_rodou' }; }
+  importarCertificadosStatus() { return this.jobStatus('importar-certificados'); }
 
-  private sefazFullState: any = null;
-  /** Varredura SEFAZ COMPLETA (background) — passa por todos os elegíveis (respeitando o cooldown). */
+  /** Varredura SEFAZ COMPLETA (background durável) — todos os elegíveis (respeitando o cooldown). */
   varrerSefazFull() {
-    if (this.sefazFullState?.status === 'rodando') return { status: 'rodando' };
-    this.sefazFullState = { status: 'rodando', em: new Date().toISOString() };
-    (async () => {
-      const r = await this.sefaz.varrerTodos({ timeBudgetMs: 12 * 60_000, maxIteracoesPorCliente: 40 });
-      this.sefazFullState = { status: 'concluido', em: new Date().toISOString(), ...r };
-    })().catch((e) => { this.sefazFullState = { status: 'erro', msg: e?.message ?? String(e) }; });
-    return { status: 'disparado', dica: 'consulte /sync-drive/varrer-sefaz-status' };
+    return this.runJob('varrer-sefaz', () => this.sefaz.varrerTodos({ timeBudgetMs: 12 * 60_000, maxIteracoesPorCliente: 40 }));
   }
-  varrerSefazStatus() { return this.sefazFullState ?? { status: 'nunca_rodou' }; }
+  varrerSefazStatus() { return this.jobStatus('varrer-sefaz'); }
 
   async previewPlanilha(nome?: string, maxRows?: number, aba?: string) {
     return this.analise.previewPlanilha(nome, maxRows, aba);
@@ -459,29 +438,28 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.analise.auditarCoberturaLote(limit, anos, offset);
   }
 
-  private reconCrawl: any = null;
-  /** RECONCILIAÇÃO POR CRAWL — background: enumera a árvore de CADA cliente ativo e marca ENTREGUE
-   *  os recibos provadamente presentes (naoCasados_BUG). Fecha o que a busca perdeu. Pesado (lento). */
-  reconciliarCrawlGlobal(anos = [new Date().getFullYear(), new Date().getFullYear() - 1]) {
-    if (this.reconCrawl?.status === 'rodando') return { status: 'rodando', desde: this.reconCrawl.em, progresso: this.reconCrawl.progresso };
-    this.reconCrawl = { status: 'rodando', em: new Date().toISOString(), anos, progresso: { feitos: 0, total: 0, corrigidas: 0, criadas: 0, bugRestante: 0, semObrigacao: 0, naoLocalizados: 0 }, naoLocalizadosLista: [] as string[] };
-    (async () => {
+  /** RECONCILIAÇÃO POR CRAWL — background durável: enumera a árvore de CADA cliente ativo e marca
+   *  ENTREGUE os recibos provadamente presentes. Progresso persiste no DB (sobrevive a deploy). */
+  async reconciliarCrawlGlobal(anos = [new Date().getFullYear(), new Date().getFullYear() - 1]) {
+    const r = await this.runJob('reconciliar-crawl', async (progresso) => {
       const companies = await this.analiseProxyListaAtivos();
-      this.reconCrawl.progresso.total = companies.length;
+      const p = { feitos: 0, total: companies.length, corrigidas: 0, criadas: 0, bugRestante: 0, semObrigacao: 0, naoLocalizados: 0 };
+      const naoLocalizadosLista: string[] = [];
       for (const cod of companies) {
         try {
-          const r: any = await this.analise.auditarCoberturaCliente(cod, anos, { aplicar: true, timeBudgetMs: 30_000 });
-          if (r?.reconciliacao) { this.reconCrawl.progresso.corrigidas += r.reconciliacao.corrigidasAgora || 0; this.reconCrawl.progresso.criadas += r.reconciliacao.criadasAgora || 0; this.reconCrawl.progresso.bugRestante += r.reconciliacao.naoCasados_BUG || 0; this.reconCrawl.progresso.semObrigacao += r.reconciliacao.naoCasados_semObrigacao || 0; }
-          else if (r?.erro) { this.reconCrawl.progresso.naoLocalizados++; if (this.reconCrawl.naoLocalizadosLista.length < 60) this.reconCrawl.naoLocalizadosLista.push(`${cod} ${r.cliente || ''} (${r.erro})`); }
-        } catch { this.reconCrawl.progresso.naoLocalizados++; }
-        this.reconCrawl.progresso.feitos++;
+          const res: any = await this.analise.auditarCoberturaCliente(cod, anos, { aplicar: true, timeBudgetMs: 30_000 });
+          if (res?.reconciliacao) { p.corrigidas += res.reconciliacao.corrigidasAgora || 0; p.criadas += res.reconciliacao.criadasAgora || 0; p.bugRestante += res.reconciliacao.naoCasados_BUG || 0; p.semObrigacao += res.reconciliacao.naoCasados_semObrigacao || 0; }
+          else if (res?.erro) { p.naoLocalizados++; if (naoLocalizadosLista.length < 60) naoLocalizadosLista.push(`${cod} ${res.cliente || ''} (${res.erro})`); }
+        } catch { p.naoLocalizados++; }
+        p.feitos++;
+        progresso(p);
       }
       await this.fiscalCalendar.markOverdue().catch(() => undefined);
-      this.reconCrawl = { ...this.reconCrawl, status: 'concluido', em: new Date().toISOString() };
-    })().catch((e) => { this.reconCrawl = { ...this.reconCrawl, status: 'erro', msg: e?.message ?? String(e) }; });
-    return { status: 'disparado', anos, dica: 'consulte /sync-drive/reconciliar-crawl-status' };
+      return { anos, progresso: p, naoLocalizadosLista };
+    });
+    return { ...r, anos };
   }
-  reconciliarCrawlStatus() { return this.reconCrawl ?? { status: 'nunca_rodou' }; }
+  reconciliarCrawlStatus() { return this.jobStatus('reconciliar-crawl'); }
   private async analiseProxyListaAtivos(): Promise<string[]> {
     const cs = await this.prisma.company.findMany({ where: { active: true, clienteCodigo: { not: null } }, select: { clienteCodigo: true } });
     return cs.map((c) => String(c.clienteCodigo)).filter((c) => /^\d+$/.test(c)).sort((a, b) => +a - +b);
@@ -717,6 +695,9 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   private readonly BACKFILL_DELAY_MS = 3 * 60_000;
 
   onApplicationBootstrap() {
+    // jobs que estavam 'rodando' quando o processo morreu (deploy/OOM) → 'interrompido'
+    // (o status persiste no DB; sem isso o deploy deixava o job fantasma "rodando" pra sempre)
+    this.prisma.jobRun.updateMany({ where: { status: 'rodando' }, data: { status: 'interrompido' } }).catch(() => undefined);
     if (!this.enabled) {
       this.logger.log('SYNC_ENABLED=false — sincronização agendada desligada');
       return;
@@ -724,6 +705,40 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     // primeiro ciclo 90s após o boot (deixa o app estabilizar); o loop se reagenda sozinho
     this.agendarProximo(90_000);
     this.logger.log('Sincronização agendada ativa — cadência adaptativa (acelera no backfill)');
+  }
+
+  // ─── JOBS PERSISTENTES (P0.2): estado no DB — sobrevive a deploy/restart ───
+  /** Dispara fn em background com estado durável. onProgresso grava progresso parcial. */
+  private async runJob(nome: string, fn: (progresso: (p: any) => void) => Promise<any>): Promise<{ status: string; dica: string }> {
+    const atual = await this.prisma.jobRun.findUnique({ where: { nome } }).catch(() => null);
+    if (atual?.status === 'rodando') return { status: 'rodando', dica: `job ${nome} já em execução` };
+    await this.prisma.jobRun.upsert({
+      where: { nome },
+      create: { nome, status: 'rodando' },
+      update: { status: 'rodando', progresso: undefined, resultado: undefined, iniciadoEm: new Date() },
+    }).catch(() => undefined);
+    let ultimoGrava = 0;
+    const progresso = (p: any) => {
+      const agora = Date.now();
+      if (agora - ultimoGrava < 3000) return; // throttle: no máx 1 write/3s
+      ultimoGrava = agora;
+      this.prisma.jobRun.update({ where: { nome }, data: { progresso: p } }).catch(() => undefined);
+    };
+    (async () => {
+      const r = await fn(progresso);
+      await this.prisma.jobRun.update({ where: { nome }, data: { status: (r as any)?.erro ? 'erro' : 'concluido', resultado: r ?? {} } }).catch(() => undefined);
+    })().catch(async (e) => {
+      await this.prisma.jobRun.update({ where: { nome }, data: { status: 'erro', resultado: { msg: e?.message ?? String(e) } } }).catch(() => undefined);
+    });
+    return { status: 'disparado', dica: `acompanhe pelo status do job ${nome}` };
+  }
+
+  /** Status durável do job (lido do DB — não zera com deploy). */
+  private async jobStatus(nome: string) {
+    const j = await this.prisma.jobRun.findUnique({ where: { nome } }).catch(() => null);
+    if (!j) return { status: 'nunca_rodou' };
+    const res = j.resultado && typeof j.resultado === 'object' ? (j.resultado as any) : {};
+    return { status: j.status, iniciadoEm: j.iniciadoEm.toISOString(), em: j.atualizadoEm.toISOString(), ...(j.progresso ? { progresso: j.progresso } : {}), ...res };
   }
 
   onModuleDestroy() {

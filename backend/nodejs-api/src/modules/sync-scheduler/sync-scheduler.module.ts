@@ -1,6 +1,6 @@
 import { Module, Controller, Get, Post, Query, Body, Req, Res, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { Public } from '../../common/public.decorator';
+import { Public, Aberto } from '../../common/public.decorator';
 import { PrismaService } from '../../database/prisma.service';
 import { SyncSchedulerService } from './sync-scheduler.service';
 import { FluxoModule } from '../fluxo/fluxo.module';
@@ -256,7 +256,7 @@ class SyncSchedulerController {
   }
 
   /** WEBHOOK do Graph — validação (echo do validationToken) + notificação de mudança (tempo real). */
-  @Public()
+  @Aberto()
   @Post('graph-webhook')
   graphWebhook(@Query('validationToken') vt: string, @Body() body: any, @Res() res: any) {
     if (vt) { res.set('Content-Type', 'text/plain').status(200).send(vt); return; }
