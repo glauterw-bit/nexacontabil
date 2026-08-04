@@ -90,6 +90,9 @@ export class AssistenteAnaliseService {
     let analise: string | null = null;
     if (querAnalise && docs.length && docs[0].fileUrl?.includes('|')) {
       analise = await this.analisarDocumento(docs[0], cliente!, mensagem);
+    } else if (querAnalise && !docs.length && abrirLink) {
+      // acervo não indexou, mas a obrigação TEM o comprovante — resolve o webUrl e analisa direto
+      analise = await this.analisarPorWebUrl(abrirLink, cliente!, mensagem);
     }
 
     // 6) RESPOSTA
@@ -100,10 +103,10 @@ export class AssistenteAnaliseService {
         : 'Não identifiquei o cliente — me diga o nome ou o código.');
     } else {
       const filtros = [tipoDef?.tipo, comp ? `competência ${comp}` : null].filter(Boolean).join(' · ');
-      partes.push(docs.length
-        ? `Encontrei ${docs.length} documento(s) de **${cliente.name}**${filtros ? ` (${filtros})` : ''}:`
-        : `Não achei documentos de **${cliente.name}**${filtros ? ` com ${filtros}` : ''} no acervo. Pode estar só no OneDrive (use o Explorador) ou ainda não subiu.`);
-      if (abrirLink && !docs.length) partes.push(`Mas a obrigação ${tipoDef?.tipo} ${comp} tem comprovante registrado — link no card abaixo.`);
+      if (docs.length) partes.push(`Encontrei ${docs.length} documento(s) de **${cliente.name}**${filtros ? ` (${filtros})` : ''}:`);
+      else if (abrirLink && analise) partes.push(`Analisei o comprovante de ${tipoDef?.tipo} ${comp} de **${cliente.name}** (link no card):`);
+      else if (abrirLink) partes.push(`A obrigação ${tipoDef?.tipo} ${comp} de **${cliente.name}** tem comprovante registrado — link no card abaixo.`);
+      else partes.push(`Não achei documentos de **${cliente.name}**${filtros ? ` com ${filtros}` : ''} no acervo. Pode estar só no OneDrive (use o Explorador) ou ainda não subiu.`);
     }
     if (analise) partes.push(`\n**Análise (IA):**\n${analise}`);
     else if (querAnalise && cliente && !docs.length) partes.push('Para eu analisar, preciso localizar o documento primeiro.');
@@ -125,6 +128,19 @@ export class AssistenteAnaliseService {
     if (user?.role === 'analista' && company?.responsavel !== user?.name) return { erro: 'documento fora da sua carteira' };
     const analise = await this.analisarDocumento(doc, company, pergunta || 'Analise este documento.');
     return { doc: { id: doc.id, nome: doc.originalFilename }, analise };
+  }
+
+  /** Analisa o COMPROVANTE registrado na obrigação (webUrl → item via Graph shares → conteúdo). */
+  private async analisarPorWebUrl(webUrl: string, cliente: any, pergunta: string): Promise<string> {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return 'Sem conexão OneDrive para baixar o comprovante.';
+    try {
+      const item = await this.onedrive.itemPorWebUrl(conn.id, webUrl);
+      if (!item) return 'Achei o link do comprovante, mas não consegui resolver o arquivo — abra pelo link do card.';
+      return this.analisarDocumento({ originalFilename: item.nome, folderPath: null, totalValue: null, fileUrl: `${item.driveId}|${item.itemId}` }, cliente, pergunta);
+    } catch (e: any) {
+      return `Não consegui baixar o comprovante (${e?.message ?? 'erro'}). Abra pelo link do card.`;
+    }
   }
 
   /** Baixa o conteúdo (PDF→texto, XML→bruto) e pede a análise ao Claude. */

@@ -880,6 +880,17 @@ export class OneDriveService {
     return { itens: achados, total, erros };
   }
 
+  /** Resolve um webUrl do OneDrive/SharePoint em { driveId, itemId } (Graph shares API). */
+  async itemPorWebUrl(connectionId: string, webUrl: string): Promise<{ driveId: string; itemId: string; nome: string } | null> {
+    const token = await this.getValidToken(connectionId);
+    const encoded = 'u!' + Buffer.from(webUrl).toString('base64').replace(/=+$/, '').replace(/\//g, '_').replace(/\+/g, '-');
+    const res: any = await fetch(`${GRAPH_BASE}/shares/${encoded}/driveItem?$select=id,name,parentReference`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return null;
+    const j: any = await res.json().catch(() => null);
+    if (!j?.id || !j?.parentReference?.driveId) return null;
+    return { driveId: j.parentReference.driveId, itemId: j.id, nome: j.name ?? '' };
+  }
+
   /** Cria uma SUBSCRIPTION (webhook) do Graph p/ mudanças na raiz de um drive — leitura em tempo real. */
   async criarSubscription(connectionId: string, driveId: string, notificationUrl: string, clientState: string, expiraISO: string): Promise<{ ok: boolean; id?: string; expiration?: string; erro?: string; status?: number }> {
     const token = await this.getValidToken(connectionId);
