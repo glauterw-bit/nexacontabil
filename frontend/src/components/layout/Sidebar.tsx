@@ -89,6 +89,7 @@ const MODULOS: NavGroup[] = [
     label: 'Fonte & Setup',
     items: [
       { href: '/drive-conectado',   icon: Globe,      label: 'Drives Conectados' },
+      { href: '/whatsapp-conectar', icon: Zap,        label: 'Conectar WhatsApp' },
       { href: '/verificacao-final', icon: ShieldCheck, label: 'Verificação Final' },
       { href: '/integracoes',       icon: Settings,   label: 'Integrações' },
       { href: '/guia',              icon: FileText,   label: 'Guia de Uso' },

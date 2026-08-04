@@ -232,6 +232,36 @@ export class WhatsappService {
     };
   }
 
+  // ─── Evolution: gestão da instância (pareamento do número do escritório) ───
+  private evoBase() { return String(process.env.EVOLUTION_API_URL || '').replace(/\/$/, ''); }
+  private evoHeaders() { return { 'Content-Type': 'application/json', apikey: String(process.env.EVOLUTION_API_KEY || '') }; }
+  private evoInstance() { return String(process.env.EVOLUTION_INSTANCE || 'domo'); }
+
+  /** Estado da instância Evolution: cria se não existir e devolve status + QR (base64) p/ parear. */
+  async evolutionStatus(): Promise<any> {
+    if (this.gateway() !== 'evolution') return { gateway: this.gateway(), erro: 'Evolution não configurada (EVOLUTION_API_URL/KEY/INSTANCE)' };
+    const nome = this.evoInstance();
+    try {
+      // estado da conexão
+      const st: any = await fetch(`${this.evoBase()}/instance/connectionState/${nome}`, { headers: this.evoHeaders() });
+      if (st.status === 404) {
+        // instância não existe → cria com QR
+        const cr: any = await fetch(`${this.evoBase()}/instance/create`, { method: 'POST', headers: this.evoHeaders(), body: JSON.stringify({ instanceName: nome, qrcode: true }) });
+        const cj: any = await cr.json().catch(() => ({}));
+        return { instancia: nome, estado: 'criada', qr: cj?.qrcode?.base64 ?? null };
+      }
+      const sj: any = await st.json().catch(() => ({}));
+      const estado = sj?.instance?.state ?? sj?.state ?? 'desconhecido';
+      if (estado === 'open') return { instancia: nome, estado: 'conectado' };
+      // não conectado → pede QR novo
+      const qr: any = await fetch(`${this.evoBase()}/instance/connect/${nome}`, { headers: this.evoHeaders() });
+      const qj: any = await qr.json().catch(() => ({}));
+      return { instancia: nome, estado, qr: qj?.base64 ?? qj?.qrcode?.base64 ?? null, pairingCode: qj?.pairingCode ?? null };
+    } catch (e: any) {
+      return { instancia: nome, erro: e?.message ?? String(e) };
+    }
+  }
+
   /**
    * Qual gateway de ENVIO está configurado?
    *  - 'evolution': env EVOLUTION_API_URL + EVOLUTION_API_KEY + EVOLUTION_INSTANCE

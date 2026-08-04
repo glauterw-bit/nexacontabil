@@ -49,6 +49,12 @@ export class WhatsappController {
     return { ok: true };
   }
 
+  /** Estado da instância Evolution + QR de pareamento (tela /whatsapp-conectar). */
+  @Get('evolution-status')
+  evolutionStatus() {
+    return this.service.evolutionStatus();
+  }
+
   /**
    * Endpoint de teste manual — usado pelo frontend para simular mensagem
    * sem precisar configurar Twilio/Meta.
