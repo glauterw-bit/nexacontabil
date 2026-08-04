@@ -1,10 +1,12 @@
-import { Module, Controller, Post, Body, UseGuards, Injectable } from '@nestjs/common';
+import { Module, Controller, Post, Body, Req, UseGuards, Injectable } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PrismaService } from '../../database/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { AiModule } from '../ai/ai.module';
 import { BuscaDocsService } from '../busca-docs/busca-docs.service';
 import { BuscaDocsModule } from '../busca-docs/busca-docs.module';
+import { CloudModule } from '../cloud/cloud.module';
+import { AssistenteAnaliseService } from './assistente.service';
 
 /* ── Assistente conversacional do DomoSYS ──
    O usuário fala em linguagem natural e o assistente resolve UMA de três ações:
@@ -177,17 +179,29 @@ Regras:
 @Controller('assistente')
 @UseGuards(JwtAuthGuard)
 class AssistenteController {
-  constructor(private readonly svc: AssistenteService) {}
+  constructor(private readonly svc: AssistenteService, private readonly analise: AssistenteAnaliseService) {}
 
   @Post('comando')
   comando(@Body() body: { mensagem: string; companyId?: string; historico?: any[] }) {
     return this.svc.comando(body?.mensagem ?? '', body?.companyId, body?.historico ?? []);
   }
+
+  /** CHAT do analista: localiza documentos (escopado à carteira) e ANALISA com IA quando pedido. */
+  @Post('chat')
+  chat(@Body() body: { mensagem: string; historico?: Array<{ role: string; content: string }> }, @Req() req?: any) {
+    return this.analise.chat(req?.user, body?.mensagem ?? '', body?.historico);
+  }
+
+  /** Analisa um documento específico (botão "Analisar" no card do chat). */
+  @Post('analisar')
+  analisar(@Body() body: { docId: string; pergunta?: string }, @Req() req?: any) {
+    return this.analise.analisarPorId(req?.user, body?.docId, body?.pergunta);
+  }
 }
 
 @Module({
-  imports: [AiModule, BuscaDocsModule],
+  imports: [AiModule, BuscaDocsModule, CloudModule],
   controllers: [AssistenteController],
-  providers: [AssistenteService, PrismaService],
+  providers: [AssistenteService, AssistenteAnaliseService, PrismaService],
 })
 export class AssistenteModule {}

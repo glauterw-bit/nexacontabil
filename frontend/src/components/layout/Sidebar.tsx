@@ -36,6 +36,7 @@ interface NavGroup { label: string; items: NavItem[] }
 // ADMIN / GESTOR — visão macro da carteira
 const VISAO: NavItem[] = [
   { href: '/central-entregas', icon: CalendarClock, label: 'Central de Entregas' },
+  { href: '/assistente',       icon: Search,        label: 'Assistente IA' },
   { href: '/cobertura',        icon: ShieldCheck,   label: 'Cobertura (prova)' },
   { href: '/gerencial',        icon: Activity,      label: 'Desempenho da equipe' },
 ];
@@ -109,6 +110,7 @@ const MODULOS: NavGroup[] = [
 // ── ANALISTA — foco total na PRÓPRIA carteira (painéis escopados no back-end pelo nome do login) ──
 const VISAO_ANALISTA: NavItem[] = [
   { href: '/meu-dia',           icon: Activity,      label: 'Meu Dia' },
+  { href: '/assistente',        icon: Search,        label: 'Assistente IA' },
   { href: '/central-entregas',  icon: CalendarClock, label: 'Minha Central' },
   { href: '/cobertura',         icon: ShieldCheck,   label: 'Minha Cobertura' },
 ];
