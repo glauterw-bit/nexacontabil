@@ -142,6 +142,13 @@ export class PaineisController {
     return this.service.corrigirCnpjs(body?.empresas ?? [], { dryRun: body?.dryRun });
   }
 
+  /** BULK — aplica contatos coletados fora (BrasilAPI bloqueia o IP do Railway). */
+  @Public()
+  @Post('aplicar-contatos')
+  aplicarContatos(@Body() body: { empresas: Array<{ cnpj?: string; whatsapp?: string; email?: string }>; dryRun?: boolean }) {
+    return this.service.aplicarContatos(body?.empresas ?? [], { dryRun: body?.dryRun });
+  }
+
   @Get('farois')
   farois() {
     return this.service.farois();

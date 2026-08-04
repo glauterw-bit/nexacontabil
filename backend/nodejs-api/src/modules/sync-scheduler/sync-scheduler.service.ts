@@ -309,7 +309,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return this.runJob('enriquecer-contatos', async (progresso) => {
       const cs = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, cnpj: true, whatsappNumber: true, email: true } });
       const alvo = cs.filter((c) => (c.cnpj || '').replace(/\D/g, '').length === 14 && (!(c.whatsappNumber || '').replace(/\D/g, '') || !(c.email || '').includes('@')));
-      const p = { feitos: 0, total: alvo.length, comWpp: 0, comEmail: 0, erros: 0 };
+      const p = { feitos: 0, total: alvo.length, comWpp: 0, comEmail: 0, erros: 0, http429: 0, httpOutros: 0 };
       for (const c of alvo) {
         const cnpj = (c.cnpj || '').replace(/\D/g, '');
         try {
@@ -326,7 +326,8 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
               if (data.whatsappNumber) p.comWpp++;
               if (data.email) p.comEmail++;
             }
-          } else if (r.status === 429) { await new Promise((rs) => setTimeout(rs, 8000)); }
+          } else if (r.status === 429) { p.http429++; await new Promise((rs) => setTimeout(rs, 8000)); }
+          else p.httpOutros++;
         } catch { p.erros++; }
         p.feitos++;
         progresso(p);

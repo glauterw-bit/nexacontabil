@@ -240,6 +240,31 @@ export class PaineisService {
     return { dryRun: dry, recebidas: empresas.length, corrigidos, jaCorretos, invalidos, semMatch, conflitos, listaConflitos, amostra };
   }
 
+  /**
+   * BULK — aplica CONTATOS coletados externamente (BrasilAPI bloqueia o IP do Railway; a coleta
+   * roda fora e entra por aqui). Casa por CNPJ; só preenche campo VAZIO (não sobrescreve).
+   */
+  async aplicarContatos(empresas: Array<{ cnpj?: string; whatsapp?: string; email?: string }>, opts?: { dryRun?: boolean }) {
+    const dry = !!opts?.dryRun;
+    const companies = await this.prisma.company.findMany({ select: { id: true, cnpj: true, whatsappNumber: true, email: true } });
+    const porCnpj = new Map(companies.map((c) => [(c.cnpj ?? '').replace(/\D/g, ''), c]));
+    let comWpp = 0, comEmail = 0, semMatch = 0, jaTinha = 0;
+    for (const e of empresas) {
+      const c = porCnpj.get((e.cnpj ?? '').replace(/\D/g, ''));
+      if (!c) { semMatch++; continue; }
+      const data: any = {};
+      const wpp = (e.whatsapp ?? '').replace(/\D/g, '');
+      if (wpp.length >= 10 && !(c.whatsappNumber || '').replace(/\D/g, '')) data.whatsappNumber = wpp;
+      const email = (e.email ?? '').trim().toLowerCase();
+      if (email.includes('@') && !(c.email || '').includes('@')) data.email = email;
+      if (!Object.keys(data).length) { jaTinha++; continue; }
+      if (!dry) await this.prisma.company.update({ where: { id: c.id }, data }).catch(() => undefined);
+      if (data.whatsappNumber) comWpp++;
+      if (data.email) comEmail++;
+    }
+    return { dryRun: dry, recebidas: empresas.length, comWpp, comEmail, jaTinha, semMatch };
+  }
+
   /** Lista simples de clientes ativos (código + nome + regime) p/ o seletor do explorador. */
   async listaClientesSimples() {
     const cs = await this.prisma.company.findMany({
