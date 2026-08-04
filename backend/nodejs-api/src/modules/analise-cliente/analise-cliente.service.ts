@@ -5,6 +5,7 @@ import { OneDriveService } from '../cloud/onedrive.service';
 import { NcmInteligenteService } from '../ncm-inteligente/ncm-inteligente.service';
 import { CertificadoDigitalService, parsePfxReal } from '../certificado-digital/certificado-digital.service';
 import { regraMonofasico } from '../organizacao/classificacao.util';
+import { norm as normFiscal, extractComp as extractCompFiscal, compDe as compDeFiscal, detectTipo as detectTipoFiscal } from '../../common/fiscal.util';
 
 @Injectable()
 export class AnaliseClienteService {
@@ -425,25 +426,10 @@ export class AnaliseClienteService {
       for (const seg of (fullPath || '').split('/')) { const cid = resolveSeg(seg); if (cid) return cid; }
       return null;
     };
-    const extractComp = (s: string): string | null => {
-      for (const y of anos) for (let m = 1; m <= 12; m++) {
-        const mm = String(m).padStart(2, '0');
-        if (s.includes(`${mm} ${y}`) || s.includes(`${y} ${mm}`) || s.includes(`${mm}${y}`) || (s.includes(MESES[m - 1]) && s.includes(String(y)))) return `${y}-${mm}`;
-      }
-      return null;
-    };
-    // Competência de um recibo, à prova da DATA DE VENCIMENTO no nome ("DAS - VENCIMENTO 20.07.2026"
-    // é competência 06/2026, não 07). DAS/DCTF/Reinf/FGTS vencem SEMPRE no mês seguinte ao da apuração.
-    const compDe = (nome: string, path: string): string | null => {
-      const pth = norm(path);
-      let c = extractComp(pth); if (c) return c;            // 1) competência na PASTA (/2026/06/) — mais confiável
-      const nm = norm(nome);
-      const nmSemVenc = nm.replace(/vencer?\w*\s*\d{1,2}\s*\d{1,2}\s*\d{4}/g, ' ').replace(/pagar?\s*ate\s*\d{1,2}\s*\d{1,2}\s*\d{4}/g, ' ');
-      c = extractComp(nmSemVenc); if (c) return c;          // 2) no NOME, ignorando a data de vencimento
-      const mv = nm.match(/(?:vencer?\w*|pagar?\s*ate)\s*(\d{1,2})\s*(\d{1,2})\s*(\d{4})/); // 3) só tem vencimento → mês anterior
-      if (mv) { const dm = +mv[2], dy = +mv[3]; if (dm >= 1 && dm <= 12) return dm === 1 ? `${dy - 1}-12` : `${dy}-${String(dm - 1).padStart(2, '0')}`; }
-      return null;
-    };
+    // fonte única (testada): src/common/fiscal.util.ts
+    const extractComp = (s: string): string | null => extractCompFiscal(s, anos);
+    // Competência à prova da data de vencimento — fonte única testada (fiscal.util).
+    const compDe = (nome: string, path: string): string | null => compDeFiscal(nome, path, anos);
 
     // busca cada tipo TENANT-WIDE (Search API). Termos AMPLOS (o escritório nomeia de vários
     // jeitos: "PGDASD-RECIBO", "REC DAS", "Simples Nacional.pdf") + VALIDAÇÃO por regex no NOME
@@ -1054,15 +1040,9 @@ export class AnaliseClienteService {
       if (/darf/.test(n)) return 'DARF';
       return null;
     };
-    const extractComp = (s: string): string | null => { for (const y of anos) for (let m = 1; m <= 12; m++) { const mm = String(m).padStart(2, '0'); if (s.includes(`${mm} ${y}`) || s.includes(`${y} ${mm}`) || s.includes(`${mm}${y}`) || s.includes(`${y}${mm}`) || (s.includes(MESES[m - 1]) && s.includes(String(y)))) return `${y}-${mm}`; } return null; };
-    const compDe = (nome: string, path: string): string | null => {
-      let c = extractComp(norm(path)); if (c) return c;
-      const nm = norm(nome);
-      c = extractComp(nm.replace(/vencer?\w*\s*\d{1,2}\s*\d{1,2}\s*\d{4}/g, ' ').replace(/pagar?\s*ate\s*\d{1,2}\s*\d{1,2}\s*\d{4}/g, ' ')); if (c) return c;
-      const mv = nm.match(/(?:vencer?\w*|pagar?\s*ate)\s*(\d{1,2})\s*(\d{1,2})\s*(\d{4})/);
-      if (mv) { const dm = +mv[2], dy = +mv[3]; if (dm >= 1 && dm <= 12 && anos.includes(dm === 1 ? dy - 1 : dy)) return dm === 1 ? `${dy - 1}-12` : `${dy}-${String(dm - 1).padStart(2, '0')}`; }
-      return null;
-    };
+    // fonte única (testada) — inclui o fix de 'VENCIMENTO'/'VENCERÁ EM' que a cópia local não tinha
+    const extractComp = (s: string): string | null => extractCompFiscal(s, anos);
+    const compDe = (nome: string, path: string): string | null => compDeFiscal(nome, path, anos);
     // 1) RESOLVE a pasta-raiz — código, senão NOME completo, senão CNPJ (garante achar TODOS)
     const reCodSeg = new RegExp(`^\\s*${codigo}\\s*[-–]`);
     const reCod = new RegExp(`(^|/)\\s*${codigo}\\s*[-–]`);
