@@ -246,7 +246,7 @@ export class WhatsappService {
       const st: any = await fetch(`${this.evoBase()}/instance/connectionState/${nome}`, { headers: this.evoHeaders() });
       if (st.status === 404) {
         // instância não existe → cria com QR
-        const cr: any = await fetch(`${this.evoBase()}/instance/create`, { method: 'POST', headers: this.evoHeaders(), body: JSON.stringify({ instanceName: nome, qrcode: true }) });
+        const cr: any = await fetch(`${this.evoBase()}/instance/create`, { method: 'POST', headers: this.evoHeaders(), body: JSON.stringify({ instanceName: nome, integration: 'WHATSAPP-BAILEYS', qrcode: true }) });
         const cj: any = await cr.json().catch(() => ({}));
         return { instancia: nome, estado: 'criada', qr: cj?.qrcode?.base64 ?? null };
       }
