@@ -233,30 +233,48 @@ export class WhatsappService {
   }
 
   /**
-   * Envia mensagem pelo Twilio. Sem WHATSAPP_TOKEN/PHONE_ID, apenas loga.
+   * Qual gateway de ENVIO está configurado?
+   *  - 'evolution': env EVOLUTION_API_URL + EVOLUTION_API_KEY + EVOLUTION_INSTANCE
+   *  - 'meta':      env WHATSAPP_TOKEN + WHATSAPP_PHONE_ID (Cloud API oficial)
+   *  - null:        nenhum — o front cai no link wa.me (manual)
+   */
+  gateway(): 'evolution' | 'meta' | null {
+    if (process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY && process.env.EVOLUTION_INSTANCE) return 'evolution';
+    if (process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_ID) return 'meta';
+    return null;
+  }
+
+  /**
+   * Envia texto pelo gateway configurado (Evolution ou Meta Cloud API).
+   * Sem gateway, apenas loga e retorna { ok:false, dev:true } — quem chama decide o fallback.
    */
   async sendMessage(to: string, body: string) {
-    const token = process.env.WHATSAPP_TOKEN;
-    const phoneId = process.env.WHATSAPP_PHONE_ID;
-    if (!token || !phoneId) {
-      this.logger.warn(`[WhatsApp DEV] -> ${to}: ${body}`);
-      return { ok: false, dev: true };
+    const gw = this.gateway();
+    const numero = (to || '').replace(/\D/g, '');
+    const e164 = numero.length <= 11 ? `55${numero}` : numero; // BR: completa o DDI se faltar
+    if (!gw) {
+      this.logger.warn(`[WhatsApp DEV] -> ${e164}: ${body.slice(0, 80)}…`);
+      return { ok: false, dev: true, motivo: 'nenhum gateway configurado (EVOLUTION_* ou WHATSAPP_*)' };
     }
     try {
-      const res = await fetch(`https://graph.facebook.com/v18.0/${phoneId}/messages`, {
+      if (gw === 'evolution') {
+        const base = String(process.env.EVOLUTION_API_URL).replace(/\/$/, '');
+        const res = await fetch(`${base}/message/sendText/${process.env.EVOLUTION_INSTANCE}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: String(process.env.EVOLUTION_API_KEY) },
+          body: JSON.stringify({ number: e164, text: body }),
+        });
+        return { ok: res.ok, gateway: gw, status: res.status };
+      }
+      const res = await fetch(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_ID}/messages`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to,
-          type: 'text',
-          text: { body },
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}` },
+        body: JSON.stringify({ messaging_product: 'whatsapp', to: e164, type: 'text', text: { body } }),
       });
-      return { ok: res.ok, status: res.status };
+      return { ok: res.ok, gateway: gw, status: res.status };
     } catch (err: any) {
       this.logger.error(`WhatsApp send failed: ${err.message}`);
-      return { ok: false, error: err.message };
+      return { ok: false, gateway: gw, error: err.message };
     }
   }
 }

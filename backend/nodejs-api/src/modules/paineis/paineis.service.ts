@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { AnaliseClienteService } from '../analise-cliente/analise-cliente.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { monofasicoPorNcm, regraMonofasico } from '../organizacao/classificacao.util';
 
 function safe(s: any) { try { return s ? JSON.parse(s) : null; } catch { return null; } }
@@ -89,7 +90,7 @@ function comoCorrigir(erro: string) {
 
 @Injectable()
 export class PaineisService {
-  constructor(private readonly prisma: PrismaService, private readonly analise: AnaliseClienteService) {}
+  constructor(private readonly prisma: PrismaService, private readonly analise: AnaliseClienteService, private readonly whatsapp: WhatsappService) {}
 
   /** Explorador de pastas do cliente (delega ao serviço de análise). */
   explorarCliente(codigo: string, ano?: number) {
@@ -205,6 +206,38 @@ export class PaineisService {
       }
     }
     return { dryRun: dry, recebidas: empresas.length, casados, naoCasados, obrigacoesIsentadas: isentadasTotal, reativados, inativados, semMatchAmostra: semMatch };
+  }
+
+  /**
+   * BULK — corrige o CNPJ das empresas pela planilha OFICIAL do Domínio (código → CNPJ).
+   * Muitos clientes ficaram com CNPJ provisório/errado (bloqueava SEFAZ, BrasilAPI e
+   * certificado). Casa por clienteCodigo; só aplica CNPJ com dígito verificador válido.
+   */
+  async corrigirCnpjs(empresas: Array<{ cod?: string; cnpj?: string }>, opts?: { dryRun?: boolean }) {
+    const { cnpjValido } = await import('../../common/fiscal.util');
+    const dry = !!opts?.dryRun;
+    const companies = await this.prisma.company.findMany({ select: { id: true, name: true, clienteCodigo: true, cnpj: true, active: true } });
+    const porCod = new Map<string, { id: string; name: string; cnpj: string; active: boolean }>();
+    for (const c of companies) if (c.clienteCodigo) porCod.set(String(parseInt(c.clienteCodigo, 10)), { id: c.id, name: c.name, cnpj: c.cnpj, active: c.active });
+    let corrigidos = 0, jaCorretos = 0, invalidos = 0, semMatch = 0, conflitos = 0;
+    const amostra: any[] = []; const listaConflitos: string[] = [];
+    for (const e of empresas) {
+      const cod = String(parseInt(String(e.cod ?? ''), 10));
+      const oficial = (e.cnpj ?? '').replace(/\D/g, '');
+      const alvo = porCod.get(cod);
+      if (!alvo) { semMatch++; continue; }
+      if (!cnpjValido(oficial)) { invalidos++; continue; }
+      const atual = (alvo.cnpj ?? '').replace(/\D/g, '');
+      if (atual === oficial) { jaCorretos++; continue; }
+      if (!dry) {
+        try {
+          await this.prisma.company.update({ where: { id: alvo.id }, data: { cnpj: oficial } });
+        } catch { conflitos++; if (listaConflitos.length < 20) listaConflitos.push(`${cod} ${alvo.name.slice(0, 30)} (CNPJ ${oficial} já usado por outra empresa)`); continue; }
+      }
+      corrigidos++;
+      if (amostra.length < 30) amostra.push({ cod, empresa: alvo.name.slice(0, 34), de: atual || '(vazio)', para: oficial, ativa: alvo.active });
+    }
+    return { dryRun: dry, recebidas: empresas.length, corrigidos, jaCorretos, invalidos, semMatch, conflitos, listaConflitos, amostra };
   }
 
   /** Lista simples de clientes ativos (código + nome + regime) p/ o seletor do explorador. */
@@ -1828,6 +1861,28 @@ export class PaineisService {
     const ult = await this.prisma.cobrancaLog.findFirst({ where: { companyId }, orderBy: { criadoEm: 'desc' }, select: { canal: true, criadoEm: true, por: true } }).catch(() => null);
     const ultimaCobranca = ult ? { canal: ult.canal, por: ult.por, em: ult.criadoEm.toISOString(), diasAtras: Math.floor((Date.now() - ult.criadoEm.getTime()) / 86400000) } : null;
     return { cliente: c.name, responsavel: c.responsavel, email: c.email, totalFaltam: faltam.length, faltam, mensagem, whatsapp, ultimaCobranca };
+  }
+
+  /** Status do gateway de envio (o front mostra "Enviar agora" só quando há gateway). */
+  gatewayWhatsapp() {
+    return { gateway: this.whatsapp.gateway() };
+  }
+
+  /**
+   * ENVIA a cobrança pelo gateway de WhatsApp configurado (Evolution/Meta) e registra no log.
+   * Fecha o loop: o analista clica 1 botão e a mensagem sai pelo número do escritório.
+   */
+  async enviarCobranca(companyId: string, por?: string) {
+    const cob: any = await this.cobrancaCliente(companyId);
+    if (cob?.erro) return cob;
+    if (!cob.totalFaltam) return { ok: false, motivo: 'cliente 100% em dia — nada a cobrar' };
+    const c = await this.prisma.company.findUnique({ where: { id: companyId }, select: { whatsappNumber: true } });
+    const numero = (c?.whatsappNumber || '').replace(/\D/g, '');
+    if (numero.length < 10) return { ok: false, motivo: 'cliente sem WhatsApp cadastrado' };
+    const envio = await this.whatsapp.sendMessage(numero, cob.mensagem);
+    if (!envio.ok) return { ok: false, motivo: (envio as any).motivo || (envio as any).error || 'falha no gateway', gateway: (envio as any).gateway ?? null };
+    await this.registrarCobranca(companyId, { canal: 'whatsapp-auto', competencias: (cob.faltam || []).map((f: any) => f.rotulo).join(', '), quantidade: cob.totalFaltam, por });
+    return { ok: true, gateway: (envio as any).gateway, enviadas: cob.totalFaltam };
   }
 
   /** Registra que uma cobrança foi enviada (histórico + evita cobrar 2x sem controle). */

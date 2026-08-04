@@ -16,6 +16,22 @@ export default function MeuDia() {
   const ano = new Date().getFullYear();
   const [cob, setCob] = useState<Record<string, any>>({});
   const [copiado, setCopiado] = useState('');
+  const [gateway, setGateway] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState('');
+  useEffect(() => {
+    fetch(`${API}/api/v1/paineis/gateway-whatsapp`, { headers: authHeaders() })
+      .then((r) => r.json()).then((j) => setGateway(j?.gateway ?? null)).catch(() => setGateway(null));
+  }, []);
+  const enviarAgora = async (companyId: string) => {
+    setEnviando(companyId);
+    try {
+      const r = await fetch(`${API}/api/v1/paineis/enviar-cobranca`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ companyId }) });
+      const j = await r.json();
+      setCob((p) => ({ ...p, [companyId]: { ...p[companyId], envioResultado: j.ok ? '✓ enviada pelo sistema' : `não enviada: ${j.motivo || 'falha'}`, ultimaCobranca: j.ok ? { canal: 'whatsapp-auto', diasAtras: 0 } : p[companyId]?.ultimaCobranca } }));
+    } catch {
+      setCob((p) => ({ ...p, [companyId]: { ...p[companyId], envioResultado: 'não enviada: erro de rede' } }));
+    } finally { setEnviando(''); }
+  };
 
   const carregar = useCallback(() => {
     setLoading(true);
@@ -82,9 +98,11 @@ export default function MeuDia() {
                         {cb.ultimaCobranca ? <div className="md-ja">já cobrado {cb.ultimaCobranca.diasAtras === 0 ? 'hoje' : `há ${cb.ultimaCobranca.diasAtras}d`}</div> : null}
                         <textarea readOnly value={cb.mensagem} rows={5} />
                         <div className="md-acts">
+                          {gateway && cb.whatsapp ? <button className="md-wa" disabled={enviando === c.companyId} onClick={() => enviarAgora(c.companyId)}>{enviando === c.companyId ? 'Enviando…' : '📤 Enviar agora'}</button> : null}
                           {cb.whatsapp ? <a className="md-wa" href={cb.whatsapp} target="_blank" rel="noopener" onClick={() => registrar(c.companyId, 'whatsapp')}>WhatsApp ↗</a> : <span className="md-wa off">sem WhatsApp</span>}
                           <button className="md-copy" onClick={() => copiar(c.companyId, cb.mensagem)}>{copiado === c.companyId ? '✓ copiado' : 'Copiar'}</button>
                           {cb.email ? <a className="md-copy" href={`mailto:${cb.email}?subject=${encodeURIComponent('Documentos pendentes')}&body=${encodeURIComponent(cb.mensagem)}`} onClick={() => registrar(c.companyId, 'email')}>E-mail</a> : null}
+                          {cb.envioResultado ? <span className="md-envio">{cb.envioResultado}</span> : null}
                         </div>
                       </div>
                     )}
@@ -120,6 +138,8 @@ export default function MeuDia() {
 .md-cob{border-top:1px solid var(--b);padding:12px 16px;background:var(--s2)}
 .md-cob.sm{color:var(--tx3);font-size:13px}
 .md-ja{color:#B7791F;font-weight:600;font-size:12px;margin-bottom:6px}
+.md-envio{font-size:12px;font-weight:600;color:#2E7D5B}
+.md-wa:disabled{opacity:.6;cursor:default}
 .md-cob textarea{width:100%;border:1px solid var(--b);border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;line-height:1.45;resize:vertical;background:var(--s)}
 .md-acts{display:flex;gap:8px;margin-top:8px}
 .md-wa{background:#25D366;color:#fff;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:600;text-decoration:none}

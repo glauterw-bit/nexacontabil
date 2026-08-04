@@ -65,6 +65,18 @@ export class PaineisController {
     return this.service.cobrancaCliente(companyId, ano ? parseInt(ano, 10) : undefined);
   }
 
+  /** Gateway de envio de WhatsApp configurado? (front decide mostrar "Enviar agora") */
+  @Get('gateway-whatsapp')
+  gatewayWhatsapp() {
+    return this.service.gatewayWhatsapp();
+  }
+
+  /** ENVIA a cobrança pelo gateway (Evolution/Meta) e registra. */
+  @Post('enviar-cobranca')
+  enviarCobranca(@Body() body: { companyId: string }, @Req() req?: any) {
+    return this.service.enviarCobranca(body.companyId, req?.user?.name);
+  }
+
   /** Registra que a cobrança foi enviada (histórico). */
   @Post('registrar-cobranca')
   registrarCobranca(@Body() body: { companyId: string; canal?: string; competencias?: string; quantidade?: number }, @Req() req?: any) {
@@ -121,6 +133,13 @@ export class PaineisController {
   @Post('aplicar-cliente-desde')
   aplicarClienteDesde(@Body() body: { empresas: Array<{ cod?: string; cnpj?: string; desde?: string; sit?: string }>; syncSituacao?: boolean; dryRun?: boolean }) {
     return this.service.aplicarClienteDesde(body?.empresas ?? [], { syncSituacao: body?.syncSituacao, dryRun: body?.dryRun });
+  }
+
+  /** BULK — corrige CNPJs pela planilha oficial do Domínio (código → CNPJ com DV válido). */
+  @Public()
+  @Post('corrigir-cnpjs')
+  corrigirCnpjs(@Body() body: { empresas: Array<{ cod?: string; cnpj?: string }>; dryRun?: boolean }) {
+    return this.service.corrigirCnpjs(body?.empresas ?? [], { dryRun: body?.dryRun });
   }
 
   @Get('farois')
