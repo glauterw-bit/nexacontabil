@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../../common/public.decorator';
 import { SefazDistribuicaoService } from './sefaz-distribuicao.service';
@@ -19,6 +19,13 @@ export class SefazController {
   @Get('saude')
   saude() {
     return this.service.saudeSefaz();
+  }
+
+  /** Campanha de procurações/certificados — o que trava o SEFAZ, escopado por analista. */
+  @Get('campanha-procuracoes')
+  campanhaProcuracoes(@Req() req: any, @Query('responsavel') responsavel?: string) {
+    const escopo = req?.user?.role === 'analista' ? req.user.name : responsavel;
+    return this.service.campanhaProcuracoes(escopo);
   }
 
   /** Busca as NF-e do cliente no SEFAZ (DistribuiçãoDFe) desde o último NSU e ingere. */

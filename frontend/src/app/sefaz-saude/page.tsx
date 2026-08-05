@@ -47,11 +47,18 @@ export default function SefazSaude() {
   const [loading, setLoading] = useState(true);
   const [foco, setFoco] = useState<string>('acao'); // acao | todos | <status>
   const [busca, setBusca] = useState('');
+  const [waBy, setWaBy] = useState<Record<string, string>>({}); // companyId -> link wa.me pronto
 
   const carregar = useCallback(() => {
     setLoading(true);
     fetch(`${API}/api/v1/sefaz/saude`, { headers: authHeaders() })
       .then((r) => r.json()).then(setD).catch(() => setD(null)).finally(() => setLoading(false));
+    fetch(`${API}/api/v1/sefaz/campanha-procuracoes`, { headers: authHeaders() })
+      .then((r) => r.json()).then((c) => {
+        const m: Record<string, string> = {};
+        (c?.itens ?? []).forEach((i: any) => { if (i.whatsapp) m[i.companyId] = i.whatsapp; });
+        setWaBy(m);
+      }).catch(() => setWaBy({}));
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -159,6 +166,9 @@ export default function SefazSaude() {
                         </span>
                       )}
                       {c.acao ? <span className="fs-acaotxt">{c.acao}</span> : null}
+                      {waBy[c.companyId] ? (
+                        <a className="fs-cobrar" href={waBy[c.companyId]} target="_blank" rel="noopener" title="Abre o WhatsApp com a mensagem pronta pedindo a procuração/certificado">💬 Cobrar procuração</a>
+                      ) : null}
                     </div>
                   </div>
                 ); })}
@@ -207,6 +217,8 @@ export default function SefazSaude() {
 .fs-acoes-h{font-size:13px;font-weight:700;color:var(--fs-ink2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:11px;display:flex;align-items:center;gap:9px}
 .fs-acoes-h span{background:var(--fs-r);color:#fff;border-radius:20px;padding:1px 9px;font-size:12px}
 .fs-acoes-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:13px}
+.fs-cobrar{margin-top:6px;display:inline-block;background:#E7F4EE;color:#059669;border:1px solid #A7D9C4;border-radius:9px;padding:5px 11px;font-size:12px;font-weight:600;text-decoration:none;transition:.15s}
+.fs-cobrar:hover{background:#059669;color:#fff;border-color:#059669}
 .fs-acao{text-align:left;border:1px solid var(--fs-b);background:var(--fs-card);border-radius:16px;padding:16px 17px;cursor:pointer;transition:.15s;position:relative;overflow:hidden}
 .fs-acao:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(28,25,23,.08)}
 .fs-acao.on{border-width:2px;padding:15px 16px}

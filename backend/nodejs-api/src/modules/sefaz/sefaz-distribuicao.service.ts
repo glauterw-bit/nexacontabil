@@ -132,6 +132,43 @@ export class SefazDistribuicaoService {
     return { resumo, clientes };
   }
 
+  /**
+   * Campanha acionável: quem depende de AÇÃO do cliente/escritório p/ liberar o SEFAZ
+   * (sem certificado, certificado vencido, falta procuração e-CAC). Escopável por analista.
+   * Cada item já traz mensagem pronta + link WhatsApp.
+   */
+  async campanhaProcuracoes(responsavel?: string) {
+    const { clientes } = await this.saudeSefaz();
+    const ACAO = new Set(['sem_cert', 'cert_vencido', 'sem_procuracao']);
+    let alvo = clientes.filter((c) => ACAO.has(c.status));
+    if (responsavel) alvo = alvo.filter((c) => (c.responsavel || '').trim() === responsavel.trim());
+
+    // telefone p/ o link do WhatsApp
+    const ids = alvo.map((c) => c.companyId);
+    const fones = await this.prisma.company.findMany({ where: { id: { in: ids } }, select: { id: true, whatsappNumber: true, email: true } });
+    const foneBy = new Map(fones.map((f) => [f.id, f]));
+
+    const MOTIVO: Record<string, string> = {
+      sem_cert: 'Ainda não temos o certificado digital para acessar seus documentos fiscais junto à Receita/SEFAZ',
+      cert_vencido: 'Seu certificado digital venceu e precisamos renová-lo para continuar acessando seus documentos fiscais',
+      sem_procuracao: 'Falta a procuração eletrônica no e-CAC para conseguirmos baixar suas notas e obrigações automaticamente',
+    };
+    const itens = alvo.map((c) => {
+      const co = foneBy.get(c.companyId);
+      const primeiroNome = (c.nome || 'cliente').split(' ')[0];
+      const mensagem = `Olá, ${primeiroNome}! Tudo bem? 😊\n\n${MOTIVO[c.status]}. Assim conseguimos manter *${c.nome}* 100% em dia sem te pedir documento por documento.\n\nPode nos ajudar com isso? Qualquer dúvida a gente te orienta no passo a passo. 🙏`;
+      const fone = (co?.whatsappNumber || '').replace(/\D/g, '');
+      const whatsapp = fone ? `https://wa.me/${fone.length <= 11 ? '55' + fone : fone}?text=${encodeURIComponent(mensagem)}` : null;
+      return { companyId: c.companyId, codigo: c.codigo, nome: c.nome, responsavel: c.responsavel, status: c.status, acao: c.acao, temFone: !!fone, email: co?.email || null, mensagem, whatsapp };
+    });
+    const porStatus = (s: string) => itens.filter((i) => i.status === s).length;
+    return {
+      total: itens.length,
+      resumo: { semCert: porStatus('sem_cert'), certVencido: porStatus('cert_vencido'), semProcuracao: porStatus('sem_procuracao'), semFone: itens.filter((i) => !i.temFone).length },
+      itens,
+    };
+  }
+
   /** Status/config da integração (sem certificado não busca). */
   async status(companyId?: string) {
     const base = {
