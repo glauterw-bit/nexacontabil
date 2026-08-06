@@ -19,8 +19,8 @@ export class PaineisController {
   }
 
   @Get('prazos')
-  prazos(@Req() req: any, @Query('responsavel') responsavel?: string) {
-    return this.service.prazos(escopo(req, responsavel));
+  prazos(@Req() req: any, @Query('responsavel') responsavel?: string, @Query('comp') comp?: string) {
+    return this.service.prazos(escopo(req, responsavel), comp);
   }
 
   @Get('produtividade')
@@ -170,8 +170,8 @@ export class PaineisController {
   }
 
   @Get('panorama')
-  panorama() {
-    return this.service.panorama();
+  panorama(@Query('comp') comp?: string) {
+    return this.service.panorama(comp);
   }
 
   @Get('tendencias')

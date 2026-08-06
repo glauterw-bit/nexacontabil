@@ -956,10 +956,12 @@ export class PaineisService {
   // 2. MAPA DE PRAZOS & SLA
   //    Todas as obrigações na linha do tempo, com alerta de atraso.
   // ───────────────────────────────────────────────────────────
-  async prazos(responsavel?: string) {
+  async prazos(responsavel?: string, comp?: string) {
     const now = new Date();
-    const ini = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const fim = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+    // janela: um mês específico (YYYY-MM) OU a janela padrão (mês passado → +2 meses)
+    const mm = /^(\d{4})-(\d{2})$/.exec(comp || '');
+    const ini = mm ? new Date(parseInt(mm[1], 10), parseInt(mm[2], 10) - 1, 1) : new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const fim = mm ? new Date(parseInt(mm[1], 10), parseInt(mm[2], 10), 0, 23, 59, 59) : new Date(now.getFullYear(), now.getMonth() + 2, 0);
 
     // FONTE ÚNICA DO CALENDÁRIO: fiscal_calendar_items (mesma tabela que a "Regerar
     // calendário" preenche, com as datas corretas — FGTS dia 20, DCTFWeb último dia útil).
@@ -1200,13 +1202,18 @@ export class PaineisService {
    * o que está entrando agora, o que vence, o que precisa de ação — com um FEED de
    * insights priorizados e acionáveis (cada um com rota). Feito para auto-refresh.
    */
-  async panorama() {
+  async panorama(comp?: string) {
     const now = new Date();
+    // mês de referência: o informado (YYYY-MM) ou o corrente
+    const m = /^(\d{4})-(\d{2})$/.exec(comp || '');
+    const baseAno = m ? parseInt(m[1], 10) : now.getFullYear();
+    const baseMes = m ? parseInt(m[2], 10) - 1 : now.getMonth();
+    const ehMesCorrente = baseAno === now.getFullYear() && baseMes === now.getMonth();
     const hoje0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
-    const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const inicioMes = new Date(baseAno, baseMes, 1);
+    const fimMes = new Date(baseAno, baseMes + 1, 0, 23, 59, 59);
     const em7 = new Date(now.getTime() + 7 * 86400000);
-    const nowComp = now.toISOString().slice(0, 7);
+    const nowComp = `${baseAno}-${String(baseMes + 1).padStart(2, '0')}`;
 
     const [companies, docsHoje, docs2026, ult, obrigMes, docsMes] = await Promise.all([
       this.prisma.company.findMany({ where: { active: true }, select: { id: true, responsavel: true, cnpj: true } }),
@@ -1214,7 +1221,7 @@ export class PaineisService {
       this.prisma.document.count({ where: { issueDate: { gte: new Date(2026, 0, 1) } } }),
       this.prisma.company.aggregate({ where: { active: true }, _max: { sharepointAnalisadoEm: true } }),
       this.prisma.fiscalCalendarItem.findMany({ where: { dataVencimento: { gte: inicioMes, lte: fimMes } }, select: { status: true, dataVencimento: true } }),
-      this.prisma.document.findMany({ where: { issueDate: { gte: inicioMes } }, select: { companyId: true } }),
+      this.prisma.document.findMany({ where: { issueDate: { gte: inicioMes, lte: fimMes } }, select: { companyId: true } }),
     ]);
 
     const totalClientes = companies.length;
@@ -1224,15 +1231,18 @@ export class PaineisService {
     const semDocMes = companies.filter((c) => !comDocMes.has(c.id)).length;
 
     const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
-    let obrigTotal = 0, obrigVencidas = 0, obrigVencem7 = 0, obrigEntregues = 0;
+    let obrigTotal = 0, obrigVencidas = 0, obrigVencem7 = 0, obrigEntregues = 0, obrigAVencer = 0;
     for (const o of obrigMes) {
       obrigTotal++;
       const v = new Date(o.dataVencimento);
       if (ENTREGUE.has(o.status)) { obrigEntregues++; continue; }
-      if (o.status === 'vencida' || v < now) obrigVencidas++;
-      else if (v <= em7) obrigVencem7++;
+      if (o.status === 'vencida' || v < now) obrigVencidas++;      // pendente E já passou do prazo = problema
+      else { obrigAVencer++; if (v <= em7) obrigVencem7++; }        // pendente mas ainda no prazo = normal
     }
+    const obrigNoPrazo = obrigEntregues + obrigAVencer;             // o que NÃO está em atraso
+    // % de "saúde": entregue + ainda no prazo sobre o total (não pune obrigação que ainda vai vencer)
     const pctEntrega = obrigTotal ? Math.round((obrigEntregues / obrigTotal) * 100) : 0;
+    const pctNoPrazo = obrigTotal ? Math.round((obrigNoPrazo / obrigTotal) * 100) : 100;
 
     const driveLidoEm = ult._max.sharepointAnalisadoEm ?? null;
     const minAtras = driveLidoEm ? Math.round((now.getTime() - new Date(driveLidoEm).getTime()) / 60000) : null;
@@ -1250,13 +1260,16 @@ export class PaineisService {
     if (!insights.some((i) => i.nivel === 'critico')) insights.push({ nivel: 'ok', titulo: 'Operação sob controle', texto: 'Sem alertas críticos no momento.', rota: '/operacao' });
 
     return {
+      competencia: nowComp,
+      ehMesCorrente,
       atualizadoEm: now.toISOString(),
       pulso: {
         docsHoje, docs2026, driveLidoEm, driveLidoHaMin: minAtras,
         totalClientes,
       },
       kpis: {
-        obrigVencidas, obrigVencem7, obrigEntregues, obrigTotal, pctEntrega,
+        obrigVencidas, obrigVencem7, obrigAVencer, obrigEntregues, obrigNoPrazo, obrigTotal,
+        pctEntrega, pctNoPrazo,
         semDocMes, semResponsavel, cnpjProvisorio,
       },
       insights: insights.slice(0, 8),

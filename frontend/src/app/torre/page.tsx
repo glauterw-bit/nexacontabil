@@ -9,8 +9,10 @@ function authHeaders(): Record<string, string> {
 const MESC = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
 type Panorama = {
+  competencia: string;
+  ehMesCorrente: boolean;
   pulso: { docsHoje: number; docs2026: number; driveLidoHaMin: number; totalClientes: number };
-  kpis: { obrigVencidas: number; obrigVencem7: number; obrigEntregues: number; obrigTotal: number; pctEntrega: number; semDocMes: number; semResponsavel: number; cnpjProvisorio: number };
+  kpis: { obrigVencidas: number; obrigVencem7: number; obrigAVencer: number; obrigEntregues: number; obrigNoPrazo: number; obrigTotal: number; pctEntrega: number; pctNoPrazo: number; semDocMes: number; semResponsavel: number; cnpjProvisorio: number };
   insights: { nivel: string; titulo: string; texto: string; rota?: string }[];
 };
 type Desemp = { ano: number; analistas: { responsavel: string; clientes: number; entregues: number; devidas: number; taxa: number; atrasados: number }[] };
@@ -81,12 +83,14 @@ function AreaChart({ data }: { data: { mes: string; documentos: number; pctEntre
       {pts.map((p, i) => (
         <g key={i} style={{ opacity: drawn ? 1 : 0, transition: `opacity .4s ease ${0.5 + i * 0.04}s` }}>
           <circle cx={p[0]} cy={p[1]} r={i === pts.length - 1 ? 4 : 2.5} fill="var(--acao)" stroke="var(--surface)" strokeWidth={i === pts.length - 1 ? 2 : 0} />
-          <text x={p[0]} y={h - 1} textAnchor="middle" className="tc-area-x">{MESC[i]}</text>
+          <text x={p[0]} y={h - 1} textAnchor="middle" className="tc-area-x">{MESC[(parseInt((data[i].mes || '').slice(5, 7), 10) || 1) - 1]}</text>
         </g>
       ))}
     </svg>
   );
 }
+
+const MESLONG = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 export default function Torre() {
   const [pan, setPan] = useState<Panorama | null>(null);
@@ -94,15 +98,29 @@ export default function Torre() {
   const [pz, setPz] = useState<Prazos | null>(null);
   const [tend, setTend] = useState<Tend | null>(null);
   const [loading, setLoading] = useState(true);
+  const hoje = new Date();
+  const [comp, setComp] = useState(`${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`);
 
-  const carregar = useCallback(() => {
+  const carregar = useCallback((cp: string) => {
     setLoading(true);
     const g = (ep: string) => fetch(`${API}/api/v1/${ep}`, { headers: authHeaders() }).then((r) => r.json()).catch(() => null);
-    Promise.all([g('paineis/panorama'), g('paineis/desempenho-analistas?ano=2026'), g('paineis/prazos'), g('paineis/tendencias')])
+    const ano = cp.slice(0, 4);
+    Promise.all([g(`paineis/panorama?comp=${cp}`), g(`paineis/desempenho-analistas?ano=${ano}`), g(`paineis/prazos?comp=${cp}`), g('paineis/tendencias')])
       .then(([p, d, z, t]) => { setPan(p); setDes(d); setPz(z); setTend(t); })
       .finally(() => setLoading(false));
   }, []);
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => { carregar(comp); }, [carregar, comp]);
+
+  const mudarMes = (delta: number) => {
+    const [a, m] = comp.split('-').map(Number);
+    const dt = new Date(a, m - 1 + delta, 1);
+    const nc = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    const atual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+    if (nc <= atual) setComp(nc); // não navega para o futuro
+  };
+  const [ca, cm] = comp.split('-').map(Number);
+  const rotuloMes = `${MESLONG[cm - 1]} ${ca}`;
+  const ehAtual = pan?.ehMesCorrente ?? true;
 
   if (loading) return <div className="tc-wrap"><div className="tc-load"><span className="tc-spin" />montando a torre…</div><Estilo /></div>;
 
@@ -116,30 +134,43 @@ export default function Torre() {
       <header className="tc-head">
         <div>
           <span className="tc-eyebrow">Torre de Controle</span>
-          <h1>Bom dia. Aqui está o escritório agora.</h1>
+          <h1>{ehAtual ? 'Aqui está o escritório agora.' : `Como foi ${rotuloMes}.`}</h1>
         </div>
         <div className="tc-head-r">
-          <span className="tc-live"><span className="tc-live-dot" />Drive lido há {pu?.driveLidoHaMin ?? '—'} min</span>
-          <button className="tc-refresh" onClick={carregar} title="Atualizar">↻</button>
+          <div className="tc-mes">
+            <button onClick={() => mudarMes(-1)} title="Mês anterior">‹</button>
+            <b>{rotuloMes}</b>
+            <button onClick={() => mudarMes(1)} disabled={ehAtual} title="Próximo mês">›</button>
+          </div>
+          {ehAtual && <span className="tc-live"><span className="tc-live-dot" />Drive lido há {pu?.driveLidoHaMin ?? '—'} min</span>}
+          <button className="tc-refresh" onClick={() => carregar(comp)} title="Atualizar">↻</button>
         </div>
       </header>
 
       {/* PULSO — bloco herói */}
       <section className="tc-hero">
         <div className="tc-hero-ring">
-          <Ring pct={k?.pctEntrega ?? 0} tone={toneTaxa(k?.pctEntrega ?? 0)} />
+          <Ring pct={k?.pctNoPrazo ?? 0} tone={toneTaxa(k?.pctNoPrazo ?? 0)} />
           <div className="tc-hero-ring-txt">
-            <b>Entrega do mês</b>
-            <small><Num value={k?.obrigEntregues ?? 0} /> de {k?.obrigTotal ?? 0} obrigações</small>
+            <b>{ehAtual ? 'Sob controle no mês' : 'Entregue no mês'}</b>
+            <small><Num value={k?.obrigEntregues ?? 0} /> entregues de {k?.obrigTotal ?? 0}</small>
+            <div className="tc-breakdown">
+              <span className="b-ok">● {k?.obrigEntregues ?? 0} entregue</span>
+              {ehAtual && <span className="b-av">● {k?.obrigAVencer ?? 0} a vencer</span>}
+              <span className="b-late">● {k?.obrigVencidas ?? 0} vencida</span>
+            </div>
           </div>
         </div>
         <div className="tc-hero-kpis">
-          <Kpi tone="erro" n={pz?.atrasadas ?? 0} label="obrigações atrasadas" sub={`${pz?.proximas7dias ?? 0} vencem em 7 dias`} rota="/prazos" />
+          <Kpi tone="erro" n={k?.obrigVencidas ?? 0} label="vencidas (atrasadas)" sub={ehAtual ? `${k?.obrigAVencer ?? 0} ainda no prazo` : 'passaram do prazo'} rota={`/prazos`} />
           <Kpi tone="info" n={pu?.docs2026 ?? 0} label="documentos em 2026" sub={`+${pu?.docsHoje ?? 0} capturados hoje`} />
-          <Kpi tone="atencao" n={k?.semDocMes ?? 0} label="clientes sem doc no mês" sub="cobrar envio" rota="/solicitacoes" />
+          <Kpi tone="atencao" n={k?.semDocMes ?? 0} label="clientes sem doc no mês" sub={ehAtual ? 'muitos ainda vão enviar' : 'não enviaram no mês'} rota="/solicitacoes" />
           <Kpi tone="acao" n={pu?.totalClientes ?? 0} label="clientes na carteira" sub={`${k?.cnpjProvisorio ?? 0} com CNPJ provisório`} />
         </div>
       </section>
+      {ehAtual && (
+        <p className="tc-ctx">Estamos no dia {hoje.getDate()} de {rotuloMes}: a maior parte das obrigações do mês <b>ainda não venceu</b> — por isso o número alto de "a vencer" é normal. O anel mede o que está <b>no prazo</b> (entregue + ainda dentro do prazo); só as <b>vencidas</b> exigem ação hoje.</p>
+      )}
 
       <div className="tc-grid">
         {/* TENDÊNCIA */}
@@ -233,6 +264,15 @@ function Estilo() {
 .tc-eyebrow{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--acao)}
 .tc-head h1{font-size:26px;font-weight:750;letter-spacing:-.02em;margin-top:5px;color:var(--tx-strong)}
 .tc-head-r{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.tc-mes{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px 4px}
+.tc-mes b{font-size:13px;font-weight:700;color:var(--tx-strong);min-width:112px;text-align:center}
+.tc-mes button{width:30px;height:30px;border:none;background:transparent;border-radius:8px;font-size:18px;cursor:pointer;color:var(--muted);transition:.13s}
+.tc-mes button:hover:not(:disabled){background:var(--surface2);color:var(--acao)}
+.tc-mes button:disabled{opacity:.3;cursor:default}
+.tc-ctx{background:color-mix(in srgb, var(--info) 8%, transparent);border:1px solid color-mix(in srgb, var(--info) 22%, transparent);color:var(--muted);border-radius:12px;padding:11px 15px;margin-bottom:18px;font-size:12.5px;line-height:1.5;animation:tcup .5s ease .08s both}
+.tc-ctx b{color:var(--tx-strong)}
+.tc-breakdown{display:flex;flex-wrap:wrap;gap:10px;margin-top:7px;font-size:11.5px;font-weight:600}
+.tc-breakdown .b-ok{color:var(--ok)} .tc-breakdown .b-av{color:var(--info)} .tc-breakdown .b-late{color:var(--erro)}
 .tc-live{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 13px}
 .tc-live-dot{width:8px;height:8px;border-radius:50%;background:var(--dot-ok);box-shadow:0 0 0 0 var(--dot-ok);animation:tcpulse 2s infinite}
 @keyframes tcpulse{0%{box-shadow:0 0 0 0 rgba(18,183,106,.5)}70%{box-shadow:0 0 0 7px rgba(18,183,106,0)}100%{box-shadow:0 0 0 0 rgba(18,183,106,0)}}
