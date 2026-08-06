@@ -35,6 +35,7 @@ interface NavGroup { label: string; items: NavItem[] }
 
 // ADMIN / GESTOR — visão macro da carteira
 const VISAO: NavItem[] = [
+  { href: '/torre',            icon: LayoutDashboard, label: 'Torre de Controle' },
   { href: '/central-entregas', icon: CalendarClock, label: 'Central de Entregas' },
   { href: '/assistente',       icon: Search,        label: 'Assistente IA' },
   { href: '/cobertura',        icon: ShieldCheck,   label: 'Cobertura (prova)' },
