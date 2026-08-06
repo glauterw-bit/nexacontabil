@@ -980,8 +980,9 @@ export class PaineisService {
     });
 
     const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
+    const PORTAL = new Set(['FGTS', 'ESOCIAL', 'DARF']); // controle no portal/banco — não vira "atrasada" por falta de PDF
     const isEntregue = (o: any) => ENTREGUE.has(o.status);
-    const isAtrasada = (o: any) => !isEntregue(o) && (o.status === 'vencida' || new Date(o.dataVencimento) < now);
+    const isAtrasada = (o: any) => !isEntregue(o) && !PORTAL.has(o.tipo) && (o.status === 'vencida' || new Date(o.dataVencimento) < now);
 
     // agrupa por dia + tipo
     const porData = new Map<string, { data: string; tipos: Map<string, { total: number; atrasadas: number }> }>();
@@ -1220,7 +1221,7 @@ export class PaineisService {
       this.prisma.document.count({ where: { createdAt: { gte: hoje0 } } }),
       this.prisma.document.count({ where: { issueDate: { gte: new Date(2026, 0, 1) } } }),
       this.prisma.company.aggregate({ where: { active: true }, _max: { sharepointAnalisadoEm: true } }),
-      this.prisma.fiscalCalendarItem.findMany({ where: { dataVencimento: { gte: inicioMes, lte: fimMes } }, select: { status: true, dataVencimento: true } }),
+      this.prisma.fiscalCalendarItem.findMany({ where: { dataVencimento: { gte: inicioMes, lte: fimMes } }, select: { status: true, dataVencimento: true, tipo: true } }),
       this.prisma.document.findMany({ where: { issueDate: { gte: inicioMes, lte: fimMes } }, select: { companyId: true } }),
     ]);
 
@@ -1231,18 +1232,22 @@ export class PaineisService {
     const semDocMes = companies.filter((c) => !comDocMes.has(c.id)).length;
 
     const ENTREGUE = new Set(['paga', 'isenta', 'entregue']);
-    let obrigTotal = 0, obrigVencidas = 0, obrigVencem7 = 0, obrigEntregues = 0, obrigAVencer = 0;
+    // FGTS/eSocial/DARF são cumpridos no PORTAL/banco (sem PDF de comprovante na pasta) →
+    // o sistema não prova entrega, então NÃO entram como "vencida" nem no % (seria falha fantasma).
+    const PORTAL = new Set(['FGTS', 'ESOCIAL', 'DARF']);
+    let obrigTotal = 0, obrigVencidas = 0, obrigVencem7 = 0, obrigEntregues = 0, obrigAVencer = 0, obrigPortal = 0;
     for (const o of obrigMes) {
       obrigTotal++;
       const v = new Date(o.dataVencimento);
       if (ENTREGUE.has(o.status)) { obrigEntregues++; continue; }
-      if (o.status === 'vencida' || v < now) obrigVencidas++;      // pendente E já passou do prazo = problema
+      if (PORTAL.has(o.tipo)) { obrigPortal++; continue; }          // controle no portal — fora da conta
+      if (o.status === 'vencida' || v < now) obrigVencidas++;       // recibo NÃO encontrado e já venceu = problema real
       else { obrigAVencer++; if (v <= em7) obrigVencem7++; }        // pendente mas ainda no prazo = normal
     }
+    const baseProva = obrigTotal - obrigPortal;                     // só o que gera comprovante rastreável
     const obrigNoPrazo = obrigEntregues + obrigAVencer;             // o que NÃO está em atraso
-    // % de "saúde": entregue + ainda no prazo sobre o total (não pune obrigação que ainda vai vencer)
-    const pctEntrega = obrigTotal ? Math.round((obrigEntregues / obrigTotal) * 100) : 0;
-    const pctNoPrazo = obrigTotal ? Math.round((obrigNoPrazo / obrigTotal) * 100) : 100;
+    const pctEntrega = baseProva ? Math.round((obrigEntregues / baseProva) * 100) : 0;
+    const pctNoPrazo = baseProva ? Math.round((obrigNoPrazo / baseProva) * 100) : 100;
 
     const driveLidoEm = ult._max.sharepointAnalisadoEm ?? null;
     const minAtras = driveLidoEm ? Math.round((now.getTime() - new Date(driveLidoEm).getTime()) / 60000) : null;
@@ -1268,7 +1273,7 @@ export class PaineisService {
         totalClientes,
       },
       kpis: {
-        obrigVencidas, obrigVencem7, obrigAVencer, obrigEntregues, obrigNoPrazo, obrigTotal,
+        obrigVencidas, obrigVencem7, obrigAVencer, obrigEntregues, obrigNoPrazo, obrigTotal, obrigPortal,
         pctEntrega, pctNoPrazo,
         semDocMes, semResponsavel, cnpjProvisorio,
       },
