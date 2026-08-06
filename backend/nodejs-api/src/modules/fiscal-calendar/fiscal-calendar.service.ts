@@ -261,12 +261,17 @@ export class FiscalCalendarService {
       });
     }
 
-    const data = itens.map((it) => ({
-      ...it,
-      companyId,
-      status: 'pendente',
-    }));
-    await this.prisma.fiscalCalendarItem.createMany({ data });
+    // IDEMPOTENTE: nunca recria uma competência que já existe (qualquer status) — senão
+    // duplica os itens já ENTREGUES que o regenerarTodos preserva (bug de duplicação).
+    const existentes = await this.prisma.fiscalCalendarItem.findMany({
+      where: { companyId, OR: [{ competencia: { startsWith: `${ano}-` } }, { competencia: String(ano) }] },
+      select: { tipo: true, competencia: true },
+    });
+    const jaTem = new Set(existentes.map((e) => `${e.tipo}|${e.competencia}`));
+    const data = itens
+      .filter((it) => !jaTem.has(`${it.tipo}|${it.competencia}`))
+      .map((it) => ({ ...it, companyId, status: 'pendente' }));
+    if (data.length) await this.prisma.fiscalCalendarItem.createMany({ data });
     return { generated: data.length };
   }
 
