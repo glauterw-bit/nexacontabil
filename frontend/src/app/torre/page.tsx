@@ -12,7 +12,7 @@ type Panorama = {
   competencia: string;
   ehMesCorrente: boolean;
   pulso: { docsHoje: number; docs2026: number; driveLidoHaMin: number; totalClientes: number };
-  kpis: { obrigVencidas: number; obrigVencem7: number; obrigAVencer: number; obrigEntregues: number; obrigNoPrazo: number; obrigTotal: number; pctEntrega: number; pctNoPrazo: number; semDocMes: number; semResponsavel: number; cnpjProvisorio: number };
+  kpis: { obrigVencidas: number; obrigVencem7: number; obrigAVencer: number; obrigEntregues: number; obrigNoPrazo: number; obrigTotal: number; obrigPortal: number; pctEntrega: number; pctNoPrazo: number; semDocMes: number; semResponsavel: number; cnpjProvisorio: number };
   insights: { nivel: string; titulo: string; texto: string; rota?: string }[];
 };
 type Desemp = { ano: number; analistas: { responsavel: string; clientes: number; entregues: number; devidas: number; taxa: number; atrasados: number }[] };
@@ -158,6 +158,7 @@ export default function Torre() {
               <span className="b-ok">● {k?.obrigEntregues ?? 0} entregue</span>
               {ehAtual && <span className="b-av">● {k?.obrigAVencer ?? 0} a vencer</span>}
               <span className="b-late">● {k?.obrigVencidas ?? 0} vencida</span>
+              {(k?.obrigPortal ?? 0) > 0 && <span className="b-portal" title="FGTS, eSocial e DARF — cumpridos no portal/banco, sem comprovante em pasta">● {k?.obrigPortal} portal</span>}
             </div>
           </div>
         </div>
@@ -272,7 +273,7 @@ function Estilo() {
 .tc-ctx{background:color-mix(in srgb, var(--info) 8%, transparent);border:1px solid color-mix(in srgb, var(--info) 22%, transparent);color:var(--muted);border-radius:12px;padding:11px 15px;margin-bottom:18px;font-size:12.5px;line-height:1.5;animation:tcup .5s ease .08s both}
 .tc-ctx b{color:var(--tx-strong)}
 .tc-breakdown{display:flex;flex-wrap:wrap;gap:10px;margin-top:7px;font-size:11.5px;font-weight:600}
-.tc-breakdown .b-ok{color:var(--ok)} .tc-breakdown .b-av{color:var(--info)} .tc-breakdown .b-late{color:var(--erro)}
+.tc-breakdown .b-ok{color:var(--ok)} .tc-breakdown .b-av{color:var(--info)} .tc-breakdown .b-late{color:var(--erro)} .tc-breakdown .b-portal{color:var(--faint)}
 .tc-live{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 13px}
 .tc-live-dot{width:8px;height:8px;border-radius:50%;background:var(--dot-ok);box-shadow:0 0 0 0 var(--dot-ok);animation:tcpulse 2s infinite}
 @keyframes tcpulse{0%{box-shadow:0 0 0 0 rgba(18,183,106,.5)}70%{box-shadow:0 0 0 7px rgba(18,183,106,0)}100%{box-shadow:0 0 0 0 rgba(18,183,106,0)}}
