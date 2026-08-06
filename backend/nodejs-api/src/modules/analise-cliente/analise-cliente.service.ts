@@ -68,11 +68,13 @@ export class AnaliseClienteService {
           data: {
             companyId, type: extDe(f.name), // pdf | jpg | xlsx | docx | ...
             status: 'recebido', originalFilename: f.name,
-            fileUrl: `${f.driveId}|${f.id}`, confidenceScore: 0,
+            fileUrl: `${f.driveId}|${f.id}`, folderPath: (f as any).path || null, confidenceScore: 0,
             issueDate: f.modified ? new Date(f.modified) : undefined,
           },
         });
         outros++;
+        // reconcilia NA HORA (a captura inicial já fecha o passado do cliente)
+        await this.reconciliarDocumento(companyId, f.name, (f as any).path || null, (f as any).webUrl || null);
       } catch { ignorados++; }
     }
 
@@ -289,11 +291,14 @@ export class AnaliseClienteService {
     const ehXml = (n: string) => n.toLowerCase().endsWith('.xml');
     const extDe = (nome: string) => { const p = nome.split('.'); return p.length > 1 ? p.pop()!.toLowerCase().slice(0, 12) : 'arquivo'; };
 
-    let novosXml = 0, novosOutros = 0, ignorados = 0;
+    let novosXml = 0, novosOutros = 0, ignorados = 0, reconciliados = 0;
     for (const f of arquivos.filter((f: any) => !ehXml(f.name) && !existPasta.has(`${f.path ?? ''}|${f.name}`))) {
       try {
         await this.prisma.document.create({ data: { companyId, type: extDe(f.name), status: 'recebido', originalFilename: f.name, fileUrl: `${f.driveId}|${f.id}`, folderPath: (f as any).path || null, confidenceScore: 0, issueDate: f.modified ? new Date(f.modified) : undefined } });
         novosOutros++;
+        // reconcilia NA HORA: se for comprovante, casa e marca ENTREGUE sem esperar o crawl
+        const r = await this.reconciliarDocumento(companyId, f.name, (f as any).path || null, (f as any).webUrl || null);
+        if (r.casou) reconciliados++;
       } catch { ignorados++; }
     }
     const novos = arquivos.filter((f: any) => !existNome.has(f.name));
@@ -310,7 +315,7 @@ export class AnaliseClienteService {
       }));
     }
     await this.prisma.company.update({ where: { id: companyId }, data: { sharepointDeltaLink: deltaLink ?? c.sharepointDeltaLink, sharepointAnalisadoEm: new Date(), sharepointDocsCount: jaTem.length + novosXml + novosOutros } });
-    return { cliente: c.name, arquivosNoDelta: arquivos.length, novosXml, novosOutros, ignorados, incremental: !!c.sharepointDeltaLink };
+    return { cliente: c.name, arquivosNoDelta: arquivos.length, novosXml, novosOutros, reconciliados, ignorados, incremental: !!c.sharepointDeltaLink };
   }
 
   /** Delta em lote (agendador/manual): clientes há mais tempo sem sync, com pasta.
@@ -1022,6 +1027,63 @@ export class AnaliseClienteService {
    * extrai a competência e cruza com as obrigações do banco. Devolve o censo + a lista dos PDFs
    * que SÃO recibo e NÃO estão casados (obrigação não entregue) — se vazia, provado: nada ficou pra trás.
    */
+  /**
+   * RECONCILIAÇÃO POR-DOCUMENTO (tempo real) — chamada logo após ingerir um arquivo.
+   * Se o arquivo é um comprovante reconhecível (detectTipo) e tem competência (compDe),
+   * casa com a obrigação (companyId + tipo + competência) e marca ENTREGUE NA HORA — sem
+   * esperar o crawl rotativo (~6h). Se a obrigação nem existe, CRIA a partir do recibo
+   * (respeitando clienteDesde). NUNCA lança: a ingestão não pode falhar por causa disto.
+   */
+  async reconciliarDocumento(companyId: string, nomeArquivo: string, folderPath?: string | null, webUrl?: string | null): Promise<{ casou: boolean; tipo?: string; comp?: string; acao?: string }> {
+    try {
+      const tipo = detectTipoFiscal(normFiscal(nomeArquivo || ''));
+      if (!tipo) return { casou: false };                       // não é comprovante (XML de nota etc.)
+      const anos = [2024, 2025, 2026];
+      const comp = compDeFiscal(nomeArquivo || '', folderPath || '', anos);
+      if (!comp) return { casou: false, tipo, acao: 'sem_competencia' };
+      if (this._compFutura(comp)) return { casou: false, tipo, comp, acao: 'futura' };
+      const ENTREGUE = new Set(['entregue', 'paga', 'isenta']);
+      const item = await this.prisma.fiscalCalendarItem.findFirst({ where: { companyId, tipo, competencia: comp }, select: { id: true, status: true, comprovanteUrl: true } });
+      if (item) {
+        if (ENTREGUE.has(item.status)) return { casou: true, tipo, comp, acao: 'ja_entregue' };
+        await this.prisma.fiscalCalendarItem.update({ where: { id: item.id }, data: { status: 'entregue', ...(item.comprovanteUrl || !webUrl ? {} : { comprovanteUrl: webUrl }) } });
+        return { casou: true, tipo, comp, acao: 'marcada' };
+      }
+      // sem obrigação no calendário → cria a partir do recibo (o recibo prova que era devida E entregue)
+      const co = await this.prisma.company.findUnique({ where: { id: companyId }, select: { clienteDesde: true } });
+      const inicio = co?.clienteDesde ? `${co.clienteDesde.getUTCFullYear()}-${String(co.clienteDesde.getUTCMonth() + 1).padStart(2, '0')}` : null;
+      if (inicio && comp < inicio) return { casou: false, tipo, comp, acao: 'antes_do_inicio' };
+      const [cy, cm] = comp.split('-').map(Number);
+      const vy = cm === 12 ? cy + 1 : cy, vm = cm === 12 ? 1 : cm + 1; // vence dia 20 do mês seguinte
+      await this.prisma.fiscalCalendarItem.create({ data: { companyId, tipo, descricao: `${tipo} - gerado a partir do recibo no OneDrive (${comp})`, competencia: comp, dataVencimento: new Date(Date.UTC(vy, vm - 1, 20)), status: 'entregue', ...(webUrl ? { comprovanteUrl: webUrl } : {}), recorrencia: 'mensal', observacoes: 'reconciliacao automatica na ingestao do documento' } });
+      return { casou: true, tipo, comp, acao: 'criada' };
+    } catch { return { casou: false }; }
+  }
+
+  /**
+   * BACKFILL — aplica a reconciliação por-documento a TODOS os comprovantes JÁ ingeridos.
+   * Fecha o histórico de uma vez (sem esperar o crawl rotativo), usando exatamente a mesma
+   * regra que passa a valer a cada novo documento. Idempotente (ignora o que já está entregue).
+   */
+  async reconciliarDocsExistentes(opts?: { timeBudgetMs?: number }) {
+    const t0 = Date.now();
+    const budget = opts?.timeBudgetMs ?? 5 * 60_000;
+    // 'recebido' = não-XML (comprovantes/recibos); XMLs são notas (status 'completed') e não reconciliam
+    const docs = await this.prisma.document.findMany({
+      where: { status: 'recebido' },
+      select: { companyId: true, originalFilename: true, folderPath: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    let vistos = 0, casados = 0, marcadas = 0, criadas = 0, jaOk = 0;
+    for (const d of docs) {
+      if (Date.now() - t0 > budget) break;
+      vistos++;
+      const r = await this.reconciliarDocumento(d.companyId, d.originalFilename || '', d.folderPath);
+      if (r.casou) { casados++; if (r.acao === 'marcada') marcadas++; else if (r.acao === 'criada') criadas++; else if (r.acao === 'ja_entregue') jaOk++; }
+    }
+    return { docsComprovante: docs.length, vistos, casados, marcadas, criadas, jaEntregue: jaOk, tempoMs: Date.now() - t0, truncado: vistos < docs.length };
+  }
+
   async auditarCoberturaCliente(codigo: string, anos: number[] = [2025, 2026], opts?: { aplicar?: boolean; timeBudgetMs?: number }) {
     const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
     if (!conn) return { erro: 'sem conexão OneDrive' };

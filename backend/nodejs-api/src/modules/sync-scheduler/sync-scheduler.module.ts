@@ -220,6 +220,18 @@ class SyncSchedulerController {
     return this.service.reconciliarCrawlStatus();
   }
 
+  /** BACKFILL por-documento — reconcilia todos os comprovantes já ingeridos (fecha o histórico). */
+  @Public()
+  @Get('reconciliar-existentes')
+  reconciliarExistentes() {
+    return this.service.reconciliarExistentesGlobal();
+  }
+  @Public()
+  @Get('reconciliar-existentes-status')
+  reconciliarExistentesStatus() {
+    return this.service.reconciliarExistentesStatus();
+  }
+
   /** Diagnóstico de cobertura via permissão de APLICAÇÃO (sites+drives que o app enxerga). */
   @Public()
   @Get('enumerar-sites')

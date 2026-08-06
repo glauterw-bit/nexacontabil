@@ -461,6 +461,17 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return { ...r, anos };
   }
   reconciliarCrawlStatus() { return this.jobStatus('reconciliar-crawl'); }
+
+  /** BACKFILL por-documento: reconcilia TODOS os comprovantes já ingeridos (fecha o histórico). */
+  async reconciliarExistentesGlobal() {
+    const r = await this.runJob('reconciliar-existentes', async () => {
+      const res = await this.analise.reconciliarDocsExistentes({ timeBudgetMs: 10 * 60_000 });
+      await this.fiscalCalendar.markOverdue().catch(() => undefined);
+      return res;
+    });
+    return r;
+  }
+  reconciliarExistentesStatus() { return this.jobStatus('reconciliar-existentes'); }
   private async analiseProxyListaAtivos(): Promise<string[]> {
     const cs = await this.prisma.company.findMany({ where: { active: true, clienteCodigo: { not: null } }, select: { clienteCodigo: true } });
     return cs.map((c) => String(c.clienteCodigo)).filter((c) => /^\d+$/.test(c)).sort((a, b) => +a - +b);
