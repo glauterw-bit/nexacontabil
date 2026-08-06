@@ -472,6 +472,22 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return r;
   }
   reconciliarExistentesStatus() { return this.jobStatus('reconciliar-existentes'); }
+
+  /** Regenera o calendário aplicando as regras de aplicabilidade (folha/ICMS) — limpa a super-geração. */
+  async regenerarCalendarioGlobal(anos = [new Date().getFullYear() - 1, new Date().getFullYear()]) {
+    const r = await this.runJob('regenerar-calendario', async (progresso) => {
+      const p = { anos, feitos: 0, total: anos.length, apagados: 0, gerados: 0 };
+      for (const ano of anos) {
+        const res = await this.fiscalCalendar.regenerarTodos(ano);
+        p.apagados += res.apagadosEmAberto || 0; p.gerados += res.gerados || 0; p.feitos++;
+        progresso(p);
+      }
+      await this.fiscalCalendar.markOverdue().catch(() => undefined);
+      return p;
+    });
+    return r;
+  }
+  regenerarCalendarioStatus() { return this.jobStatus('regenerar-calendario'); }
   private async analiseProxyListaAtivos(): Promise<string[]> {
     const cs = await this.prisma.company.findMany({ where: { active: true, clienteCodigo: { not: null } }, select: { clienteCodigo: true } });
     return cs.map((c) => String(c.clienteCodigo)).filter((c) => /^\d+$/.test(c)).sort((a, b) => +a - +b);

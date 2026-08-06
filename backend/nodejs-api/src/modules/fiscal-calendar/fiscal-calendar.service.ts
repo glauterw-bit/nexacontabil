@@ -75,6 +75,22 @@ export class FiscalCalendarService {
     if (!company) throw new NotFoundException('Empresa nao encontrada');
 
     const regime = (company.taxRegime || '').toUpperCase();
+
+    // ── PERFIL DE APLICABILIDADE (evita super-geração de obrigações que o cliente NÃO deve) ──
+    // FOLHA (FGTS/eSocial): só quem tem funcionários OU já entregou folha OU tem documento de folha.
+    // ICMS: só contribuinte de ICMS (tem Inscrição Estadual, ou segmento com ICMS, ou histórico ICMS).
+    // Seguro porque a reconciliação por-documento RECRIA a obrigação se chegar um comprovante real.
+    const [empCount, folhaHist, folhaDoc, icmsHist] = await Promise.all([
+      this.prisma.employee.count({ where: { companyId } }).catch(() => 0),
+      this.prisma.fiscalCalendarItem.count({ where: { companyId, tipo: { in: ['FGTS', 'ESOCIAL', 'DCTFWeb'] }, status: { in: ['entregue', 'paga'] } } }).catch(() => 0),
+      this.prisma.document.count({ where: { companyId, OR: [{ originalFilename: { contains: 'fgts', mode: 'insensitive' } }, { originalFilename: { contains: 'esocial', mode: 'insensitive' } }, { originalFilename: { contains: 'grf', mode: 'insensitive' } }] } }).catch(() => 0),
+      this.prisma.fiscalCalendarItem.count({ where: { companyId, tipo: 'ICMS', status: { in: ['entregue', 'paga'] } } }).catch(() => 0),
+    ]);
+    const temFolha = empCount > 0 || folhaHist > 0 || folhaDoc > 0;
+    const seg = (company.segmentoFiscal || '').toLowerCase();
+    const temIE = !!(company.ie && company.ie.replace(/\D/g, '').length >= 6);
+    const temICMS = temIE || ['comercio', 'industria', 'transporte'].includes(seg) || icmsHist > 0;
+
     const itens: Array<{
       tipo: string;
       descricao: string;
@@ -91,23 +107,25 @@ export class FiscalCalendarService {
       const vencMes = mes === 12 ? 1 : mes + 1;
       const vencAno = mes === 12 ? ano + 1 : ano;
 
-      // Comuns a todos os regimes
-      itens.push({
-        tipo: 'FGTS',
-        descricao: 'FGTS Digital (Pix, guia no portal MTE) - competencia ' + competencia,
-        competencia,
-        dataVencimento: new Date(vencAno, vencMes - 1, 20), // dia 20 desde o FGTS Digital (mar/2024)
-        recorrencia: 'mensal',
-        prioridade: 'alta',
-      });
-      itens.push({
-        tipo: 'ESOCIAL',
-        descricao: 'eSocial - envio mensal eventos S-1200/S-1210 - ' + competencia,
-        competencia,
-        dataVencimento: new Date(vencAno, vencMes - 1, 15),
-        recorrencia: 'mensal',
-        prioridade: 'alta',
-      });
+      // FOLHA (FGTS + eSocial) — SÓ para quem tem folha (funcionários/histórico/documento)
+      if (temFolha) {
+        itens.push({
+          tipo: 'FGTS',
+          descricao: 'FGTS Digital (Pix, guia no portal MTE) - competencia ' + competencia,
+          competencia,
+          dataVencimento: new Date(vencAno, vencMes - 1, 20), // dia 20 desde o FGTS Digital (mar/2024)
+          recorrencia: 'mensal',
+          prioridade: 'alta',
+        });
+        itens.push({
+          tipo: 'ESOCIAL',
+          descricao: 'eSocial - envio mensal eventos S-1200/S-1210 - ' + competencia,
+          competencia,
+          dataVencimento: new Date(vencAno, vencMes - 1, 15),
+          recorrencia: 'mensal',
+          prioridade: 'alta',
+        });
+      }
 
       // Por regime tributário
       if (regime === 'SIMPLES_NACIONAL' || regime === 'SIMPLES') {
@@ -147,15 +165,17 @@ export class FiscalCalendarService {
           recorrencia: 'mensal',
           prioridade: 'alta',
         });
-        // ICMS estadual
-        itens.push({
-          tipo: 'ICMS',
-          descricao: 'GIA ICMS - competencia ' + competencia,
-          competencia,
-          dataVencimento: new Date(vencAno, vencMes - 1, 15),
-          recorrencia: 'mensal',
-          prioridade: 'alta',
-        });
+        // ICMS estadual — SÓ para contribuinte de ICMS (não para empresa só de serviço)
+        if (temICMS) {
+          itens.push({
+            tipo: 'ICMS',
+            descricao: 'GIA ICMS - competencia ' + competencia,
+            competencia,
+            dataVencimento: new Date(vencAno, vencMes - 1, 15),
+            recorrencia: 'mensal',
+            prioridade: 'alta',
+          });
+        }
         // DCTFWeb mensal
         itens.push({
           tipo: 'DCTFWeb',

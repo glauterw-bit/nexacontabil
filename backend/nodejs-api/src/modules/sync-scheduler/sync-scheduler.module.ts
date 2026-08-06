@@ -232,6 +232,19 @@ class SyncSchedulerController {
     return this.service.reconciliarExistentesStatus();
   }
 
+  /** Regenera o calendário aplicando aplicabilidade (folha/ICMS) — limpa a super-geração. */
+  @Public()
+  @Get('regenerar-calendario')
+  regenerarCalendario(@Query('anos') anos?: string) {
+    const lista = anos ? anos.split(',').map((a) => parseInt(a, 10)).filter(Boolean) : undefined;
+    return this.service.regenerarCalendarioGlobal(lista);
+  }
+  @Public()
+  @Get('regenerar-calendario-status')
+  regenerarCalendarioStatus() {
+    return this.service.regenerarCalendarioStatus();
+  }
+
   /** Diagnóstico de cobertura via permissão de APLICAÇÃO (sites+drives que o app enxerga). */
   @Public()
   @Get('enumerar-sites')
