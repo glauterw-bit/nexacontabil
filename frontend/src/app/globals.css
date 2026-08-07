@@ -230,3 +230,88 @@
     animation: pulse 2s infinite;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   CAMADA DE MOVIMENTO — sistêmica. Toda tela herda daqui.
+   Princípio: motion serve à leitura (entrada suave, resposta tátil),
+   nunca decoração. Respeita prefers-reduced-motion.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes riseIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes railGrow { from { transform: scaleY(0); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+@keyframes popIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+
+/* Troca de rota: fade suave (opacity só → não quebra position:sticky) */
+.route-enter { animation: fadeIn 0.32s ease both; }
+
+/* Containers de página herdam uma entrada leve */
+.page, .page-narrow { animation: fadeIn 0.3s ease both; }
+
+/* Cartões: sobem ao entrar; realce só quando são interativos (link/botão) */
+.card-aura {
+  animation: riseIn 0.5s var(--ease-out) both;
+  transition: box-shadow 0.22s var(--ease-out), transform 0.22s var(--ease-out), border-color 0.2s;
+}
+a.card-aura:hover, button.card-aura:hover, .card-aura[data-clickable]:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-pop);
+  border-color: color-mix(in srgb, var(--acao) 45%, var(--border));
+}
+a.card-aura:active, button.card-aura:active, .card-aura[data-clickable]:active { transform: translateY(-1px); }
+
+/* Botões: resposta tátil ao clique + brilho de ação no primário */
+.btn-primary, .btn-secondary, .btn-ghost {
+  transition: background-color 0.15s, color 0.15s, transform 0.1s var(--ease-out), box-shadow 0.18s var(--ease-out);
+}
+.btn-primary { box-shadow: 0 1px 2px color-mix(in srgb, var(--acao) 35%, transparent); }
+.btn-primary:hover { box-shadow: 0 6px 18px color-mix(in srgb, var(--acao) 32%, transparent); transform: translateY(-1px); }
+.btn-primary:active, .btn-secondary:active, .btn-ghost:active { transform: scale(0.97); }
+
+/* Itens de navegação: leve deslize ao passar o mouse */
+.nav-item:not(:hover) { transform: translateX(0); }
+.nav-item:hover { transform: translateX(2px); }
+
+/* Chips e badges entram com um leve pop */
+.chip { transition: transform 0.12s var(--ease-out), background-color 0.15s; }
+.chip:hover { transform: translateY(-1px); }
+
+/* Linhas de tabela: realce mais vivo */
+.table-aura tbody tr { transition: background 0.14s var(--ease-out); }
+
+/* Transição suave ao alternar tema (só as superfícies; não anima no load
+   porque o tema é fixado antes da 1ª pintura pelo script no <head>) */
+body, .card-aura, .btn-secondary, .input-aura,
+.table-aura thead th, .table-aura tbody td {
+  transition-property: background-color, border-color, color;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
+}
+
+/* Utilitários de entrada para telas que quiserem orquestrar */
+.anim-rise { animation: riseIn 0.5s var(--ease-out) both; }
+.anim-fade { animation: fadeIn 0.4s ease both; }
+.anim-pop { animation: popIn 0.35s var(--ease-spring) both; }
+.stagger > * { animation: riseIn 0.5s var(--ease-out) both; }
+.stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.stagger > *:nth-child(3) { animation-delay: 0.1s; }
+.stagger > *:nth-child(4) { animation-delay: 0.14s; }
+.stagger > *:nth-child(5) { animation-delay: 0.18s; }
+.stagger > *:nth-child(6) { animation-delay: 0.22s; }
+.stagger > *:nth-child(7) { animation-delay: 0.26s; }
+.stagger > *:nth-child(8) { animation-delay: 0.3s; }
+
+/* Acessibilidade: quem pede menos movimento, recebe menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

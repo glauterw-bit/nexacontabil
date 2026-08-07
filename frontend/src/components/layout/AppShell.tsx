@@ -78,13 +78,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
 function AuthenticatedShell({ children }: { children: React.ReactNode }) {
   const [cmdOpen, setCmdOpen] = useState(false);
+  const pathname = usePathname();
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden bg-page">
         <TopBar onOpenCommand={() => setCmdOpen(true)} />
         <main className="flex-1 overflow-y-auto">
-          {children}
+          {/* chave pela rota → cada navegação anima a entrada do conteúdo */}
+          <div key={pathname} className="route-enter">
+            {children}
+          </div>
         </main>
       </div>
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />

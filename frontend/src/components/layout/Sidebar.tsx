@@ -202,12 +202,15 @@ export function Sidebar() {
     const active = isActive(href);
     return (
       <Link href={href}
-        className={`relative flex items-center gap-2.5 pl-3.5 pr-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
+        className={`nav-item relative flex items-center gap-2.5 pl-3.5 pr-3 py-2 rounded-lg text-[13px] font-medium ${
           active ? 'text-tx-strong' : 'text-tx-muted hover:text-tx-strong hover:bg-inset'
         }`}
-        style={active ? { background: 'linear-gradient(90deg, color-mix(in srgb, var(--acao) 22%, transparent), color-mix(in srgb, var(--acao) 5%, transparent))' } : undefined}>
-        {active && <span style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 3, borderRadius: 99, background: 'var(--acao)' }} />}
-        <Icon className="h-4 w-4 flex-shrink-0" style={{ color: active ? 'var(--acao)' : undefined, opacity: active ? 1 : 0.85 }} />
+        style={{
+          transition: 'color .15s, background-color .15s, transform .15s var(--ease-out)',
+          ...(active ? { background: 'linear-gradient(90deg, color-mix(in srgb, var(--acao) 22%, transparent), color-mix(in srgb, var(--acao) 5%, transparent))' } : {}),
+        }}>
+        {active && <span style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 3, borderRadius: 99, background: 'var(--acao)', transformOrigin: 'center', animation: 'railGrow .35s var(--ease-out) both' }} />}
+        <Icon className="h-4 w-4 flex-shrink-0" style={{ color: active ? 'var(--acao)' : undefined, opacity: active ? 1 : 0.85, transition: 'color .15s' }} />
         <span className="truncate">{label}</span>
       </Link>
     );
