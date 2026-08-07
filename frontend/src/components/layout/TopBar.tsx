@@ -6,6 +6,7 @@ import { useCompetencia, fmtCompetencia } from '@/contexts/CompetenciaContext';
 
 const ROUTE_LABELS: Record<string, string> = {
   operacao: 'Operação',
+  torre: 'Torre de Controle',
   farois: 'Faróis',
   'meu-dia': 'Meu Dia',
   carteira: 'Clientes',
