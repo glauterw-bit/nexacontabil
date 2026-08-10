@@ -274,6 +274,18 @@ export class WhatsappService {
     return null;
   }
 
+  /** Gateway PRONTO PARA ENVIAR (não só configurado): Evolution precisa estar 'open' (pareado). */
+  async conectado(): Promise<boolean> {
+    const gw = this.gateway();
+    if (gw === 'meta') return true; // Meta Cloud não tem estado de pareamento
+    if (gw !== 'evolution') return false;
+    try {
+      const st: any = await fetch(`${this.evoBase()}/instance/connectionState/${this.evoInstance()}`, { headers: this.evoHeaders() });
+      const sj: any = await st.json().catch(() => ({}));
+      return (sj?.instance?.state ?? sj?.state) === 'open';
+    } catch { return false; }
+  }
+
   /**
    * Envia texto pelo gateway configurado (Evolution ou Meta Cloud API).
    * Sem gateway, apenas loga e retorna { ok:false, dev:true } — quem chama decide o fallback.

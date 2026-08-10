@@ -56,7 +56,8 @@ export default function MeuDia() {
   const [feitos, setFeitos] = useState<Record<string, boolean>>({}); // links de fila já abertos
 
   useEffect(() => {
-    fetch(`${API}/api/v1/paineis/gateway-whatsapp`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setGateway(j?.gateway ?? null)).catch(() => setGateway(null));
+    // 'gateway' aqui = PRONTO PARA ENVIAR (pareado). Se não, o lote vira fila de 1-clique.
+    fetch(`${API}/api/v1/paineis/gateway-whatsapp`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setGateway(j?.conectado ? (j?.gateway ?? null) : null)).catch(() => setGateway(null));
     fetch(`${API}/api/v1/paineis/prazos`, { headers: authHeaders() }).then((r) => r.json()).then(setPz).catch(() => setPz(null));
   }, []);
   useEffect(() => {

@@ -1907,8 +1907,8 @@ export class PaineisService {
   }
 
   /** Status do gateway de envio (o front mostra "Enviar agora" só quando há gateway). */
-  gatewayWhatsapp() {
-    return { gateway: this.whatsapp.gateway() };
+  async gatewayWhatsapp() {
+    return { gateway: this.whatsapp.gateway(), conectado: await this.whatsapp.conectado() };
   }
 
   /**
@@ -1940,7 +1940,8 @@ export class PaineisService {
     const ano = new Date().getFullYear();
     const limit = opts?.limit ?? 40;
     const minDias = opts?.minDiasDesdeUltima ?? 3;
-    const gw = this.whatsapp.gateway();
+    // só considera "gateway" se estiver REALMENTE conectado (pareado); senão vira fila de 1-clique
+    const gw = (await this.whatsapp.conectado()) ? this.whatsapp.gateway() : null;
     const rf: any = await this.recibosFaltantes(ano, undefined, responsavel);
     const pendentes = (rf.clientes || []).filter((c: any) => c.faltam > 0);
 
