@@ -1928,6 +1928,51 @@ export class PaineisService {
     return { ok: true, gateway: (envio as any).gateway, enviadas: cob.totalFaltam };
   }
 
+  /**
+   * COBRANÇA EM LOTE — o maior economizador de tempo do analista, custo de IA ZERO.
+   * Percorre os clientes da carteira (escopada) com pendência e, para cada um:
+   *  - pula quem já foi cobrado nos últimos N dias (anti-spam);
+   *  - se o WhatsApp está pareado (gateway), ENVIA na hora (com throttle anti-flood);
+   *  - se não, devolve a mensagem + link wa.me pronta pra fila de 1-clique no front.
+   * Mensagens são TEMPLATE (determinístico), não IA. Cap por chamada p/ não estourar timeout.
+   */
+  async cobrarLote(responsavel?: string, opts?: { limit?: number; minDiasDesdeUltima?: number }) {
+    const ano = new Date().getFullYear();
+    const limit = opts?.limit ?? 40;
+    const minDias = opts?.minDiasDesdeUltima ?? 3;
+    const gw = this.whatsapp.gateway();
+    const rf: any = await this.recibosFaltantes(ano, undefined, responsavel);
+    const pendentes = (rf.clientes || []).filter((c: any) => c.faltam > 0);
+
+    const resultados: any[] = [];
+    let enviadas = 0, prontas = 0, puladasRecentes = 0, semWhatsapp = 0, falhas = 0, processados = 0;
+    for (const c of pendentes) {
+      if (processados >= limit) break;
+      const ult = await this.prisma.cobrancaLog.findFirst({ where: { companyId: c.companyId }, orderBy: { criadoEm: 'desc' }, select: { criadoEm: true } }).catch(() => null);
+      if (ult && Date.now() - ult.criadoEm.getTime() < minDias * 86400000) {
+        puladasRecentes++; resultados.push({ companyId: c.companyId, cliente: c.cliente, status: 'pulada_recente', diasAtras: Math.floor((Date.now() - ult.criadoEm.getTime()) / 86400000) });
+        continue;
+      }
+      const cob: any = await this.cobrancaCliente(c.companyId, ano);
+      if (cob?.erro || !cob.totalFaltam) { resultados.push({ companyId: c.companyId, cliente: c.cliente, status: 'sem_pendencia' }); continue; }
+      processados++;
+      if (!cob.whatsapp) { semWhatsapp++; resultados.push({ companyId: c.companyId, cliente: c.cliente, status: 'sem_whatsapp', qtd: cob.totalFaltam, mensagem: cob.mensagem }); continue; }
+      if (gw) {
+        const env: any = await this.enviarCobranca(c.companyId, responsavel || 'lote');
+        if (env.ok) { enviadas++; resultados.push({ companyId: c.companyId, cliente: c.cliente, status: 'enviada', qtd: cob.totalFaltam }); }
+        else { falhas++; resultados.push({ companyId: c.companyId, cliente: c.cliente, status: 'falha', motivo: env.motivo }); }
+        await new Promise((r) => setTimeout(r, 900)); // throttle anti-flood do gateway
+      } else {
+        prontas++; resultados.push({ companyId: c.companyId, cliente: c.cliente, status: 'pronta', qtd: cob.totalFaltam, whatsapp: cob.whatsapp, mensagem: cob.mensagem });
+      }
+    }
+    return {
+      gateway: gw,
+      resumo: { totalPendentes: pendentes.length, processados, enviadas, prontasSemGateway: prontas, puladasRecentes, semWhatsapp, falhas, restantes: Math.max(0, pendentes.length - resultados.length) },
+      resultados,
+    };
+  }
+
   /** Registra que uma cobrança foi enviada (histórico + evita cobrar 2x sem controle). */
   async registrarCobranca(companyId: string, opts: { canal?: string; competencias?: string; quantidade?: number; por?: string }) {
     if (!companyId) return { erro: 'companyId obrigatório' };

@@ -51,6 +51,9 @@ export default function MeuDia() {
   const [copiado, setCopiado] = useState('');
   const [gateway, setGateway] = useState<string | null>(null);
   const [enviando, setEnviando] = useState('');
+  const [lote, setLote] = useState<any>(null);
+  const [loteLoading, setLoteLoading] = useState(false);
+  const [feitos, setFeitos] = useState<Record<string, boolean>>({}); // links de fila já abertos
 
   useEffect(() => {
     fetch(`${API}/api/v1/paineis/gateway-whatsapp`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setGateway(j?.gateway ?? null)).catch(() => setGateway(null));
@@ -71,6 +74,21 @@ export default function MeuDia() {
     } catch { setCob((p) => ({ ...p, [companyId]: { ...p[companyId], envioResultado: 'não enviada: erro de rede' } })); }
     finally { setEnviando(''); }
   };
+  const registrarLote = (companyId: string, qtd?: number) => {
+    fetch(`${API}/api/v1/paineis/registrar-cobranca`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ companyId, canal: 'whatsapp', quantidade: qtd }) }).catch(() => {});
+  };
+
+  const cobrarTodos = async () => {
+    if (loteLoading) return;
+    setLoteLoading(true); setLote(null); setFeitos({});
+    try {
+      const r = await fetch(`${API}/api/v1/paineis/cobrar-lote`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({}) });
+      const j = await r.json();
+      setLote(j);
+      if (j?.resumo?.enviadas > 0) carregar(); // recarrega a fila se enviou de fato
+    } catch { setLote({ erro: true }); } finally { setLoteLoading(false); }
+  };
+
   const carregar = useCallback(() => {
     setLoading(true);
     fetch(`${API}/api/v1/paineis/recibos-faltantes?ano=${ano}`, { headers: authHeaders() }).then((r) => r.json()).then(setD).catch(() => setD(null)).finally(() => setLoading(false));
@@ -145,7 +163,45 @@ export default function MeuDia() {
 
       {loading ? <div className="md-load"><span className="md-spin" />carregando sua carteira…</div> : !d ? <div className="md-load">Sem dados.</div> : (
         <section className="md-fila">
-          <h2>Fila de cobrança <span className="md-cnt">{totFalta} docs · {comFalta.length} clientes</span></h2>
+          <div className="md-fila-h">
+            <h2>Fila de cobrança <span className="md-cnt">{totFalta} docs · {comFalta.length} clientes</span></h2>
+            {comFalta.length > 0 && (
+              <button className="md-lote-btn" onClick={cobrarTodos} disabled={loteLoading}>
+                {loteLoading ? 'Processando…' : gateway ? `⚡ Cobrar todos (${comFalta.length})` : `⚡ Preparar todas (${comFalta.length})`}
+              </button>
+            )}
+          </div>
+
+          {lote && !lote.erro && (
+            <div className="md-lote">
+              <div className="md-lote-top">
+                <b>{lote.gateway ? `✓ ${lote.resumo.enviadas} cobranças enviadas pelo WhatsApp` : `${lote.resumo.prontasSemGateway} mensagens prontas para disparar`}</b>
+                <button className="md-lote-x" onClick={() => setLote(null)}>✕</button>
+              </div>
+              <div className="md-lote-stats">
+                {lote.resumo.enviadas > 0 && <span className="ok">✓ {lote.resumo.enviadas} enviadas</span>}
+                {lote.resumo.prontasSemGateway > 0 && <span className="wa">{lote.resumo.prontasSemGateway} prontas</span>}
+                {lote.resumo.puladasRecentes > 0 && <span className="mut">{lote.resumo.puladasRecentes} já cobradas (últimos 3d)</span>}
+                {lote.resumo.semWhatsapp > 0 && <span className="mut">{lote.resumo.semWhatsapp} sem WhatsApp</span>}
+                {lote.resumo.falhas > 0 && <span className="err">{lote.resumo.falhas} falharam</span>}
+                {lote.resumo.restantes > 0 && <span className="mut">+{lote.resumo.restantes} nesta rodada (clique de novo p/ continuar)</span>}
+              </div>
+              {!lote.gateway && (
+                <>
+                  <p className="md-lote-dica">Sem o WhatsApp pareado, abra uma a uma (1 clique cada) — a mensagem já vai pronta:</p>
+                  <div className="md-lote-fila">
+                    {lote.resultados.filter((x: any) => x.status === 'pronta').map((x: any) => (
+                      <a key={x.companyId} className={`md-lote-link ${feitos[x.companyId] ? 'feito' : ''}`} href={x.whatsapp} target="_blank" rel="noopener"
+                        onClick={() => { setFeitos((p) => ({ ...p, [x.companyId]: true })); registrarLote(x.companyId, x.qtd); }}>
+                        {feitos[x.companyId] ? '✓ ' : ''}{x.cliente} <em>({x.qtd})</em>
+                      </a>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {comFalta.length === 0 ? (
             <div className="md-zero">🎉 Sua carteira está 100% em dia. Nada a cobrar hoje!</div>
           ) : (
@@ -219,6 +275,28 @@ export default function MeuDia() {
 .md-prox-info small{font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 
 .md-fila{animation:mdup .5s ease .15s both}
+.md-fila-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:11px}
+.md-fila-h h2{margin-bottom:0}
+.md-lote-btn{border:none;background:var(--acao);color:#fff;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 1px 2px color-mix(in srgb,var(--acao) 35%,transparent);transition:transform .1s var(--ease-out),box-shadow .18s}
+.md-lote-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px color-mix(in srgb,var(--acao) 32%,transparent)}
+.md-lote-btn:active:not(:disabled){transform:scale(.97)}
+.md-lote-btn:disabled{opacity:.6;cursor:default}
+.md-lote{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;animation:mdup .3s ease both}
+.md-lote-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.md-lote-top b{font-size:14px;color:var(--tx-strong)}
+.md-lote-x{border:none;background:transparent;color:var(--faint);font-size:15px;cursor:pointer;padding:2px 6px;border-radius:6px}
+.md-lote-x:hover{background:var(--surface2);color:var(--tx)}
+.md-lote-stats{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.md-lote-stats span{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:20px;background:var(--surface2);color:var(--muted)}
+.md-lote-stats .ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+.md-lote-stats .wa{background:color-mix(in srgb,#25D366 18%,transparent);color:#1a9e4b}
+.md-lote-stats .err{background:color-mix(in srgb,var(--erro) 15%,transparent);color:var(--erro)}
+.md-lote-dica{font-size:12px;color:var(--muted);margin:11px 0 8px}
+.md-lote-fila{display:flex;flex-wrap:wrap;gap:7px}
+.md-lote-link{display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#fff;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600;text-decoration:none;transition:transform .1s var(--ease-out),opacity .15s}
+.md-lote-link em{font-style:normal;opacity:.85;font-size:11px}
+.md-lote-link:hover{transform:translateY(-1px)}
+.md-lote-link.feito{background:var(--surface2);color:var(--faint)}
 .md-zero{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;text-align:center;font-weight:500;color:var(--ok)}
 .md-list{list-style:none;display:flex;flex-direction:column;gap:9px}
 .md-item{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:.15s}

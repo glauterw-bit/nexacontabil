@@ -77,6 +77,13 @@ export class PaineisController {
     return this.service.enviarCobranca(body.companyId, req?.user?.name);
   }
 
+  /** COBRANÇA EM LOTE — dispara todas as pendências da carteira (escopada) de uma vez. */
+  @Post('cobrar-lote')
+  cobrarLote(@Req() req: any, @Body() body: { responsavel?: string; limit?: number; minDiasDesdeUltima?: number }) {
+    const escopoResp = req?.user?.role === 'analista' ? req.user.name : body?.responsavel;
+    return this.service.cobrarLote(escopoResp, { limit: body?.limit, minDiasDesdeUltima: body?.minDiasDesdeUltima });
+  }
+
   /** Registra que a cobrança foi enviada (histórico). */
   @Post('registrar-cobranca')
   registrarCobranca(@Body() body: { companyId: string; canal?: string; competencias?: string; quantidade?: number }, @Req() req?: any) {
