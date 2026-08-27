@@ -1227,6 +1227,7 @@ export class PaineisService {
 
     const totalClientes = companies.length;
     const semResponsavel = companies.filter((c) => !c.responsavel).length;
+    const novosSemana = await this.prisma.company.count({ where: { active: true, createdAt: { gte: new Date(Date.now() - 7 * 86400000) } } }).catch(() => 0);
     const cnpjProvisorio = companies.filter((c) => (c.cnpj ?? '').replace(/\D/g, '').startsWith('7')).length;
     const comDocMes = new Set(docsMes.map((d) => d.companyId));
     const semDocMes = companies.filter((c) => !comDocMes.has(c.id)).length;
@@ -1257,6 +1258,7 @@ export class PaineisService {
     if (obrigVencidas > 0) insights.push({ nivel: 'critico', titulo: `${obrigVencidas} obrigação(ões) vencida(s)`, texto: 'Prazos do mês já vencidos — priorizar a entrega hoje.', rota: '/prazos' });
     if (obrigVencem7 > 0) insights.push({ nivel: 'alerta', titulo: `${obrigVencem7} vencem em 7 dias`, texto: 'Obrigações da competência com prazo próximo.', rota: '/prazos' });
     if (obrigTotal === 0) insights.push({ nivel: 'alerta', titulo: 'Calendário fiscal vazio', texto: `Nenhuma obrigação gerada para ${nowComp}. Configure em Saúde da Implantação.`, rota: '/implantacao' });
+    if (novosSemana > 0) insights.push({ nivel: 'oportunidade', titulo: `${novosSemana} cliente(s) novo(s) esta semana`, texto: 'Cadastrados automaticamente da pasta — atribua o responsável e confira o regime.', rota: '/atribuir-responsavel' });
     if (semDocMes > 0) insights.push({ nivel: 'alerta', titulo: `${semDocMes} clientes sem documentos no mês`, texto: 'Não enviaram/capturamos notas deste mês — cobrar ou puxar do SEFAZ.', rota: '/solicitacoes' });
     if (semResponsavel > 0) insights.push({ nivel: 'alerta', titulo: `${semResponsavel} clientes sem responsável`, texto: 'Atribua para destravar o Meu Dia e a carteira dos analistas.', rota: '/implantacao' });
     if (cnpjProvisorio > 0) insights.push({ nivel: 'alerta', titulo: `${cnpjProvisorio} CNPJs provisórios`, texto: 'Sem CNPJ real não há SEFAZ, situação fiscal nem NFS-e nacional.', rota: '/carteira' });

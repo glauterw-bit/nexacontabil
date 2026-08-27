@@ -220,6 +220,13 @@ class SyncSchedulerController {
     return this.service.reconciliarCrawlStatus();
   }
 
+  /** CLIENTES NOVOS — pastas em "Empresas Ativas" sem cadastro. ?criar=1 cadastra na hora. */
+  @Public()
+  @Get('clientes-novos')
+  clientesNovos(@Query('criar') criar?: string) {
+    return this.service.detectarClientesNovos(criar === '1' || criar === 'true');
+  }
+
   /** BACKFILL por-documento — reconcilia todos os comprovantes já ingeridos (fecha o histórico). */
   @Public()
   @Get('reconciliar-existentes')

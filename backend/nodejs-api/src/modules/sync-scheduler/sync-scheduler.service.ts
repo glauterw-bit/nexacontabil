@@ -38,6 +38,7 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   private reconGlobalFeita = false;
   private reconGlobalResultado: any = null;
   private carteiraRealinhada = false;
+  private jobsRetomados = false;
   private appScanIndisponivel = false; // desliga o scan app-only no boot se faltar permissão Azure
 
   constructor(
@@ -462,6 +463,18 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   }
   reconciliarCrawlStatus() { return this.jobStatus('reconciliar-crawl'); }
 
+  /** CLIENTES NOVOS: pasta nova em "Empresas Ativas" → cadastro automático + calendário. */
+  async detectarClientesNovos(criar = false) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'sem conexão OneDrive' };
+    const r: any = await this.onedrive.detectarClientesNovos(conn.id, { criar });
+    if ((r?.criados ?? 0) > 0) {
+      // gera o calendário fiscal do ano p/ os recém-criados (garantirAno só cria p/ quem não tem)
+      await this.fiscalCalendar.garantirAno(new Date().getFullYear()).catch(() => undefined);
+    }
+    return r;
+  }
+
   /** BACKFILL por-documento: reconcilia TODOS os comprovantes já ingeridos (fecha o histórico). */
   async reconciliarExistentesGlobal() {
     const r = await this.runJob('reconciliar-existentes', async () => {
@@ -851,6 +864,19 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       if (!this.carteiraRealinhada) {
         await passo('realinharCarteira', () => this.analise.realinharCarteira());
         this.carteiraRealinhada = true;
+      }
+      // 0b-3. CLIENTES NOVOS (todo ciclo): pasta nova em "Empresas Ativas" vira cliente
+      //       cadastrado + calendário do ano na hora. capturaInicial pega na sequência.
+      await passo('clientesNovos', () => this.detectarClientesNovos(true));
+      // 0b-4. RETOMA JOBS que um deploy matou (1x por boot): o crawl é idempotente,
+      //       então 'interrompido' → re-dispara em background de onde a base ficou.
+      if (!this.jobsRetomados) {
+        this.jobsRetomados = true;
+        await passo('retomarJobs', async () => {
+          const st: any = await this.jobStatus('reconciliar-crawl');
+          if (st?.status === 'interrompido') { this.reconciliarCrawlGlobal([2025, 2026]).catch(() => undefined); return { retomado: 'reconciliar-crawl' }; }
+          return { retomado: null };
+        });
       }
       // 0c. RECONCILIAÇÃO GLOBAL (1x, EM BACKGROUND — não bloqueia o ciclo): busca cada
       //     tipo de comprovante no Drive inteiro e casa por tipo+competência (2024/25/26).

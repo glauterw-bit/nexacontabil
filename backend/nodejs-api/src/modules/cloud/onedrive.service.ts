@@ -1013,6 +1013,49 @@ export class OneDriveService {
    * inativos por não estarem na planilha; mantém fora as pastas-lixo (sem código) e as de
    * "Empresas Inativas". Também vincula/atualiza o itemId da pasta.
    */
+  /**
+   * DETECTA CLIENTES NOVOS — pastas reais em "Empresas Ativas" (código "NNN -") que NÃO
+   * existem no cadastro. Com criar=true, CADASTRA na hora: CNPJ provisório determinístico
+   * (cnpjFromItem — mesmo itemId → mesmo CNPJ, sem duplicar), regime da pasta,
+   * clienteDesde = hoje (meses anteriores viram isentos pelo manterIsencaoInicio).
+   * O resto do pipeline já cuida: capturaInicial (1ª varredura), sefazInferirCnpj (CNPJ
+   * real via XML), cadastroOficial (planilha). Sem responsável → aparece p/ o gestor atribuir.
+   */
+  async detectarClientesNovos(connectionId: string, opts?: { criar?: boolean }) {
+    const cart: any = await this.getCarteira(connectionId);
+    if (cart.erro || !cart.clientes?.length) return { erro: cart.erro ?? 'carteira vazia', novos: [] };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const reais = cart.clientes.filter((c: any) => c.ativo && c.codigo);
+    const empresas = await this.prisma.company.findMany({ select: { clienteCodigo: true, name: true, sharepointItemId: true } });
+    const temItem = new Set(empresas.map((e) => e.sharepointItemId).filter(Boolean));
+    const temCod = new Set(empresas.map((e) => String(e.clienteCodigo || '')).filter(Boolean));
+    const temNome = new Set(empresas.map((e) => norm(e.name)));
+    const novos = reais.filter((f: any) => !temItem.has(f.itemId) && !temCod.has(String(f.codigo)) && !temNome.has(norm(f.nome)));
+
+    const regimeMap: Record<string, string> = {
+      'Simples Nacional': 'SIMPLES_NACIONAL', 'Lucro Presumido': 'LUCRO_PRESUMIDO',
+      'Lucro Real': 'LUCRO_REAL', 'MEI': 'MEI', 'Não identificado': 'SIMPLES_NACIONAL',
+    };
+    let criados = 0, erros = 0;
+    if (opts?.criar) {
+      for (const f of novos) {
+        try {
+          await this.prisma.company.create({
+            data: {
+              name: f.nome, cnpj: cnpjFromItem(f.itemId), taxRegime: regimeMap[f.regime] ?? 'SIMPLES_NACIONAL',
+              active: true, clienteCodigo: String(f.codigo),
+              sharepointItemId: f.itemId, sharepointDriveId: f.driveId,
+              clienteDesde: new Date(),
+            },
+          });
+          criados++;
+          this.logger.log(`cliente NOVO cadastrado da pasta: ${f.codigo} - ${f.nome}`);
+        } catch { erros++; }
+      }
+    }
+    return { pastasReais: reais.length, detectados: novos.length, criados, erros, novos: novos.slice(0, 30).map((f: any) => ({ codigo: f.codigo, nome: f.nome, regime: f.regime })) };
+  }
+
   async realinharPelaCarteira(connectionId: string) {
     const cart: any = await this.getCarteira(connectionId);
     if (cart.erro || !cart.clientes?.length) return { erro: cart.erro ?? 'carteira vazia' };
