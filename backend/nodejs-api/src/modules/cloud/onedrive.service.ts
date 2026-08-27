@@ -1056,6 +1056,49 @@ export class OneDriveService {
     return { pastasReais: reais.length, detectados: novos.length, criados, erros, novos: novos.slice(0, 30).map((f: any) => ({ codigo: f.codigo, nome: f.nome, regime: f.regime })) };
   }
 
+  /**
+   * DETECTA CLIENTES QUE SAÍRAM — espelho do detectarClientesNovos. Cliente ATIVO no
+   * cadastro cuja pasta está EXPLICITAMENTE em "Empresas Inativas" → inativa.
+   * REGRA DE SEGURANÇA: só inativa com match EXPLÍCITO na lista de inativas (por itemId,
+   * código ou nome). Pasta que simplesmente não apareceu na varredura (throttle, permissão,
+   * site fora do ar) NUNCA inativa ninguém — silêncio não é prova de saída.
+   */
+  async detectarClientesSaidos(connectionId: string, opts?: { aplicar?: boolean }) {
+    const cart: any = await this.getCarteira(connectionId);
+    if (cart.erro || !cart.clientes?.length) return { erro: cart.erro ?? 'carteira vazia', saidos: [] };
+    const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const inativas = cart.clientes.filter((c: any) => !c.ativo);
+    const ativas = cart.clientes.filter((c: any) => c.ativo);
+    // guarda-chuva: se a varredura não enxergou NENHUMA pasta ativa, algo está errado — aborta
+    if (!ativas.length) return { erro: 'varredura sem pastas ativas — abortado por segurança', saidos: [] };
+
+    const inatItem = new Set(inativas.map((f: any) => f.itemId).filter(Boolean));
+    const inatCod = new Set(inativas.filter((f: any) => f.codigo).map((f: any) => String(f.codigo)));
+    const inatNome = new Set(inativas.map((f: any) => norm(f.nome)));
+    // quem está em ATIVAS não pode ser inativado (pasta duplicada nos dois sites → fica ativo)
+    const ativItem = new Set(ativas.map((f: any) => f.itemId).filter(Boolean));
+    const ativCod = new Set(ativas.filter((f: any) => f.codigo).map((f: any) => String(f.codigo)));
+    const ativNome = new Set(ativas.map((f: any) => norm(f.nome)));
+
+    const empresas = await this.prisma.company.findMany({ where: { active: true }, select: { id: true, name: true, clienteCodigo: true, sharepointItemId: true } });
+    const saidos = empresas.filter((c) => {
+      const cod = String(c.clienteCodigo || ''); const nm = norm(c.name);
+      const naAtivas = (c.sharepointItemId && ativItem.has(c.sharepointItemId)) || (cod && ativCod.has(cod)) || ativNome.has(nm);
+      if (naAtivas) return false;
+      return (c.sharepointItemId && inatItem.has(c.sharepointItemId)) || (cod && inatCod.has(cod)) || inatNome.has(nm);
+    });
+
+    let inativados = 0;
+    if (opts?.aplicar) {
+      for (const c of saidos) {
+        await this.prisma.company.update({ where: { id: c.id }, data: { active: false } }).catch(() => undefined);
+        inativados++;
+        this.logger.log(`cliente SAIU (pasta em Empresas Inativas): ${c.clienteCodigo} - ${c.name}`);
+      }
+    }
+    return { pastasInativas: inativas.length, detectados: saidos.length, inativados, saidos: saidos.slice(0, 30).map((c) => ({ codigo: c.clienteCodigo, nome: c.name })) };
+  }
+
   async realinharPelaCarteira(connectionId: string) {
     const cart: any = await this.getCarteira(connectionId);
     if (cart.erro || !cart.clientes?.length) return { erro: cart.erro ?? 'carteira vazia' };

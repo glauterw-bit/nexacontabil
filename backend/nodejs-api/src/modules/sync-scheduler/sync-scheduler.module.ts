@@ -227,6 +227,13 @@ class SyncSchedulerController {
     return this.service.detectarClientesNovos(criar === '1' || criar === 'true');
   }
 
+  /** CLIENTES QUE SAÍRAM — pasta em "Empresas Inativas". ?aplicar=1 inativa o cadastro. */
+  @Public()
+  @Get('clientes-saidos')
+  clientesSaidos(@Query('aplicar') aplicar?: string) {
+    return this.service.detectarClientesSaidos(aplicar === '1' || aplicar === 'true');
+  }
+
   /** BACKFILL por-documento — reconcilia todos os comprovantes já ingeridos (fecha o histórico). */
   @Public()
   @Get('reconciliar-existentes')

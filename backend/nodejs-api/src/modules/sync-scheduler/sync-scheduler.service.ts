@@ -475,6 +475,13 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     return r;
   }
 
+  /** CLIENTES QUE SAÍRAM: pasta em "Empresas Inativas" → inativa o cadastro. */
+  async detectarClientesSaidos(aplicar = false) {
+    const conn = await this.prisma.cloudConnection.findFirst({ where: { provider: 'microsoft_onedrive', active: true }, orderBy: { createdAt: 'desc' } });
+    if (!conn) return { erro: 'sem conexão OneDrive' };
+    return this.onedrive.detectarClientesSaidos(conn.id, { aplicar });
+  }
+
   /** BACKFILL por-documento: reconcilia TODOS os comprovantes já ingeridos (fecha o histórico). */
   async reconciliarExistentesGlobal() {
     const r = await this.runJob('reconciliar-existentes', async () => {
@@ -868,6 +875,8 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       // 0b-3. CLIENTES NOVOS (todo ciclo): pasta nova em "Empresas Ativas" vira cliente
       //       cadastrado + calendário do ano na hora. capturaInicial pega na sequência.
       await passo('clientesNovos', () => this.detectarClientesNovos(true));
+      // 0b-3b. CICLO DE VIDA (espelho): pasta movida p/ "Empresas Inativas" → inativa o cliente.
+      await passo('clientesSaidos', () => this.detectarClientesSaidos(true));
       // 0b-4. RETOMA JOBS que um deploy matou (1x por boot): o crawl é idempotente,
       //       então 'interrompido' → re-dispara em background de onde a base ficou.
       if (!this.jobsRetomados) {
