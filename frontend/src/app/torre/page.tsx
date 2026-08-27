@@ -12,7 +12,7 @@ type Panorama = {
   competencia: string;
   ehMesCorrente: boolean;
   pulso: { docsHoje: number; docs2026: number; driveLidoHaMin: number; totalClientes: number };
-  kpis: { obrigVencidas: number; obrigVencem7: number; obrigAVencer: number; obrigEntregues: number; obrigNoPrazo: number; obrigTotal: number; obrigPortal: number; pctEntrega: number; pctNoPrazo: number; semDocMes: number; semResponsavel: number; cnpjProvisorio: number };
+  kpis: { obrigVencidas: number; obrigVencem7: number; obrigAVencer: number; obrigEntregues: number; obrigNoPrazo: number; obrigTotal: number; obrigPortal: number; obrigDocumentais: number; pctEntrega: number; pctNoPrazo: number; semDocMes: number; semResponsavel: number; cnpjProvisorio: number };
   insights: { nivel: string; titulo: string; texto: string; rota?: string }[];
 };
 type Desemp = { ano: number; analistas: { responsavel: string; clientes: number; entregues: number; devidas: number; taxa: number; atrasados: number }[] };
@@ -153,7 +153,7 @@ export default function Torre() {
           <Ring pct={k?.pctNoPrazo ?? 0} tone={toneTaxa(k?.pctNoPrazo ?? 0)} />
           <div className="tc-hero-ring-txt">
             <b>{ehAtual ? 'Sob controle no mês' : 'Entregue no mês'}</b>
-            <small><Num value={k?.obrigEntregues ?? 0} /> entregues de {k?.obrigTotal ?? 0}</small>
+            <small><Num value={k?.obrigEntregues ?? 0} /> entregues de {k?.obrigDocumentais ?? k?.obrigTotal ?? 0} que exigem comprovante</small>
             <div className="tc-breakdown">
               <span className="b-ok">● {k?.obrigEntregues ?? 0} entregue</span>
               {ehAtual && <span className="b-av">● {k?.obrigAVencer ?? 0} a vencer</span>}

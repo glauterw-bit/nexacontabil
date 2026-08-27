@@ -1276,6 +1276,7 @@ export class PaineisService {
       },
       kpis: {
         obrigVencidas, obrigVencem7, obrigAVencer, obrigEntregues, obrigNoPrazo, obrigTotal, obrigPortal,
+        obrigDocumentais: baseProva,   // base HONESTA do %: só o que gera comprovante rastreável
         pctEntrega, pctNoPrazo,
         semDocMes, semResponsavel, cnpjProvisorio,
       },
