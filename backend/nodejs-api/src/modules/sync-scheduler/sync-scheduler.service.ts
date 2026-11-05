@@ -28,6 +28,11 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
   private readonly logger = new Logger('SyncScheduler');
   private timer: NodeJS.Timeout | null = null;
   private running = false;
+  private runningSince: Date | null = null;
+  private watchdog: NodeJS.Timeout | null = null;
+  /** Teto de duração de um ciclo. Passou disso, a trava é considerada MORTA (promise
+   *  pendurada numa chamada de rede sem timeout) e o pipeline é reativado. */
+  private readonly CICLO_MAX_MS = 25 * 60_000;
   private lastRun: any = null;
   private proximaEm: Date | null = null;
   private lastAuditYmd: string | null = null;
@@ -752,7 +757,8 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
     }
     // primeiro ciclo 90s após o boot (deixa o app estabilizar); o loop se reagenda sozinho
     this.agendarProximo(90_000);
-    this.logger.log('Sincronização agendada ativa — cadência adaptativa (acelera no backfill)');
+    this.iniciarWatchdog();
+    this.logger.log('Sincronização agendada ativa — cadência adaptativa (acelera no backfill) + watchdog');
   }
 
   // ─── JOBS PERSISTENTES (P0.2): estado no DB — sobrevive a deploy/restart ───
@@ -791,6 +797,31 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
 
   onModuleDestroy() {
     if (this.timer) clearTimeout(this.timer);
+    if (this.watchdog) clearInterval(this.watchdog);
+  }
+
+  /**
+   * GUARDA-VIDA do auto-piloto. O reagendamento vive no `finally` do ciclo, então um erro
+   * é tolerado — mas uma promise que NUNCA resolve (fetch preso num socket morto) impede o
+   * `finally` de rodar: o timer nunca é rearmado e a trava de sobreposição barra todo ciclo
+   * seguinte. Foi exatamente o que travou a operação de 23/09 a 04/11/2026 em silêncio.
+   * Este watchdog checa a cada 5 min e reativa o pipeline quando ele parou de andar.
+   */
+  private iniciarWatchdog() {
+    if (this.watchdog) clearInterval(this.watchdog);
+    this.watchdog = setInterval(() => {
+      if (!this.enabled) return;
+      const travadoMs = this.running && this.runningSince ? Date.now() - this.runningSince.getTime() : 0;
+      const atrasadoMs = !this.running && this.proximaEm ? Date.now() - this.proximaEm.getTime() : 0;
+      if (travadoMs > this.CICLO_MAX_MS) {
+        this.logger.error(`watchdog: ciclo travado há ${Math.round(travadoMs / 60000)} min — reativando o pipeline`);
+        this.runCycle('watchdog').catch(() => undefined);
+      } else if (atrasadoMs > 5 * 60_000) {
+        this.logger.error(`watchdog: próximo ciclo atrasado ${Math.round(atrasadoMs / 60000)} min (timer perdido) — reagendando`);
+        this.agendarProximo(1_000);
+      }
+    }, 5 * 60_000);
+    this.watchdog.unref?.();
   }
 
   /** Reagenda o próximo ciclo (setTimeout único; sem sobreposição — só arma após terminar). */
@@ -831,6 +862,8 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
       cadenciaAtualMin: (this.aceleradoAgora ? this.BACKFILL_DELAY_MS : this.intervalMs) / 60000,
       backfillAcelerado: this.aceleradoAgora,
       executandoAgora: this.running,
+      executandoHaMin: this.running && this.runningSince ? Math.round((Date.now() - this.runningSince.getTime()) / 60000) : null,
+      tetoCicloMin: this.CICLO_MAX_MS / 60000,
       ultimaExecucao: this.lastRun,
       proximaEm: this.running ? null : this.proximaEm,
     };
@@ -838,8 +871,15 @@ export class SyncSchedulerService implements OnApplicationBootstrap, OnModuleDes
 
   /** Um ciclo completo de sincronização. Guardado contra sobreposição. */
   async runCycle(origem: string) {
-    if (this.running) return { skipped: true, motivo: 'ciclo anterior ainda em execução' };
+    if (this.running) {
+      // Trava auto-curativa: um ciclo que passou do teto está TRAVADO (já congelou a
+      // operação por 42 dias em set/2026). Libera e segue em vez de bloquear pra sempre.
+      const travadoMs = this.runningSince ? Date.now() - this.runningSince.getTime() : 0;
+      if (travadoMs < this.CICLO_MAX_MS) return { skipped: true, motivo: 'ciclo anterior ainda em execução' };
+      this.logger.error(`ciclo anterior TRAVADO há ${Math.round(travadoMs / 60000)} min — liberando a trava e seguindo`);
+    }
     this.running = true;
+    this.runningSince = new Date();
     const startedAt = new Date();
     const competencia = startedAt.toISOString().slice(0, 7);
     const resultado: any = { origem, competencia, startedAt: startedAt.toISOString() };
